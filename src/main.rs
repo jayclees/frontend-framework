@@ -40,11 +40,19 @@ impl Tokenizer {
             end: self.cursor,
             r#type,
         });
+    }
+
+    pub fn push_token_pop_state(&mut self, r#type: TokenType) {
+        self.push_token(r#type);
         self.pop_state();
     }
 
     fn err_unexpected(&self, char: char) {
-        panic!(r#"Unexpected token "{char}"."#);
+        dbg!(&self.tokens);
+        panic!(
+            r#"Unexpected token "{}" at line: {}, column: {}."#,
+            char, self.line, self.column
+        );
     }
 
     fn err_eof(&self) {
@@ -58,7 +66,8 @@ impl Tokenizer {
         let _attr_id_reg = Regex::new(r#"\A[A-Z][a-zA-Z]\z"#).unwrap();
         let _newline_reg = Regex::new(r#"\n"#).unwrap();
 
-        // todo create method to attempt to recover from unexpected token and keep going?
+        // todo Create method to attempt to recover from unexpected token and keep going? Recovery
+        // todo method will depend on what state it is currently in and the state history.
         for (cursor, char) in string.chars().enumerate() {
             self.cursor = cursor;
 
@@ -105,7 +114,7 @@ impl Tokenizer {
                 InLineComment => {
                     // ignore everything until new line
                     if char == '\n' {
-                        self.push_token(LineComment(self.buf.clone()));
+                        self.push_token_pop_state(LineComment(self.buf.clone()));
                     } else {
                         self.buf.push(char);
                     }
@@ -117,8 +126,10 @@ impl Tokenizer {
                     // allow numbers once first letter is identified as an ascii letter
                     if char.is_ascii_alphanumeric() {
                         self.buf.push(char);
+                        // todo this is wrong. we need to check the next char in this char iteration
+                        // and push token/pop state.
                     } else if char.is_whitespace() || char == '[' || char == '{' {
-                        self.push_token(BlockIdentifier(self.buf.clone()));
+                        self.push_token_pop_state(BlockIdentifier(self.buf.clone()));
                         self.start_state(ParsedBlockIdentifier, Some(char));
                     } else {
                         self.err_unexpected(char);
@@ -128,10 +139,12 @@ impl Tokenizer {
                 }
                 ParsedBlockIdentifier => {
                     if !char.is_whitespace() && char == '{' {
-                        self.push_token(OpenCurly);
+                        self.push_token_pop_state(OpenCurly);
                         self.start_state(InBlock, None);
                     } else if !char.is_whitespace() && char == '[' {
-                        self.start_state(ParsingDirective, None);
+                        self.push_token(DirectiveOpen);
+                        self.start_state(InDirective, None);
+                        self.buf.clear();
                     } else if !char.is_whitespace() && char == '@' {
                         let next = string.chars().nth(cursor + 1);
 
@@ -145,16 +158,14 @@ impl Tokenizer {
                         } else {
                             self.err_unexpected(char);
                         }
-
                     } else {
                         self.err_unexpected(char);
                     }
-                    // todo expect optional control flow in square brackets after block id?
                 }
                 InBlock => {
-                    // expect attr id or block id or event id
+                    // expect attr id or block id
                     if char.is_ascii_alphabetic() {
-                        self.start_state(ParsingAttrIdentifier, Some(char));
+                        self.start_state(ParsingIdentifier, Some(char));
                     }
                 }
                 ParsingIdentifier => {
@@ -175,13 +186,34 @@ impl Tokenizer {
                 ParsedEventListener => {
                     // expect function call definition or some kind of expression that does something to the app state
                 }
-                ParsingDirective => {
-                    if char.is_ascii_alphabetic() {
-                        
+                InDirective => {
+                    if !char.is_whitespace() && char.is_ascii_alphabetic() {
+                        self.start_state(ParsingDirectiveIdentifier, Some(char));
+                    } else if !char.is_whitespace() {
+                        self.err_unexpected(char);
                     }
-                    // close on close bracket
                 }
-                ParsedDirective => {
+                ParsingDirectiveIdentifier => {
+                    if char.is_ascii_alphabetic() {
+                        self.buf.push(char);
+
+
+                    } else if char == ':' {
+                        self.push_token_pop_state(DirectiveIdentifier(self.buf.clone()));
+                        self.buf.push(char);
+                        dbg!(&self.tokens);
+                        dbg!(&self.buf);
+                        std::process::exit(1);
+                        // start state based on directive type? or buffer everything until
+                        // bracket close and hand off to directive value tokenizer?
+                    } else if char == ']' {
+                        //
+                    }
+
+                    // directives might be blank?
+                    // colon for value
+                }
+                ParsedDirectiveIdentifier => {
                     // expect function call definition or some kind of expression that does something to the app state
                 }
                 InDblQuoteUnescaped => {
@@ -219,8 +251,9 @@ enum State {
     ParsingEventListener,
     ParsedEventListener,
 
-    ParsingDirective,
-    ParsedDirective,
+    InDirective,
+    ParsingDirectiveIdentifier,
+    ParsedDirectiveIdentifier,
 
     InDblQuoteUnescaped,
     InDblQuoteEscaped,
@@ -245,74 +278,10 @@ enum TokenType {
     OpenCurly,
     CloseCurly,
     Expression,
-}
-
-impl TokenType {
-    // fn expected(&self) -> Vec<TokenType> {
-    //     match &self {
-    //         BlockIdentifier(_) => vec![OpenCurly],
-    //         AttrIdentifier(_) => vec![Colon],
-    //         Colon => vec![Expression, StringExpr("".to_owned())],
-    //         OpenCurly => vec![BlockIdentifier("".to_owned()), AttrIdentifier("".to_owned()), CloseCurly],
-    //         CloseCurly => vec![BlockIdentifier("".to_owned())],
-    //         StringExpr(_) | Expression => {
-    //             vec![AttrIdentifier("".to_owned()), BlockIdentifier("".to_owned())]
-    //         }
-    //     }
-    // }
-    //
-    // fn expects(&self, token: TokenType) -> bool {
-    //     for expected in self.expected() {
-    //         if expected.types_match(&token) {
-    //             return true;
-    //         }
-    //     }
-    //     false
-    // }
-
-    fn types_match(&self, token: &TokenType) -> bool {
-        match self {
-            BlockIdentifier(_) => {
-                if let BlockIdentifier(_) = token {
-                    true
-                } else {
-                    false
-                }
-            }
-            AttrIdentifier(_) => {
-                if let AttrIdentifier(_) = token {
-                    true
-                } else {
-                    false
-                }
-            }
-            StringExpr(_) => {
-                if let StringExpr(_) = token {
-                    true
-                } else {
-                    false
-                }
-            }
-            LineComment(_) => {
-                if let LineComment(_) = token {
-                    true
-                } else {
-                    false
-                }
-            }
-            BlockComment(_) => {
-                if let BlockComment(_) = token {
-                    true
-                } else {
-                    false
-                }
-            }
-            Colon => token == &Colon,
-            OpenCurly => token == &OpenCurly,
-            CloseCurly => token == &CloseCurly,
-            Expression => token == &Expression,
-        }
-    }
+    DirectiveOpen,
+    DirectiveClose,
+    DirectiveIdentifier(String),
+    DirectiveColon,
 }
 
 struct Block {
