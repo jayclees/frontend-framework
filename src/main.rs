@@ -8,8 +8,12 @@ use std::fs::read_to_string;
 #[derive(Debug)]
 struct Tokenizer {
     state_history: Vec<State>,
+    cursor: usize,
     line: usize,
     column: usize,
+    buf: String,
+    buf_start: Option<usize>,
+    tokens: Vec<Token>,
 }
 
 impl Tokenizer {
@@ -17,18 +21,38 @@ impl Tokenizer {
         self.state_history.last().unwrap()
     }
 
-    pub fn tokenize(&mut self) -> Vec<Token> {
-        let mut tokens: Vec<Token> = vec![];
+    pub fn start_state(&mut self, state: State, starting_char: Option<char>) {
+        self.state_history.push(state);
+        if starting_char.is_some() {
+            self.buf.push(starting_char.unwrap());
+            self.buf_start = Some(self.cursor);
+        }
+    }
+
+    pub fn pop_state(&mut self) {
+        self.buf.clear();
+        self.state_history.pop();
+    }
+
+    pub fn push_token(&mut self, r#type: TokenType) {
+        self.tokens.push(Token {
+            start: self.buf_start.expect("buf_start should be set."),
+            end: self.cursor,
+            r#type,
+        });
+        self.pop_state();
+    }
+
+    pub fn tokenize(&mut self) -> &Vec<Token> {
         let string = read_to_string("app/root.app").unwrap();
-        let block_id_reg = Regex::new(r#"\A[A-Z][a-zA-Z]\z"#).unwrap();
-        let attr_id_reg = Regex::new(r#"\A[A-Z][a-zA-Z]\z"#).unwrap();
-        let newline_reg = Regex::new(r#"\n"#).unwrap();
-        let mut buf = String::new();
-        // todo remove initial 0. this was set to satisfy compiler before implementation was complete
-        let mut buf_start: usize = 0;
+        let _block_id_reg = Regex::new(r#"\A[A-Z][a-zA-Z]\z"#).unwrap();
+        let _attr_id_reg = Regex::new(r#"\A[A-Z][a-zA-Z]\z"#).unwrap();
+        let _newline_reg = Regex::new(r#"\n"#).unwrap();
 
         // todo create method to attempt to recover from unexpected token and keep going?
         for (cursor, char) in string.chars().enumerate() {
+            self.cursor = cursor;
+
             if char == '\n' {
                 self.line += 1;
                 self.column = 0;
@@ -38,9 +62,8 @@ impl Tokenizer {
 
             match self.state() {
                 Start => {
-                    if char.is_alphabetic() {
-                        buf.push(char);
-                        self.state_history.push(ParsingBlockIdentifier)
+                    if char.is_ascii_alphabetic() {
+                        self.start_state(ParsingBlockIdentifier, Some(char));
                     } else if char.is_whitespace() {
                         // do nothing
                     } else if char == '/' {
@@ -51,22 +74,16 @@ impl Tokenizer {
                         }
 
                         if next.unwrap() == '/' {
-                            self.state_history.push(InLineComment);
-                            buf.push(char);
-                            buf_start = cursor;
+                            self.start_state(InLineComment, Some(char));
                         } else if next.unwrap() == '*' {
-                            self.state_history.push(InBlockComment);
-                            buf.push(char);
-                            buf_start = cursor;
+                            self.start_state(InBlockComment, Some(char));
                         } else {
-                            self.panic("Unexpected token.")
+                            self.panic(format!(r#"Unexpected token "{char}"."#).as_str());
                         }
                     } else if char == '#' {
-                        self.state_history.push(InLineComment);
-                        buf.push(char);
-                        buf_start = cursor;
+                        self.start_state(InLineComment, Some(char));
                     } else {
-                        self.panic("Unexpected token.");
+                        self.panic(format!(r#"Unexpected token "{char}"."#).as_str());
                     }
                     // expect block identifier or comment
                 }
@@ -76,32 +93,38 @@ impl Tokenizer {
                 InLineComment => {
                     // ignore everything until new line
                     if char == '\n' {
-                        let token = Token {
-                            start: buf_start,
-                            end: cursor,
-                            r#type: LineComment(buf.clone()),
-                        };
-                        tokens.push(token);
-                        buf.clear();
-                        self.state_history.pop();
+                        self.push_token(LineComment(self.buf.clone()));
                     } else {
-                        buf.push(char);
+                        self.buf.push(char);
                     }
                 }
                 InBlockComment => {
                     //
                 }
                 ParsingBlockIdentifier => {
+                    // allow numbers once first letter is identified as an ascii letter
+                    if char.is_ascii_alphanumeric() {
+                        self.buf.push(char);
+                    } else if char.is_whitespace() || char == '{' {
+                        self.push_token(BlockIdentifier(self.buf.clone()));
+                        self.start_state(ParsedBlockIdentifier, Some(char));
+                    } else {
+                        self.panic(format!("Unexpected token {char}").as_str());
+                    }
                     // match char against regex
                     // terminate on whitespace or curly, append token
                 }
                 ParsedBlockIdentifier => {
+                    if ! char.is_whitespace() && char == '{' {
+                        self.push_token(OpenCurly);
+                        self.start_state(InBlock, None);
+                    } else {
+                        self.panic(format!("Unexpected token {char}").as_str());
+                    }
                     // todo expect optional control flow in square brackets after block id?
-                    // expect whitespace or open curly
-                    // enter into block scope on curly
                 }
                 InBlock => {
-                    // expect attr id or block id
+                    // expect attr id or block id or event id
                 }
                 ParsingAttrIdentifier => {
                     // terminate if whitespace or colon
@@ -128,10 +151,10 @@ impl Tokenizer {
             }
         }
 
-        tokens
+        &self.tokens
     }
 
-    fn panic(&self, msg: &'static str) {
+    fn panic(&self, msg: &str) {
         panic!("Line {}:{}: {}", self.line, self.column, msg)
     }
 }
@@ -267,8 +290,12 @@ enum BlockType {
 fn main() {
     let mut tokenizer = Tokenizer {
         state_history: vec![Start],
-        line: 0,
+        cursor: 0,
+        line: 1,
         column: 0,
+        buf: String::new(),
+        buf_start: None,
+        tokens: vec![],
     };
 
     let tokens = tokenizer.tokenize();
