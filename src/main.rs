@@ -1,3 +1,4 @@
+use std::cell::RefCell;
 use crate::State::*;
 use crate::TokenType::*;
 use regex::Regex;
@@ -31,6 +32,7 @@ impl Tokenizer {
 
     pub fn pop_state(&mut self) {
         self.buf.clear();
+        self.buf_start = Some(self.cursor);
         self.state_history.pop();
     }
 
@@ -59,6 +61,41 @@ impl Tokenizer {
         panic!("Unexpected end of file.");
     }
 
+    fn match_with_source(&self) {
+        let string = read_to_string("app/my-page.app").unwrap();
+        let mut string = RefCell::new(string.chars());
+        let mut highlighted = String::new();
+        let mut prev: Option<&Token> = None;
+        for token in self.tokens.iter().clone() {
+            let skip = if prev.is_some() {
+                token.start - prev.unwrap().end
+            } else {
+                0
+            };
+            let x = string.get_mut().skip(skip).take(token.end - token.start).collect::<String>();
+            match token.r#type {
+                BlockIdentifier(_) => {println!("BlockIdentifier: {x}");}
+                AttrIdentifier(_) => {println!("AttrIdentifier: {x}");}
+                StringExpr(_) => {println!("StringExpr: {x}");}
+                LineComment(_) => {println!("LineComment: {x}");}
+                BlockComment(_) => {println!("BlockComment: {x}");}
+                Colon => {println!("Colon: {x}");}
+                OpenCurly => {println!("OpenCurly: {x}");}
+                CloseCurly => {println!("CloseCurly: {x}");}
+                Expression => {println!("Expression: {x}");}
+                DirectiveOpen => {println!("DirectiveOpen: {x}");}
+                DirectiveClose => {println!("DirectiveClose: {x}");}
+                DirectiveIdentifier(_) => {println!("DirectiveIdentifier: {x}");}
+                DirectiveColon => {println!("DirectiveColon: {x}");}
+            }
+
+            // highlighted.push_str(format!("<span>{x}</span>").as_str());
+            prev = Some(token);
+        }
+
+        // println!("{highlighted}");
+    }
+
     pub fn tokenize(&mut self) -> &Vec<Token> {
         let string = read_to_string("app/my-page.app").unwrap();
         let mut skip: usize = 0;
@@ -68,7 +105,9 @@ impl Tokenizer {
 
         // todo Create method to attempt to recover from unexpected token and keep going? Recovery
         // todo method will depend on what state it is currently in and the state history.
+        let mut peekable = string.chars().peekable();
         for (cursor, char) in string.chars().enumerate() {
+            peekable.next();
             self.cursor = cursor;
 
             if char == '\n' {
@@ -88,25 +127,26 @@ impl Tokenizer {
                     if char.is_ascii_alphabetic() {
                         self.start_state(ParsingBlockIdentifier, Some(char));
                     } else if char == '/' {
-                        let next = string.chars().nth(cursor + 1);
+                        let next = peekable.peek();
 
                         if next.is_none() {
                             self.err_eof();
                         }
 
-                        if next.unwrap() == '/' {
+                        if next.unwrap() == &'/' {
                             self.start_state(InLineComment, Some(char));
-                        } else if next.unwrap() == '*' {
+                        } else if next.unwrap() == &'*' {
                             self.start_state(InBlockComment, Some(char));
                         } else {
                             self.err_unexpected(char);
                         }
                     } else if char == '#' {
                         self.start_state(InLineComment, Some(char));
-                    } else {
+                    } else if !char.is_whitespace() {
                         self.err_unexpected(char);
+                    } else {
+                        // ignore
                     }
-                    // expect block identifier or comment
                 }
                 DefaultState => {
                     //
@@ -120,7 +160,11 @@ impl Tokenizer {
                     }
                 }
                 InBlockComment => {
-                    //
+                    if self.buf.ends_with("*/") {
+                        self.push_token_pop_state(BlockComment(self.buf.clone()));
+                    } else {
+                        self.buf.push(char);
+                    }
                 }
                 ParsingBlockIdentifier => {
                     // allow numbers once first letter is identified as an ascii letter
@@ -197,23 +241,32 @@ impl Tokenizer {
                     if char.is_ascii_alphabetic() {
                         self.buf.push(char);
 
-
+                        // let next = peekable.next().expect("Unexpected end of file.");
+                        // if !next.is_ascii_alphabetic() {
+                        //     self.push_token_pop_state(DirectiveIdentifier(self.buf.clone()));
+                        //     self.start_state(ParsedDirectiveIdentifier, None);
+                        // }
                     } else if char == ':' {
                         self.push_token_pop_state(DirectiveIdentifier(self.buf.clone()));
-                        self.buf.push(char);
-                        dbg!(&self.tokens);
-                        dbg!(&self.buf);
-                        std::process::exit(1);
+                        self.push_token(DirectiveColon);
+                        self.start_state(ParsedDirectiveIdentifier, None);
+                        // self.push_token_pop_state()
+                    } else if char == ']' {
+
+                    }
+                }
+                ParsedDirectiveIdentifier => {
+                    // directives might be blank?
+                    if char == ':' {
+                        self.push_token(DirectiveColon);
+                        // dbg!(&self.tokens);
+                        // dbg!(&self.buf);
+                        // std::process::exit(1);
                         // start state based on directive type? or buffer everything until
                         // bracket close and hand off to directive value tokenizer?
                     } else if char == ']' {
                         //
                     }
-
-                    // directives might be blank?
-                    // colon for value
-                }
-                ParsedDirectiveIdentifier => {
                     // expect function call definition or some kind of expression that does something to the app state
                 }
                 InDblQuoteUnescaped => {
@@ -225,6 +278,8 @@ impl Tokenizer {
                 }
             }
         }
+
+        self.match_with_source();
 
         &self.tokens
     }

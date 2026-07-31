@@ -1,5 +1,10 @@
 // this is a comment
 # and another comment
+/*
+hello
+*/
+
+    
 Page [extends: root] {
     title: "",
     description: "",
