@@ -1,9 +1,9 @@
 use super::tokenizer::State::*;
 use super::tokenizer::TokenType::*;
+use regex::Regex;
 use std::cell::RefCell;
 use std::fmt::{Display, Formatter};
 use std::fs::read_to_string;
-use regex::Regex;
 
 #[derive(Debug)]
 pub struct Tokenizer {
@@ -35,11 +35,13 @@ impl Tokenizer {
         self.state_history.last().unwrap()
     }
 
-    fn start_state(&mut self, state: State, starting_char: Option<char>) {
+    fn push_state(&mut self, state: State, starting_char: Option<char>) {
         self.state_history.push(state);
+        self.buf.clear();
+        self.buf_start = Some(self.cursor);
+
         if let Some(char) = starting_char {
             self.buf.push(char);
-            self.buf_start = Some(self.cursor);
         }
     }
 
@@ -53,10 +55,10 @@ impl Tokenizer {
         let start = self.buf_start.expect("buf_start should be set.");
         let end = self.cursor;
 
-        // if start == end {
-        //     dbg!(r#type, start, end);
-        //     panic!("Token should not be zero length.");
-        // }
+        if start == end {
+            dbg!(r#type, start, end);
+            panic!("Token should not be zero length.");
+        }
 
         self.tokens.push(Token { start, end, r#type });
     }
@@ -67,10 +69,14 @@ impl Tokenizer {
     }
 
     fn err_unexpected(&self, char: char) {
+        // todo provide expected tokens based on current tokenizer state
         dbg!(&self.tokens);
         panic!(
-            r#"Unexpected token "{}" at line: {}, column: {}."#,
-            char, self.line, self.column
+            r#"Unexpected token "{}" at line: {}, column: {}. State: "{}""#,
+            char,
+            self.line,
+            self.column,
+            self.state()
         );
     }
 
@@ -81,7 +87,7 @@ impl Tokenizer {
     fn match_with_source(&self) {
         let string = read_to_string("app/my-page.app").unwrap();
         let mut string = RefCell::new(string.chars());
-        let mut highlighted = String::new();
+        // let mut highlighted = String::new();
         let mut prev: Option<&Token> = None;
         for token in self.tokens.iter().clone() {
             let skip = if let Some(prev) = prev {
@@ -89,21 +95,26 @@ impl Tokenizer {
             } else {
                 0
             };
-            let x = string.get_mut().skip(skip).take(token.end - token.start).collect::<String>();
+            let x = string
+                .get_mut()
+                .skip(skip)
+                .take(token.end - token.start)
+                .collect::<String>();
             match token.r#type {
-                BlockIdentifier(_) => println!(r#"BlockIdentifier: "{x}""#),
-                AttrIdentifier(_) => println!(r#"AttrIdentifier: "{x}""#),
-                StringExpr(_) => println!(r#"StringExpr: "{x}""#),
-                LineComment(_) => println!(r#"LineComment: "{x}""#),
-                BlockComment(_) => println!(r#"BlockComment: "{x}""#),
-                Colon => println!(r#"Colon: "{x}""#),
-                OpenCurly => println!(r#"OpenCurly: "{x}""#),
-                CloseCurly => println!(r#"CloseCurly: "{x}""#),
-                Expression => println!(r#"Expression: "{x}""#),
-                DirectiveOpen => println!(r#"DirectiveOpen: "{x}""#),
-                DirectiveClose => println!(r#"DirectiveClose: "{x}""#),
-                DirectiveIdentifier(_) => println!(r#"DirectiveIdentifier: "{x}""#),
-                DirectiveColon => println!(r#"DirectiveColon: "{x}""#),
+                BlockIdentifier(_) => println!(r#"BlockIdentifier: '{x}'"#),
+                AttrIdentifier(_) => println!(r#"AttrIdentifier: '{x}'"#),
+                StringExpr(_) => println!(r#"StringExpr: '{x}'"#),
+                LineComment(_) => println!(r#"LineComment: '{x}'"#),
+                BlockComment(_) => println!(r#"BlockComment: '{x}'"#),
+                Colon => println!(r#"Colon: '{x}'"#),
+                BlockOpen => println!(r#"BlockOpen: '{x}'"#),
+                BlockClose => println!(r#"BlockClose: '{x}'"#),
+                Expression => println!(r#"Expression: '{x}'"#),
+                DirectiveOpen => println!(r#"DirectiveOpen: '{x}'"#),
+                DirectiveClose => println!(r#"DirectiveClose: '{x}'"#),
+                DirectiveIdentifier(_) => println!(r#"DirectiveIdentifier: '{x}'"#),
+                DirectiveColon => println!(r#"DirectiveColon: '{x}'"#),
+                DirectiveValue(_) => println!(r#"DirectiveValue: '{x}'"#),
             }
 
             // highlighted.push_str(format!("<span>{x}</span>").as_str());
@@ -142,7 +153,7 @@ impl Tokenizer {
             match self.state() {
                 Start => {
                     if char.is_ascii_alphabetic() {
-                        self.start_state(ParsingBlockIdentifier, Some(char));
+                        self.push_state(ParsingBlockIdentifier, Some(char));
                     } else if char == '/' {
                         let next = peekable.peek();
 
@@ -151,22 +162,19 @@ impl Tokenizer {
                         }
 
                         if next.unwrap() == &'/' {
-                            self.start_state(InLineComment, Some(char));
+                            self.push_state(InLineComment, Some(char));
                         } else if next.unwrap() == &'*' {
-                            self.start_state(InBlockComment, Some(char));
+                            self.push_state(InBlockComment, Some(char));
                         } else {
                             self.err_unexpected(char);
                         }
                     } else if char == '#' {
-                        self.start_state(InLineComment, Some(char));
+                        self.push_state(InLineComment, Some(char));
                     } else if !char.is_whitespace() {
                         self.err_unexpected(char);
                     } else {
                         // ignore
                     }
-                }
-                DefaultState => {
-                    //
                 }
                 InLineComment => {
                     // ignore everything until new line
@@ -191,7 +199,7 @@ impl Tokenizer {
                         // and push token/pop state.
                     } else if char.is_whitespace() || char == '[' || char == '{' {
                         self.push_token_pop_state(BlockIdentifier(self.buf.clone()));
-                        self.start_state(ParsedBlockIdentifier, Some(char));
+                        self.push_state(ParsedBlockIdentifier, Some(char));
                     } else {
                         self.err_unexpected(char);
                     }
@@ -199,34 +207,21 @@ impl Tokenizer {
                     // terminate on whitespace or curly, append token
                 }
                 ParsedBlockIdentifier => {
-                    if !char.is_whitespace() && char == '{' {
-                        self.push_token_pop_state(OpenCurly);
-                        self.start_state(InBlock, None);
-                    } else if !char.is_whitespace() && char == '[' {
-                        self.push_token(DirectiveOpen);
-                        self.start_state(InDirective, None);
-                        self.buf.clear();
-                    } else if !char.is_whitespace() && char == '@' {
-                        let next = string.chars().nth(cursor + 1);
-
-                        if next.is_none() {
-                            self.err_eof();
+                    // First start state, push token after to fix
+                    // off by one error (cursor was off by -1).
+                    if !char.is_whitespace() {
+                        match char {
+                            '[' => self.push_state(ParsingDirective, Some(char)),
+                            '{' => self.push_state(InBlock, Some(char)),
+                            '@' => self.push_state(ParsingEventListener, Some(char)),
+                            _ => self.err_unexpected(char),
                         }
-
-                        if next.unwrap() == '[' {
-                            self.start_state(ParsingEventListener, None);
-                            skip += 1; // the next char will be [, which we can skip
-                        } else {
-                            self.err_unexpected(char);
-                        }
-                    } else {
-                        self.err_unexpected(char);
                     }
                 }
                 InBlock => {
                     // expect attr id or block id
                     if char.is_ascii_alphabetic() {
-                        self.start_state(ParsingIdentifier, Some(char));
+                        self.push_state(ParsingIdentifier, Some(char));
                     }
                 }
                 ParsingIdentifier => {
@@ -247,9 +242,9 @@ impl Tokenizer {
                 ParsedEventListener => {
                     // expect function call definition or some kind of expression that does something to the app state
                 }
-                InDirective => {
+                ParsingDirective => {
                     if !char.is_whitespace() && char.is_ascii_alphabetic() {
-                        self.start_state(ParsingDirectiveIdentifier, Some(char));
+                        self.push_state(ParsingDirectiveIdentifier, Some(char));
                     } else if !char.is_whitespace() {
                         self.err_unexpected(char);
                     }
@@ -265,26 +260,61 @@ impl Tokenizer {
                         // }
                     } else if char == ':' {
                         self.push_token_pop_state(DirectiveIdentifier(self.buf.clone()));
-                        self.push_token(DirectiveColon);
-                        self.start_state(ParsedDirectiveIdentifier, None);
+                        self.push_state(ParsingDirectiveColon, Some(char));
                         // self.push_token_pop_state()
                     } else if char == ']' {
-
+                        self.push_token_pop_state(DirectiveIdentifier(self.buf.clone()));
+                        self.buf.push(char);
+                        self.push_state(ParsedDirectiveIdentifier, None);
                     }
                 }
                 ParsedDirectiveIdentifier => {
                     // directives might be blank?
-                    if char == ':' {
-                        self.push_token(DirectiveColon);
-                        // dbg!(&self.tokens);
-                        // dbg!(&self.buf);
-                        // std::process::exit(1);
-                        // start state based on directive type? or buffer everything until
-                        // bracket close and hand off to directive value tokenizer?
-                    } else if char == ']' {
-                        //
-                    }
+                    // if char == ':' {
+                    //     self.push_token_pop_state(DirectiveColon);
+                    //     self.start_state(ParsingDirectiveValue, None);
+                    //     // start state based on directive type? or buffer everything until
+                    //     // bracket close and hand off to directive value tokenizer?
+                    // } else if char == ']' {
+                    //     //
+                    // }
                     // expect function call definition or some kind of expression that does something to the app state
+                }
+                ParsingDirectiveColon => {
+                    if self.buf.as_str() != ":" {
+                        dbg!(&self.buf);
+                        panic!(
+                            "Error internal implementation. Should only have : in buffer at this point."
+                        );
+                    }
+
+                    self.push_token_pop_state(DirectiveColon);
+                    self.push_state(ParsingDirectiveValue, None);
+                }
+                ParsingDirectiveValue => {
+                    // for now just grab everything until close bracket
+                    if char == ']' {
+                        self.push_token_pop_state(DirectiveValue(self.buf.clone()));
+                        // State at this point should be ParsedBlockIdentifier, which we will also pop
+                        self.pop_state();
+                        self.push_state(ParsedDirective, Some(char));
+                    } else {
+                        self.buf.push(char);
+                    }
+
+                    // potentially create another tokenizer for directive values, parse based
+                    // on directive identifier. e.g. [if: expr], [for post in posts]
+                    // or create a generic (simple) expression tokenizer
+                }
+                ParsedDirective => {
+                    if self.buf.as_str() != "]" {
+                        dbg!(&self.buf);
+                        panic!(
+                            "Error internal implementation. Should only have : in buffer at this point."
+                        );
+                    }
+
+                    self.push_token_pop_state(DirectiveClose);
                 }
                 InDblQuoteUnescaped => {
                     // if char is dbl quote, exit current state into X state
@@ -296,6 +326,11 @@ impl Tokenizer {
             }
         }
 
+        // All states should have been popped, and we should be back to start
+        // if self.state() != &Start {
+        //     self.err_eof();
+        // }
+
         self.match_with_source();
 
         &self.tokens
@@ -305,7 +340,6 @@ impl Tokenizer {
 #[derive(Debug, PartialEq)]
 pub enum State {
     Start,
-    DefaultState,
     InLineComment,
     InBlockComment,
 
@@ -323,12 +357,45 @@ pub enum State {
     ParsingEventListener,
     ParsedEventListener,
 
-    InDirective,
+    ParsingDirective,
+    ParsedDirective,
     ParsingDirectiveIdentifier,
     ParsedDirectiveIdentifier,
+    ParsingDirectiveColon,
+    ParsingDirectiveValue,
 
     InDblQuoteUnescaped,
     InDblQuoteEscaped,
+}
+
+impl Display for State {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                Start => "Start",
+                InLineComment => "InLineComment",
+                InBlockComment => "InBlockComment",
+                ParsingBlockIdentifier => "ParsingBlockIdentifier",
+                ParsedBlockIdentifier => "ParsedBlockIdentifier",
+                InBlock => "InBlock",
+                ParsingIdentifier => "ParsingIdentifier",
+                ParsingAttrIdentifier => "ParsingAttrIdentifier",
+                ParsedAttrIdentifier => "ParsedAttrIdentifier",
+                ParsingEventListener => "ParsingEventListener",
+                ParsedEventListener => "ParsedEventListener",
+                ParsingDirective => "ParsingDirective",
+                ParsedDirective => "ParsedDirective",
+                ParsingDirectiveIdentifier => "ParsingDirectiveIdentifier",
+                ParsedDirectiveIdentifier => "ParsedDirectiveIdentifier",
+                ParsingDirectiveColon => "ParsingDirectiveColon",
+                ParsingDirectiveValue => "ParsingDirectiveValue",
+                InDblQuoteUnescaped => "InDblQuoteUnescaped",
+                InDblQuoteEscaped => "InDblQuoteEscaped",
+            }
+        )
+    }
 }
 
 #[derive(Debug)]
@@ -347,13 +414,14 @@ pub enum TokenType {
     LineComment(String),
     BlockComment(String),
     Colon,
-    OpenCurly,
-    CloseCurly,
+    BlockOpen,
+    BlockClose,
     Expression,
     DirectiveOpen,
     DirectiveClose,
     DirectiveIdentifier(String),
     DirectiveColon,
+    DirectiveValue(String),
 }
 
 impl Display for TokenType {
@@ -365,13 +433,14 @@ impl Display for TokenType {
             LineComment(str) => write!(f, "LineComment({str})"),
             BlockComment(str) => write!(f, "BlockComment({str})"),
             Colon => write!(f, "Colon"),
-            OpenCurly => write!(f, "OpenCurly"),
-            CloseCurly => write!(f, "CloseCurly"),
+            BlockOpen => write!(f, "BlockOpen"),
+            BlockClose => write!(f, "BlockClose"),
             Expression => write!(f, "Expression"),
             DirectiveOpen => write!(f, "DirectiveOpen"),
             DirectiveClose => write!(f, "DirectiveClose"),
             DirectiveIdentifier(_) => write!(f, "DirectiveIdentifier"),
             DirectiveColon => write!(f, "DirectiveColon"),
+            DirectiveValue(str) => write!(f, "DirectiveValue({str})"),
         }
     }
 }

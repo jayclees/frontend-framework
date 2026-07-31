@@ -4,7 +4,7 @@
 hello
 */
 
-    
+
 Page [extends: root] {
     title: "",
     description: "",
@@ -38,5 +38,6 @@ Page [extends: root] {
         CustomComponent {
             customAttribute:
         }
+        div {}
     }
 }
