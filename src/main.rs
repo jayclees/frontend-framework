@@ -1,10 +1,15 @@
+mod helper;
+mod tokenizer;
+
 use std::cell::RefCell;
 use crate::State::*;
 use crate::TokenType::*;
 use regex::Regex;
 use std::cmp::PartialEq;
 use std::collections::HashMap;
+use std::fmt::{Display, Formatter};
 use std::fs::read_to_string;
+use std::process::exit;
 
 #[derive(Debug)]
 struct Tokenizer {
@@ -24,8 +29,8 @@ impl Tokenizer {
 
     pub fn start_state(&mut self, state: State, starting_char: Option<char>) {
         self.state_history.push(state);
-        if starting_char.is_some() {
-            self.buf.push(starting_char.unwrap());
+        if let Some(char) = starting_char {
+            self.buf.push(char);
             self.buf_start = Some(self.cursor);
         }
     }
@@ -37,11 +42,15 @@ impl Tokenizer {
     }
 
     pub fn push_token(&mut self, r#type: TokenType) {
-        self.tokens.push(Token {
-            start: self.buf_start.expect("buf_start should be set."),
-            end: self.cursor,
-            r#type,
-        });
+        let start = self.buf_start.expect("buf_start should be set.");
+        let end = self.cursor;
+
+        if start == end {
+            dbg!(r#type, start, end);
+            panic!("Token should not be zero length.");
+        }
+
+        self.tokens.push(Token { start, end, r#type });
     }
 
     pub fn push_token_pop_state(&mut self, r#type: TokenType) {
@@ -67,26 +76,26 @@ impl Tokenizer {
         let mut highlighted = String::new();
         let mut prev: Option<&Token> = None;
         for token in self.tokens.iter().clone() {
-            let skip = if prev.is_some() {
-                token.start - prev.unwrap().end
+            let skip = if let Some(prev) = prev {
+                token.start - prev.end
             } else {
                 0
             };
             let x = string.get_mut().skip(skip).take(token.end - token.start).collect::<String>();
             match token.r#type {
-                BlockIdentifier(_) => {println!("BlockIdentifier: {x}");}
-                AttrIdentifier(_) => {println!("AttrIdentifier: {x}");}
-                StringExpr(_) => {println!("StringExpr: {x}");}
-                LineComment(_) => {println!("LineComment: {x}");}
-                BlockComment(_) => {println!("BlockComment: {x}");}
-                Colon => {println!("Colon: {x}");}
-                OpenCurly => {println!("OpenCurly: {x}");}
-                CloseCurly => {println!("CloseCurly: {x}");}
-                Expression => {println!("Expression: {x}");}
-                DirectiveOpen => {println!("DirectiveOpen: {x}");}
-                DirectiveClose => {println!("DirectiveClose: {x}");}
-                DirectiveIdentifier(_) => {println!("DirectiveIdentifier: {x}");}
-                DirectiveColon => {println!("DirectiveColon: {x}");}
+                BlockIdentifier(_) => println!("BlockIdentifier: {x}"),
+                AttrIdentifier(_) => println!("AttrIdentifier: {x}"),
+                StringExpr(_) => println!("StringExpr: {x}"),
+                LineComment(_) => println!("LineComment: {x}"),
+                BlockComment(_) => println!("BlockComment: {x}"),
+                Colon => println!("Colon: {x}"),
+                OpenCurly => println!("OpenCurly: {x}"),
+                CloseCurly => println!("CloseCurly: {x}"),
+                Expression => println!("Expression: {x}"),
+                DirectiveOpen => println!("DirectiveOpen: {x}"),
+                DirectiveClose => println!("DirectiveClose: {x}"),
+                DirectiveIdentifier(_) => println!("DirectiveIdentifier: {x}"),
+                DirectiveColon => println!("DirectiveColon: {x}"),
             }
 
             // highlighted.push_str(format!("<span>{x}</span>").as_str());
@@ -339,13 +348,33 @@ enum TokenType {
     DirectiveColon,
 }
 
+impl Display for TokenType {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match &self {
+            BlockIdentifier(str) => write!(f, "BlockIdentifier({str})"),
+            AttrIdentifier(str) => write!(f, "AttrIdentifier({str})"),
+            StringExpr(str) => write!(f, "StringExpr({str})"),
+            LineComment(str) => write!(f, "LineComment({str})"),
+            BlockComment(str) => write!(f, "BlockComment({str})"),
+            Colon => write!(f, "Colon"),
+            OpenCurly => write!(f, "OpenCurly"),
+            CloseCurly => write!(f, "CloseCurly"),
+            Expression => write!(f, "Expression"),
+            DirectiveOpen => write!(f, "DirectiveOpen"),
+            DirectiveClose => write!(f, "DirectiveClose"),
+            DirectiveIdentifier(_) => write!(f, "DirectiveIdentifier"),
+            DirectiveColon => write!(f, "DirectiveColon"),
+        }
+    }
+}
+
 struct Block {
     handle: String,
     r#type: BlockType,
     attributes: HashMap<String, String>,
-    html: String,              // must be one of these three, maybe turn into enum
-    text: String,              // must be one of these three, maybe turn into enum
-    children: Box<Vec<Block>>, // must be one of these three, maybe turn into enum
+    html: String,         // must be one of these three, maybe turn into enum
+    text: String,         // must be one of these three, maybe turn into enum
+    children: Vec<Block>, // must be one of these three, maybe turn into enum
 }
 
 enum BlockType {
