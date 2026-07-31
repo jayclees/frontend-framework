@@ -45,10 +45,10 @@ impl Tokenizer {
         let start = self.buf_start.expect("buf_start should be set.");
         let end = self.cursor;
 
-        if start == end {
-            dbg!(r#type, start, end);
-            panic!("Token should not be zero length.");
-        }
+        // if start == end {
+        //     dbg!(r#type, start, end);
+        //     panic!("Token should not be zero length.");
+        // }
 
         self.tokens.push(Token { start, end, r#type });
     }
@@ -83,19 +83,19 @@ impl Tokenizer {
             };
             let x = string.get_mut().skip(skip).take(token.end - token.start).collect::<String>();
             match token.r#type {
-                BlockIdentifier(_) => println!("BlockIdentifier: {x}"),
-                AttrIdentifier(_) => println!("AttrIdentifier: {x}"),
-                StringExpr(_) => println!("StringExpr: {x}"),
-                LineComment(_) => println!("LineComment: {x}"),
-                BlockComment(_) => println!("BlockComment: {x}"),
-                Colon => println!("Colon: {x}"),
-                OpenCurly => println!("OpenCurly: {x}"),
-                CloseCurly => println!("CloseCurly: {x}"),
-                Expression => println!("Expression: {x}"),
-                DirectiveOpen => println!("DirectiveOpen: {x}"),
-                DirectiveClose => println!("DirectiveClose: {x}"),
-                DirectiveIdentifier(_) => println!("DirectiveIdentifier: {x}"),
-                DirectiveColon => println!("DirectiveColon: {x}"),
+                BlockIdentifier(_) => println!(r#"BlockIdentifier: "{x}""#),
+                AttrIdentifier(_) => println!(r#"AttrIdentifier: "{x}""#),
+                StringExpr(_) => println!(r#"StringExpr: "{x}""#),
+                LineComment(_) => println!(r#"LineComment: "{x}""#),
+                BlockComment(_) => println!(r#"BlockComment: "{x}""#),
+                Colon => println!(r#"Colon: "{x}""#),
+                OpenCurly => println!(r#"OpenCurly: "{x}""#),
+                CloseCurly => println!(r#"CloseCurly: "{x}""#),
+                Expression => println!(r#"Expression: "{x}""#),
+                DirectiveOpen => println!(r#"DirectiveOpen: "{x}""#),
+                DirectiveClose => println!(r#"DirectiveClose: "{x}""#),
+                DirectiveIdentifier(_) => println!(r#"DirectiveIdentifier: "{x}""#),
+                DirectiveColon => println!(r#"DirectiveColon: "{x}""#),
             }
 
             // highlighted.push_str(format!("<span>{x}</span>").as_str());
