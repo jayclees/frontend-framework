@@ -5,7 +5,7 @@ hello
 */
 
 
-Page [extends: root] {
+Page [extends: root] [marker-directive] {
     title: "",
     description: "",
     body {

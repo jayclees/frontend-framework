@@ -47,8 +47,7 @@ impl Tokenizer {
     }
 
     fn pop_state(&mut self) {
-        self.buf.clear();
-        self.buf_start = Some(self.cursor);
+        self.clear_buffer();
         self.state_history.pop();
     }
 
@@ -67,6 +66,21 @@ impl Tokenizer {
     fn push_token_pop_state(&mut self, r#type: TokenType) {
         self.push_token(r#type);
         self.pop_state();
+    }
+
+    fn clear_buffer(&mut self) {
+        self.buf.clear();
+        self.buf_start = Some(self.cursor);
+    }
+
+    fn err_msg(&self, msg: String) {
+        panic!(
+            r#"Error: {} at line: {}, column: {}. State: "{}""#,
+            msg,
+            self.line,
+            self.column,
+            self.state()
+        );
     }
 
     fn err_unexpected(&self, char: char) {
@@ -230,8 +244,6 @@ impl Tokenizer {
                     // allow numbers once first letter is identified as an ascii letter
                     if char.is_ascii_alphanumeric() {
                         self.buf.push(char);
-                        // todo this is wrong. we need to check the next char in this char iteration
-                        // and push token/pop state.
                     } else if char.is_whitespace() || char == '[' || char == '{' {
                         self.push_token_pop_state(BlockIdentifier(self.buf.clone()));
                         self.push_state(ParsedBlockIdentifier, Some(char));
@@ -279,20 +291,18 @@ impl Tokenizer {
                 }
                 ParsingDirective => {
                     if !char.is_whitespace() && char.is_ascii_alphabetic() {
+                        self.push_token(DirectiveOpen);
+                        self.clear_buffer();
                         self.push_state(ParsingDirectiveIdentifier, Some(char));
+                    } else if char == '-' {
+                        self.err_msg(r#"Directive identifiers cannot start with '-'."#.to_owned());
                     } else if !char.is_whitespace() {
                         self.err_unexpected(char);
                     }
                 }
                 ParsingDirectiveIdentifier => {
-                    if char.is_ascii_alphabetic() {
+                    if char.is_ascii_alphabetic() || char == '-' {
                         self.buf.push(char);
-
-                        // let next = peekable.next().expect("Unexpected end of file.");
-                        // if !next.is_ascii_alphabetic() {
-                        //     self.push_token_pop_state(DirectiveIdentifier(self.buf.clone()));
-                        //     self.start_state(ParsedDirectiveIdentifier, None);
-                        // }
                     } else if char == ':' {
                         self.push_token_pop_state(DirectiveIdentifier(self.buf.clone()));
                         self.push_state(ParsingDirectiveColon, Some(char));
@@ -300,20 +310,13 @@ impl Tokenizer {
                     } else if char == ']' {
                         self.push_token_pop_state(DirectiveIdentifier(self.buf.clone()));
                         self.buf.push(char);
-                        self.push_state(ParsedDirectiveIdentifier, None);
+                        self.push_state(EmptyDirectiveParsed, None);
                     }
                 }
-                ParsedDirectiveIdentifier => {
-                    // directives might be blank?
-                    // if char == ':' {
-                    //     self.push_token_pop_state(DirectiveColon);
-                    //     self.start_state(ParsingDirectiveValue, None);
-                    //     // start state based on directive type? or buffer everything until
-                    //     // bracket close and hand off to directive value tokenizer?
-                    // } else if char == ']' {
-                    //     //
-                    // }
-                    // expect function call definition or some kind of expression that does something to the app state
+                EmptyDirectiveParsed => {
+                    self.push_token_pop_state(DirectiveClose);
+                    // We are now in State::ParsingDirective, which we will pop
+                    self.pop_state();
                 }
                 ParsingDirectiveColon => {
                     if self.buf.as_str() != ":" {
@@ -395,7 +398,7 @@ pub enum State {
     ParsingDirective,
     ParsedDirective,
     ParsingDirectiveIdentifier,
-    ParsedDirectiveIdentifier,
+    EmptyDirectiveParsed,
     ParsingDirectiveColon,
     ParsingDirectiveValue,
 
@@ -423,7 +426,7 @@ impl Display for State {
                 ParsingDirective => "ParsingDirective",
                 ParsedDirective => "ParsedDirective",
                 ParsingDirectiveIdentifier => "ParsingDirectiveIdentifier",
-                ParsedDirectiveIdentifier => "ParsedDirectiveIdentifier",
+                EmptyDirectiveParsed => "EmptyDirectiveParsed",
                 ParsingDirectiveColon => "ParsingDirectiveColon",
                 ParsingDirectiveValue => "ParsingDirectiveValue",
                 InDblQuoteUnescaped => "InDblQuoteUnescaped",
@@ -442,7 +445,7 @@ pub struct Token {
 
 #[derive(Debug, PartialEq)]
 pub enum TokenType {
-    // Keyword(?),
+    // Keyword(KeywordEnum),
     BlockIdentifier(String),
     AttrIdentifier(String),
     StringExpr(String),
