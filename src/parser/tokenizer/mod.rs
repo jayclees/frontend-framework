@@ -3,7 +3,8 @@ use super::tokenizer::TokenType::*;
 use regex::Regex;
 use std::cell::RefCell;
 use std::fmt::{Display, Formatter};
-use std::fs::read_to_string;
+use std::fs::{read_to_string, OpenOptions};
+use std::io::Write;
 
 #[derive(Debug)]
 pub struct Tokenizer {
@@ -85,43 +86,77 @@ impl Tokenizer {
     }
 
     fn match_with_source(&self) {
-        let string = read_to_string("app/my-page.app").unwrap();
-        let mut string = RefCell::new(string.chars());
-        // let mut highlighted = String::new();
+        let source = read_to_string("app/my-page.app").unwrap();
+        let mut source = RefCell::new(source.chars());
+        let mut highlighted = String::new();
         let mut prev: Option<&Token> = None;
         for token in self.tokens.iter().clone() {
-            let skip = if let Some(prev) = prev {
-                token.start - prev.end
+            let (ws_start, ws_stop) = if let Some(prev) = prev {
+                (prev.end, token.start)
             } else {
-                0
+                (0, token.start)
             };
-            let x = string
-                .get_mut()
-                .skip(skip)
-                .take(token.end - token.start)
-                .collect::<String>();
-            match token.r#type {
-                BlockIdentifier(_) => println!(r#"BlockIdentifier: '{x}'"#),
-                AttrIdentifier(_) => println!(r#"AttrIdentifier: '{x}'"#),
-                StringExpr(_) => println!(r#"StringExpr: '{x}'"#),
-                LineComment(_) => println!(r#"LineComment: '{x}'"#),
-                BlockComment(_) => println!(r#"BlockComment: '{x}'"#),
-                Colon => println!(r#"Colon: '{x}'"#),
-                BlockOpen => println!(r#"BlockOpen: '{x}'"#),
-                BlockClose => println!(r#"BlockClose: '{x}'"#),
-                Expression => println!(r#"Expression: '{x}'"#),
-                DirectiveOpen => println!(r#"DirectiveOpen: '{x}'"#),
-                DirectiveClose => println!(r#"DirectiveClose: '{x}'"#),
-                DirectiveIdentifier(_) => println!(r#"DirectiveIdentifier: '{x}'"#),
-                DirectiveColon => println!(r#"DirectiveColon: '{x}'"#),
-                DirectiveValue(_) => println!(r#"DirectiveValue: '{x}'"#),
-            }
+            let string = source.get_mut();
+            let whitespace = string.take(ws_stop - ws_start).collect::<String>();
+            let token_string = string.take(token.end - token.start).collect::<String>();
+            // match token.r#type {
+            //     BlockIdentifier(_) => println!(r#"BlockIdentifier: '{x}'"#),
+            //     AttrIdentifier(_) => println!(r#"AttrIdentifier: '{x}'"#),
+            //     StringExpr(_) => println!(r#"StringExpr: '{x}'"#),
+            //     LineComment(_) => println!(r#"LineComment: '{x}'"#),
+            //     BlockComment(_) => println!(r#"BlockComment: '{x}'"#),
+            //     Colon => println!(r#"Colon: '{x}'"#),
+            //     BlockOpen => println!(r#"BlockOpen: '{x}'"#),
+            //     BlockClose => println!(r#"BlockClose: '{x}'"#),
+            //     Expression => println!(r#"Expression: '{x}'"#),
+            //     DirectiveOpen => println!(r#"DirectiveOpen: '{x}'"#),
+            //     DirectiveClose => println!(r#"DirectiveClose: '{x}'"#),
+            //     DirectiveIdentifier(_) => println!(r#"DirectiveIdentifier: '{x}'"#),
+            //     DirectiveColon => println!(r#"DirectiveColon: '{x}'"#),
+            //     DirectiveValue(_) => println!(r#"DirectiveValue: '{x}'"#),
+            // }
 
-            // highlighted.push_str(format!("<span>{x}</span>").as_str());
+            let token_type = token.r#type.to_string();
+            let display = if let Some(i) = token_type.find("(") {
+                token_type[..i].to_owned()
+            } else {
+                token_type
+            };
+            highlighted.push_str(
+                format!(
+                    r#"{}<span class="{}">{}</span>"#,
+                    whitespace, display, token_string
+                )
+                .as_str(),
+            );
             prev = Some(token);
         }
 
-        // println!("{highlighted}");
+        let layout = read_to_string("generated/layout.html")
+            .unwrap()
+            .replace("{REPLACE}", highlighted.as_str());
+        let bytes = layout.as_bytes();
+        let written = OpenOptions::new()
+            .create(true)
+            .truncate(true)
+            .write(true)
+            .open("generated/generated.html")
+            .unwrap()
+            .write(bytes);
+
+        if let Ok(written) = written {
+            if written == bytes.len() {
+                println!("{written} bytes written to generated/generated.html");
+            } else {
+                eprintln!(
+                    "Failed to successfully write to generated/generated.html. {}/{} bytes written.",
+                    bytes.len(),
+                    written
+                );
+            }
+        } else {
+            dbg!("Failed to write to generated/generated.html");
+        }
     }
 
     pub fn tokenize(&mut self) -> &Vec<Token> {
