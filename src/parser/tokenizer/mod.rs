@@ -1,10 +1,15 @@
-use super::tokenizer::State::*;
+mod state;
+mod token_type;
+
 use super::tokenizer::TokenType::*;
 use regex::Regex;
+use state::State;
+use state::State::*;
 use std::cell::RefCell;
 use std::fmt::{Display, Formatter};
 use std::fs::{read_to_string, OpenOptions};
 use std::io::Write;
+use token_type::Token;
 
 #[derive(Debug)]
 pub struct Tokenizer {
@@ -362,10 +367,10 @@ impl Tokenizer {
                 }
                 ParsingAttrSeparator => {
                     // expect
-                },
+                }
                 ParsedAttrSeparator => {
                     //
-                },
+                }
                 ParsingEventListener => {
                     let buf = self.buf.as_str();
                     if buf != "@" && buf != "@[" {
@@ -503,86 +508,6 @@ impl Tokenizer {
 
         &self.tokens
     }
-}
-
-#[derive(Debug, PartialEq)]
-pub enum State {
-    Start,
-    InLineComment,
-    InBlockComment,
-
-    ParsingBlockIdentifier,
-    ParsedBlockIdentifier,
-
-    ParsingBlock,
-    ParsingBlockClose,
-
-    ParsingAttrIdentifier,
-    ParsedAttrIdentifier,
-    ParsingAttributeColon,
-    ParsedAttrColon,
-    ParsingAttrSeparator,
-    ParsedAttrSeparator,
-
-    ParsingEventListener,
-    ParsingEventListenerIdentifier,
-    ParsingEventListenerColon,
-    ParsingEventListenerHandler,
-    ParsedEventListener,
-
-    ParsingDirective,
-    ParsingDirectiveIdentifier,
-    EmptyDirectiveParsed,
-    ParsingDirectiveColon,
-    ParsingDirectiveValue,
-    ParsedDirective,
-
-    InDblQuoteUnescaped,
-    InDblQuoteEscaped,
-}
-
-impl Display for State {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{}",
-            match self {
-                Start => "Start",
-                InLineComment => "InLineComment",
-                InBlockComment => "InBlockComment",
-                ParsingBlockIdentifier => "ParsingBlockIdentifier",
-                ParsedBlockIdentifier => "ParsedBlockIdentifier",
-                ParsingBlock => "ParsingBlock",
-                ParsingBlockClose => "ParsingBlockClose",
-                ParsingAttrIdentifier => "ParsingAttrIdentifier",
-                ParsedAttrIdentifier => "ParsedAttrIdentifier",
-                ParsedAttrColon => "ParsedAttrColon",
-                ParsingAttributeColon => "ParsingAttributeColon",
-                ParsingAttrSeparator => "ParsingAttrSeparator",
-                ParsedAttrSeparator => "ParsedAttrSeparator",
-                ParsingEventListener => "ParsingEventListener",
-                ParsedEventListener => "ParsedEventListener",
-                ParsingEventListenerIdentifier => "ParsingEventListenerIdentifier",
-                ParsingEventListenerColon => "ParsingEventListenerColon",
-                ParsingEventListenerHandler => "ParsingEventListenerHandler",
-                ParsingDirective => "ParsingDirective",
-                ParsedDirective => "ParsedDirective",
-                ParsingDirectiveIdentifier => "ParsingDirectiveIdentifier",
-                EmptyDirectiveParsed => "EmptyDirectiveParsed",
-                ParsingDirectiveColon => "ParsingDirectiveColon",
-                ParsingDirectiveValue => "ParsingDirectiveValue",
-                InDblQuoteUnescaped => "InDblQuoteUnescaped",
-                InDblQuoteEscaped => "InDblQuoteEscaped",
-            }
-        )
-    }
-}
-
-#[derive(Debug)]
-pub struct Token {
-    start: usize,
-    end: usize,
-    r#type: TokenType,
 }
 
 #[derive(Debug, PartialEq)]
