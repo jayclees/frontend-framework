@@ -287,22 +287,85 @@ impl Tokenizer {
                     }
                 }
                 ParsingBlock => {
-                    // expect attr id or block id
-                    // if char.is_ascii_alphabetic() {
-                    //     self.push_state(ParsingIdentifier, Some(char));
-                    // }
+                    self.push_token(BlockOpen);
+                    if char.is_ascii_alphabetic() {
+                        self.push_state(ParsingAttrIdentifier, Some(char));
+                    } else if char.is_whitespace() {
+                        self.push_state(ParsingAttrIdentifier, None);
+                    } else {
+                        self.err_unexpected(char);
+                    }
                 }
-                ParsingIdentifier => {
-                    //
+                ParsingBlockClose => {
+                    if self.buf.as_str() != "}" {
+                        self.err_msg("".to_owned());
+                    }
                 }
                 ParsingAttrIdentifier => {
-                    // terminate if whitespace or colon
-                    // if terminated on whitespace, assume an attribute like disabled in `<input disabled>`
+                    if self.buf.is_empty() {
+                        if char.is_alphabetic() {
+                            self.buf.push(char);
+                        } else if char.is_ascii_digit() {
+                            self.err_msg(
+                                "Attribute identifiers must start with alphabetic character."
+                                    .to_owned(),
+                            );
+                        } else if !char.is_whitespace() {
+                            self.err_unexpected(char);
+                        }
+                    } else {
+                        if char.is_ascii_alphanumeric() {
+                            self.buf.push(char);
+                        } else if char.is_whitespace() || [':', ',', '}'].contains(&char) {
+                            self.push_token_pop_state(AttrIdentifier(self.buf.clone()));
+
+                            if char.is_whitespace() {
+                                // could still be colon, comma, or close curly
+                                self.push_state(ParsedAttrIdentifier, None);
+                            } else {
+                                match char {
+                                    ':' => self.push_state(ParsingAttributeColon, Some(char)),
+                                    ',' => self.push_state(ParsingAttrSeparator, Some(char)),
+                                    '}' => self.push_state(ParsingBlockClose, Some(char)),
+                                    _ => unimplemented!(),
+                                }
+                            }
+                        } else {
+                            self.err_unexpected(char);
+                        }
+                    }
+                    // if terminated on comma or block close curly, assume
+                    // an attribute like disabled in `<input disabled>`
                 }
                 ParsedAttrIdentifier => {
-                    // was just terminated by whitespace or colon
+                    if char == ':' {
+                        self.buf.push(char);
+                        self.push_state(ParsingAttributeColon, Some(char));
+                    }
+                    // was just terminated by whitespace, colon, or comma
                     // expect another attr id, or block id, or close curly
                 }
+                ParsingAttributeColon => {
+                    if self.buf.as_str() != ":" {
+                        dbg!(&self.buf);
+                        self.err_msg(
+                            "Error internal implementation. Should only have : in buffer at this point.".to_owned()
+                        );
+                    }
+
+                    self.push_token_pop_state(AttrColon);
+                    self.push_state(ParsedAttrColon, Some(char));
+                }
+                ParsedAttrColon => {
+                    // expect expression
+                    // todo create separate tokenizer for expressions?
+                }
+                ParsingAttrSeparator => {
+                    // expect
+                },
+                ParsedAttrSeparator => {
+                    //
+                },
                 ParsingEventListener => {
                     let buf = self.buf.as_str();
                     if buf != "@" && buf != "@[" {
@@ -384,8 +447,7 @@ impl Tokenizer {
                 }
                 EmptyDirectiveParsed => {
                     self.push_token_pop_state(DirectiveClose);
-                    // We are now in State::ParsingDirective, which we will pop
-                    self.pop_state();
+                    self.pop_state(); // Popping State::ParsingDirective
                 }
                 ParsingDirectiveColon => {
                     if self.buf.as_str() != ":" {
@@ -453,12 +515,14 @@ pub enum State {
     ParsedBlockIdentifier,
 
     ParsingBlock,
-
-    // To figure out if what we're parsing is a block id or an attribute id
-    ParsingIdentifier,
+    ParsingBlockClose,
 
     ParsingAttrIdentifier,
     ParsedAttrIdentifier,
+    ParsingAttributeColon,
+    ParsedAttrColon,
+    ParsingAttrSeparator,
+    ParsedAttrSeparator,
 
     ParsingEventListener,
     ParsingEventListenerIdentifier,
@@ -489,9 +553,13 @@ impl Display for State {
                 ParsingBlockIdentifier => "ParsingBlockIdentifier",
                 ParsedBlockIdentifier => "ParsedBlockIdentifier",
                 ParsingBlock => "ParsingBlock",
-                ParsingIdentifier => "ParsingIdentifier",
+                ParsingBlockClose => "ParsingBlockClose",
                 ParsingAttrIdentifier => "ParsingAttrIdentifier",
                 ParsedAttrIdentifier => "ParsedAttrIdentifier",
+                ParsedAttrColon => "ParsedAttrColon",
+                ParsingAttributeColon => "ParsingAttributeColon",
+                ParsingAttrSeparator => "ParsingAttrSeparator",
+                ParsedAttrSeparator => "ParsedAttrSeparator",
                 ParsingEventListener => "ParsingEventListener",
                 ParsedEventListener => "ParsedEventListener",
                 ParsingEventListenerIdentifier => "ParsingEventListenerIdentifier",
@@ -521,13 +589,14 @@ pub struct Token {
 pub enum TokenType {
     // Keyword(KeywordEnum),
     BlockIdentifier(String),
-    AttrIdentifier(String),
     StringExpr(String),
     LineComment(String),
     BlockComment(String),
-    Colon,
+    Colon, // todo remove
     BlockOpen,
     BlockClose,
+    AttrIdentifier(String),
+    AttrColon,
     Expression,
     DirectiveOpen,
     DirectiveClose,
@@ -545,13 +614,14 @@ impl Display for TokenType {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match &self {
             BlockIdentifier(str) => write!(f, "BlockIdentifier({str})"),
-            AttrIdentifier(str) => write!(f, "AttrIdentifier({str})"),
             StringExpr(str) => write!(f, "StringExpr({str})"),
             LineComment(str) => write!(f, "LineComment({str})"),
             BlockComment(str) => write!(f, "BlockComment({str})"),
             Colon => write!(f, "Colon"),
             BlockOpen => write!(f, "BlockOpen"),
             BlockClose => write!(f, "BlockClose"),
+            AttrIdentifier(str) => write!(f, "AttrIdentifier({str})"),
+            AttrColon => write!(f, "AttrColon"),
             Expression => write!(f, "Expression"),
             DirectiveOpen => write!(f, "DirectiveOpen"),
             DirectiveClose => write!(f, "DirectiveClose"),
