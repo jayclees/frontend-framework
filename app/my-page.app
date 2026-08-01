@@ -5,7 +5,7 @@ hello
 */
 
 
-Page [extends: root] [marker-directive] {
+Page [extends: root] [marker-directive] @[load: do_thing()] {
     title: "",
     description: "",
     body {

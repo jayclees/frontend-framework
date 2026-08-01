@@ -47,7 +47,12 @@ impl Tokenizer {
     }
 
     fn pop_state(&mut self) {
-        self.clear_buffer();
+        // self.clear_buffer();
+        if !self.buf.is_empty() {
+            // todo Should buffer always be already cleared when popping state?
+            dbg!(&self.buf);
+            panic!("Buffer should be already empty here?");
+        }
         self.state_history.pop();
     }
 
@@ -61,6 +66,7 @@ impl Tokenizer {
         }
 
         self.tokens.push(Token { start, end, r#type });
+        self.clear_buffer();
     }
 
     fn push_token_pop_state(&mut self, r#type: TokenType) {
@@ -246,7 +252,11 @@ impl Tokenizer {
                         self.buf.push(char);
                     } else if char.is_whitespace() || char == '[' || char == '{' {
                         self.push_token_pop_state(BlockIdentifier(self.buf.clone()));
-                        self.push_state(ParsedBlockIdentifier, Some(char));
+                        if !char.is_whitespace() {
+                            self.push_state(ParsedBlockIdentifier, Some(char));
+                        } else {
+                            self.push_state(ParsedBlockIdentifier, None);
+                        }
                     } else {
                         self.err_unexpected(char);
                     }
@@ -283,16 +293,66 @@ impl Tokenizer {
                     // expect another attr id, or block id, or close curly
                 }
                 ParsingEventListener => {
-                    // match against event identifier regex
-                    // terminate on colon
+                    let buf = self.buf.as_str();
+                    if buf != "@" && buf != "@[" {
+                        dbg!(&buf);
+                        self.err_msg(
+                            "Error internal implementation. Should only have @ or @[ in buffer at this point.".to_owned()
+                        );
+                    }
+
+                    if char == '[' {
+                        self.buf.push(char);
+                    } else if buf == "@[" {
+                        self.push_token(EventListenerOpen);
+
+                        if char.is_ascii_alphabetic() {
+                            self.push_state(ParsingEventListenerIdentifier, Some(char));
+                        } else {
+                            self.err_unexpected(char);
+                        }
+                    } else {
+                        self.err_unexpected(char);
+                    }
+                }
+                ParsingEventListenerIdentifier => {
+                    // This state should be entered with ascii_alphabetic as first char
+                    if char.is_ascii_alphabetic() || char == '.' {
+                        self.buf.push(char);
+                    } else if char == ':' {
+                        self.push_token_pop_state(EventListenerIdentifier(self.buf.clone()));
+                        self.push_state(ParsingEventListenerColon, Some(char));
+                    } else {
+                        self.err_unexpected(char);
+                    }
+                }
+                ParsingEventListenerColon => {
+                    if self.buf.as_str() != ":" {
+                        dbg!(&self.buf);
+                        panic!(
+                            "Error internal implementation. Should only have : in buffer at this point."
+                        );
+                    }
+                    self.push_token_pop_state(EventListenerColon);
+                    self.push_state(ParsingEventListenerHandler, Some(char));
+                }
+                ParsingEventListenerHandler => {
+                    // todo for now just put everything into this until bracket close
+                    if char == ']' {
+                        self.push_token_pop_state(EventListenerHandler(self.buf.clone()));
+                        self.push_state(ParsedEventListener, Some(char));
+                    } else {
+                        self.buf.push(char);
+                    }
                 }
                 ParsedEventListener => {
-                    // expect function call definition or some kind of expression that does something to the app state
+                    self.push_token(EventListenerClose);
+                    self.pop_state();
+                    self.pop_state(); // Popping State::ParsingEventListener
                 }
                 ParsingDirective => {
                     if !char.is_whitespace() && char.is_ascii_alphabetic() {
                         self.push_token(DirectiveOpen);
-                        self.clear_buffer();
                         self.push_state(ParsingDirectiveIdentifier, Some(char));
                     } else if char == '-' {
                         self.err_msg(r#"Directive identifiers cannot start with '-'."#.to_owned());
@@ -306,10 +366,8 @@ impl Tokenizer {
                     } else if char == ':' {
                         self.push_token_pop_state(DirectiveIdentifier(self.buf.clone()));
                         self.push_state(ParsingDirectiveColon, Some(char));
-                        // self.push_token_pop_state()
                     } else if char == ']' {
                         self.push_token_pop_state(DirectiveIdentifier(self.buf.clone()));
-                        self.buf.push(char);
                         self.push_state(EmptyDirectiveParsed, None);
                     }
                 }
@@ -333,8 +391,6 @@ impl Tokenizer {
                     // for now just grab everything until close bracket
                     if char == ']' {
                         self.push_token_pop_state(DirectiveValue(self.buf.clone()));
-                        // State at this point should be ParsedBlockIdentifier, which we will also pop
-                        self.pop_state();
                         self.push_state(ParsedDirective, Some(char));
                     } else {
                         self.buf.push(char);
@@ -353,6 +409,7 @@ impl Tokenizer {
                     }
 
                     self.push_token_pop_state(DirectiveClose);
+                    self.pop_state(); // Popping State::ParsingDirective
                 }
                 InDblQuoteUnescaped => {
                     // if char is dbl quote, exit current state into X state
@@ -393,14 +450,17 @@ pub enum State {
     ParsedAttrIdentifier,
 
     ParsingEventListener,
+    ParsingEventListenerIdentifier,
+    ParsingEventListenerColon,
+    ParsingEventListenerHandler,
     ParsedEventListener,
 
     ParsingDirective,
-    ParsedDirective,
     ParsingDirectiveIdentifier,
     EmptyDirectiveParsed,
     ParsingDirectiveColon,
     ParsingDirectiveValue,
+    ParsedDirective,
 
     InDblQuoteUnescaped,
     InDblQuoteEscaped,
@@ -423,6 +483,9 @@ impl Display for State {
                 ParsedAttrIdentifier => "ParsedAttrIdentifier",
                 ParsingEventListener => "ParsingEventListener",
                 ParsedEventListener => "ParsedEventListener",
+                ParsingEventListenerIdentifier => "ParsingEventListenerIdentifier",
+                ParsingEventListenerColon => "ParsingEventListenerColon",
+                ParsingEventListenerHandler => "ParsingEventListenerHandler",
                 ParsingDirective => "ParsingDirective",
                 ParsedDirective => "ParsedDirective",
                 ParsingDirectiveIdentifier => "ParsingDirectiveIdentifier",
@@ -460,6 +523,11 @@ pub enum TokenType {
     DirectiveIdentifier(String),
     DirectiveColon,
     DirectiveValue(String),
+    EventListenerOpen,
+    EventListenerClose,
+    EventListenerIdentifier(String),
+    EventListenerColon,
+    EventListenerHandler(String),
 }
 
 impl Display for TokenType {
@@ -479,6 +547,11 @@ impl Display for TokenType {
             DirectiveIdentifier(_) => write!(f, "DirectiveIdentifier"),
             DirectiveColon => write!(f, "DirectiveColon"),
             DirectiveValue(str) => write!(f, "DirectiveValue({str})"),
+            EventListenerOpen => write!(f, "EventListenerOpen"),
+            EventListenerClose => write!(f, "EventListenerClose"),
+            EventListenerIdentifier(str) => write!(f, "EventListenerIdentifier({str})"),
+            EventListenerColon => write!(f, "EventListenerColon"),
+            EventListenerHandler(str) => write!(f, "EventListenerHandler({str})"),
         }
     }
 }

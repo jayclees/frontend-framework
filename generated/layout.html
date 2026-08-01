@@ -8,18 +8,29 @@
     <style>
         .BlockIdentifier,
         .AttrIdentifier,
-        .DirectiveIdentifier {
-            color: #FF5722;
+        .DirectiveIdentifier,
+        .EventListenerIdentifier {
+            color: #FF5722; /* deep orange 500 */
         }
 
         .DirectiveOpen,
         .DirectiveClose,
         .DirectiveColon {
-            color: #42A5F5;
+            color: #42A5F5; /* blue 400 */
+        }
+
+        .EventListenerOpen,
+        .EventListenerClose,
+        .EventListenerColon {
+            color: #9575CD; /* deep purple 300 */
+        }
+
+        .EventListenerHandler {
+            color: #90A4AE; /* blue grey 300 */
         }
 
         .DirectiveValue {
-            color: #FF9800;
+            color: #FF9800; /* orange 500 */
         }
 
         .StringExpr,
@@ -40,6 +51,6 @@
     </style>
 </head>
 <body>
-<div class="container"><pre><code>{REPLACE}</code></pre></div>
+<div class="container-fluid p-4"><pre><code>{REPLACE}</code></pre></div>
 </body>
 </html>
