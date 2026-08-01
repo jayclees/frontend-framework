@@ -152,6 +152,15 @@ impl Tokenizer {
             prev = Some(token);
         }
 
+        // append remaining untokenized text
+        highlighted.push_str(
+            format!(
+                r#"<span class="Untokenized">{}</span>"#,
+                source.get_mut().as_str()
+            )
+            .as_str(),
+        );
+
         let layout = read_to_string("generated/layout.html")
             .unwrap()
             .replace("{REPLACE}", highlighted.as_str());
@@ -269,17 +278,17 @@ impl Tokenizer {
                     if !char.is_whitespace() {
                         match char {
                             '[' => self.push_state(ParsingDirective, Some(char)),
-                            '{' => self.push_state(InBlock, Some(char)),
+                            '{' => self.push_state(ParsingBlock, Some(char)),
                             '@' => self.push_state(ParsingEventListener, Some(char)),
                             _ => self.err_unexpected(char),
                         }
                     }
                 }
-                InBlock => {
+                ParsingBlock => {
                     // expect attr id or block id
-                    if char.is_ascii_alphabetic() {
-                        self.push_state(ParsingIdentifier, Some(char));
-                    }
+                    // if char.is_ascii_alphabetic() {
+                    //     self.push_state(ParsingIdentifier, Some(char));
+                    // }
                 }
                 ParsingIdentifier => {
                     //
@@ -441,7 +450,7 @@ pub enum State {
     ParsingBlockIdentifier,
     ParsedBlockIdentifier,
 
-    InBlock,
+    ParsingBlock,
 
     // To figure out if what we're parsing is a block id or an attribute id
     ParsingIdentifier,
@@ -477,7 +486,7 @@ impl Display for State {
                 InBlockComment => "InBlockComment",
                 ParsingBlockIdentifier => "ParsingBlockIdentifier",
                 ParsedBlockIdentifier => "ParsedBlockIdentifier",
-                InBlock => "InBlock",
+                ParsingBlock => "ParsingBlock",
                 ParsingIdentifier => "ParsingIdentifier",
                 ParsingAttrIdentifier => "ParsingAttrIdentifier",
                 ParsedAttrIdentifier => "ParsedAttrIdentifier",
