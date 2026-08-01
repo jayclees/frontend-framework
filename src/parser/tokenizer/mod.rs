@@ -49,7 +49,7 @@ impl Tokenizer {
     fn pop_state(&mut self) {
         // self.clear_buffer();
         if !self.buf.is_empty() {
-            // todo Should buffer always be already cleared when popping state?
+            // An uncleared buffer may indicate something is wrong somewhere, so panic.
             dbg!(&self.buf);
             panic!("Buffer should be already empty here?");
         }
@@ -145,7 +145,9 @@ impl Tokenizer {
             highlighted.push_str(
                 format!(
                     r#"{}<span class="{}">{}</span>"#,
-                    whitespace, display, token_string
+                    whitespace,
+                    display,
+                    html_escape::encode_text(&token_string).as_ref()
                 )
                 .as_str(),
             );
@@ -156,7 +158,7 @@ impl Tokenizer {
         highlighted.push_str(
             format!(
                 r#"<span class="Untokenized">{}</span>"#,
-                source.get_mut().as_str()
+                html_escape::encode_text(source.get_mut().as_str())
             )
             .as_str(),
         );

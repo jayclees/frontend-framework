@@ -18,3 +18,6 @@ enum BlockType {
     P,
     Html(&'static str), // Takes HTML tag as arg
 }
+
+// Todo implement Action struct (for things like event handlers)
+// Todo implement Expression struct (for directives like [if: $expr]
