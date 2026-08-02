@@ -1,10 +1,12 @@
-pub mod state;
-pub mod token_type;
+mod expression;
+mod state;
+mod token_type;
 
 use regex::Regex;
 use state::State;
 use state::State::*;
 use std::cell::RefCell;
+use std::cmp::PartialEq;
 use std::fs::{read_to_string, OpenOptions};
 use std::io::Write;
 use token_type::Token;
@@ -96,7 +98,7 @@ impl Tokenizer {
 
     fn err_unexpected(&self, char: char) {
         // todo provide expected tokens based on current tokenizer state
-        dbg!(&self.tokens);
+        // dbg!(&self.tokens);
         panic!(
             r#"Unexpected token "{}" at line: {}, column: {}. State: "{}""#,
             char,
@@ -204,10 +206,15 @@ impl Tokenizer {
 
         // todo Create method to attempt to recover from unexpected token and keep going? Recovery
         // todo method will depend on what state it is currently in and the state history.
-        let mut peekable = string.chars().peekable();
+        let mut peekable = string.chars().enumerate().peekable();
         for (cursor, char) in string.chars().enumerate() {
-            peekable.next();
             self.cursor = cursor;
+
+            if let Some((pos, _)) = peekable.peek()
+                && pos <= &cursor
+            {
+                peekable.next();
+            }
 
             if char == '\n' {
                 self.line += 1;
@@ -224,7 +231,7 @@ impl Tokenizer {
             match self.state() {
                 Start => {
                     if char.is_ascii_alphabetic() {
-                        self.push_state(ParsingBlockIdentifier, Some(char));
+                        self.push_state(ParsingIdentifier, Some(char));
                     } else if char == '/' {
                         let next = peekable.peek();
 
@@ -232,9 +239,9 @@ impl Tokenizer {
                             self.err_eof();
                         }
 
-                        if next.unwrap() == &'/' {
+                        if next.unwrap().1 == '/' {
                             self.push_state(InLineComment, Some(char));
-                        } else if next.unwrap() == &'*' {
+                        } else if next.unwrap().1 == '*' {
                             self.push_state(InBlockComment, Some(char));
                         } else {
                             self.err_unexpected(char);
@@ -262,22 +269,96 @@ impl Tokenizer {
                         self.buf.push(char);
                     }
                 }
-                ParsingBlockIdentifier => {
-                    // allow numbers once first letter is identified as an ascii letter
-                    if char.is_ascii_alphanumeric() {
+                ParsingIdentifier => {
+                    // Parsing an identifier which could be either a block or attr identifier.
+                    let is_in_block = self
+                        .state_history
+                        .get(self.state_history.len() - 2)
+                        .unwrap()
+                        != &ParsingBlock;
+
+                    if self.buf.is_empty() && char.is_ascii_alphabetic() {
                         self.buf.push(char);
-                    } else if char.is_whitespace() || char == '[' || char == '{' {
-                        self.push_token_pop_state(BlockIdentifier(self.buf.clone()));
-                        if !char.is_whitespace() {
-                            self.push_state(ParsedBlockIdentifier, Some(char));
-                        } else {
-                            self.push_state(ParsedBlockIdentifier, None);
+                    } else if !self.buf.is_empty() {
+                        // Allow numbers, -, _ after first char in identifier.
+                        if char.is_ascii_alphanumeric() || ['-', '_'].contains(&char) {
+                            self.buf.push(char);
                         }
-                    } else {
+                        // Resolved to block identifier.
+                        else if ['{', '['].contains(&char) {
+                            self.push_token_pop_state(BlockIdentifier(self.buf.clone()));
+                            self.push_state(ParsedBlockIdentifier, Some(char));
+                        }
+                        // Resolved to attr identifier.
+                        else if [':', ',', '}'].contains(&char) {
+                            if is_in_block {
+                                if char == '}' {
+                                    self.err_unexpected(char);
+                                } else {
+                                    self.err_msg(
+                                        "Attribute identifiers must be within blocks.".to_owned(),
+                                    );
+                                }
+                            }
+                            self.push_token_pop_state(AttrIdentifier(self.buf.clone()));
+                            // if char == ':' {
+                            //
+                            // } else if char == ',' {
+                            //
+                            // } else if char == '}' {
+                            //
+                            // }
+                            self.push_state(ParsedAttrIdentifier, Some(char));
+                        }
+                        // Peek the following chars, the next valid non whitespace char
+                        // will decide whether this is a block or attr identifier.
+                        else if char.is_whitespace() {
+                            let mut i = 0;
+                            loop {
+                                i += 1;
+                                if i > 10000 {
+                                    panic!("infinite");
+                                }
+                                if let Some(next) = peekable.next() {
+                                    if ['{', '['].contains(&next.1) {
+                                        // Resolved to a block identifier.
+                                        self.push_token_pop_state(BlockIdentifier(
+                                            self.buf.clone(),
+                                        ));
+                                        self.push_state(ParsedBlockIdentifier, None);
+                                        break;
+                                    } else if [':', ','].contains(&next.1) {
+                                        // Resolved to an attr identifier.
+                                        if is_in_block {
+                                            self.err_msg(
+                                                "Attribute identifiers must be within blocks."
+                                                    .to_owned(),
+                                            );
+                                        }
+                                        self.push_token_pop_state(AttrIdentifier(self.buf.clone()));
+                                        self.push_state(ParsedAttrIdentifier, None);
+                                        break;
+                                    } else if next.1 == '}' {
+                                        if is_in_block {
+                                            self.err_unexpected(next.1);
+                                        }
+                                        // Resolved to a boolean attribute identifier, and block is now closed
+                                        self.push_token_pop_state(BlockIdentifier(
+                                            self.buf.clone(),
+                                        ));
+                                        break;
+                                    } else if !char.is_whitespace() {
+                                        self.err_unexpected(next.1);
+                                    }
+                                } else {
+                                    self.err_eof();
+                                }
+                            }
+                        }
+                    } else if !char.is_whitespace() {
+                        // char must start with ascii alphabetic
                         self.err_unexpected(char);
                     }
-                    // match char against regex
-                    // terminate on whitespace or curly, append token
                 }
                 ParsedBlockIdentifier => {
                     // First start state, push token after to fix
@@ -293,12 +374,10 @@ impl Tokenizer {
                 }
                 ParsingBlock => {
                     self.push_token(BlockOpen);
-                    if char.is_ascii_alphabetic() {
-                        self.push_state(ParsingAttrIdentifier, Some(char));
-                    } else if char.is_whitespace() {
-                        self.push_state(ParsingAttrIdentifier, None);
+                    if char.is_whitespace() {
+                        self.push_state(ParsingIdentifier, None);
                     } else {
-                        self.err_unexpected(char);
+                        self.push_state(ParsingIdentifier, Some(char));
                     }
                 }
                 ParsingBlockClose => {
@@ -306,46 +385,11 @@ impl Tokenizer {
                         self.err_msg("".to_owned());
                     }
                 }
-                ParsingAttrIdentifier => {
-                    if self.buf.is_empty() {
-                        if char.is_alphabetic() {
-                            self.buf.push(char);
-                        } else if char.is_ascii_digit() {
-                            self.err_msg(
-                                "Attribute identifiers must start with alphabetic character."
-                                    .to_owned(),
-                            );
-                        } else if !char.is_whitespace() {
-                            self.err_unexpected(char);
-                        }
-                    } else {
-                        if char.is_ascii_alphanumeric() {
-                            self.buf.push(char);
-                        } else if char.is_whitespace() || [':', ',', '}'].contains(&char) {
-                            self.push_token_pop_state(AttrIdentifier(self.buf.clone()));
-
-                            if char.is_whitespace() {
-                                // could still be colon, comma, or close curly
-                                self.push_state(ParsedAttrIdentifier, None);
-                            } else {
-                                match char {
-                                    ':' => self.push_state(ParsingAttributeColon, Some(char)),
-                                    ',' => self.push_state(ParsingAttrSeparator, Some(char)),
-                                    '}' => self.push_state(ParsingBlockClose, Some(char)),
-                                    _ => unimplemented!(),
-                                }
-                            }
-                        } else {
-                            self.err_unexpected(char);
-                        }
-                    }
-                    // if terminated on comma or block close curly, assume
-                    // an attribute like disabled in `<input disabled>`
-                }
                 ParsedAttrIdentifier => {
-                    if char == ':' {
-                        self.buf.push(char);
-                        self.push_state(ParsingAttributeColon, Some(char));
+                    let buf = self.buf.as_str();
+                    if buf == ":" {
+                        self.push_token_pop_state(AttrColon);
+                        self.push_state(ParsedAttrColon, None);
                     }
                     // was just terminated by whitespace, colon, or comma
                     // expect another attr id, or block id, or close curly
