@@ -379,14 +379,14 @@ impl Tokenizer {
                     if self.buf.as_str() == "{" {
                         self.push_token(BlockOpen);
                         self.clear_buffer();
-                    } else {
-                        if char.is_ascii_alphabetic() {
-                            self.push_state(ParsingIdentifier, Some(char));
-                        } else if char == '}' {
-                            self.push_state(ParsingBlockClose, Some(char));
-                        } else if !char.is_whitespace() {
-                            self.err_unexpected(char);
-                        }
+                    }
+
+                    if char.is_ascii_alphabetic() {
+                        self.push_state(ParsingIdentifier, Some(char));
+                    } else if char == '}' {
+                        self.push_state(ParsingBlockClose, Some(char));
+                    } else if !char.is_whitespace() {
+                        self.err_unexpected(char);
                     }
                 }
                 ParsingBlockClose => {
