@@ -1,12 +1,14 @@
 mod expression;
+mod helper;
 mod state;
 mod token_type;
 
+use expression::ExpressionTokenizer;
+use helper::current;
 use regex::Regex;
 use state::State;
 use state::State::*;
 use std::cell::RefCell;
-use std::cmp::PartialEq;
 use std::fs::{read_to_string, OpenOptions};
 use std::io::Write;
 use token_type::Token;
@@ -39,7 +41,11 @@ impl Tokenizer {
 
 impl Tokenizer {
     fn state(&self) -> &State {
-        self.state_history.last().unwrap()
+        current(&self.state_history)
+    }
+
+    fn prev_state(&self) -> Option<&State> {
+        self.state_history.get(self.state_history.len() - 2)
     }
 
     fn push_state(&mut self, state: State, starting_char: Option<char>) {
@@ -203,6 +209,7 @@ impl Tokenizer {
         let _block_id_reg = Regex::new(r#"\A[A-Z][a-zA-Z]\z"#).unwrap();
         let _attr_id_reg = Regex::new(r#"\A[A-Z][a-zA-Z]\z"#).unwrap();
         let _newline_reg = Regex::new(r#"\n"#).unwrap();
+        let mut in_dbl_quo = false;
 
         // todo Create method to attempt to recover from unexpected token and keep going? Recovery
         // todo method will depend on what state it is currently in and the state history.
@@ -218,7 +225,7 @@ impl Tokenizer {
 
             if char == '\n' {
                 self.line += 1;
-                self.column = 1;
+                self.column = 0;
             } else {
                 self.column += 1;
             }
@@ -271,11 +278,7 @@ impl Tokenizer {
                 }
                 ParsingIdentifier => {
                     // Parsing an identifier which could be either a block or attr identifier.
-                    let is_in_block = self
-                        .state_history
-                        .get(self.state_history.len() - 2)
-                        .unwrap()
-                        != &ParsingBlock;
+                    let is_in_block = self.prev_state().unwrap() == &ParsingBlock;
 
                     if self.buf.is_empty() && char.is_ascii_alphabetic() {
                         self.buf.push(char);
@@ -291,7 +294,7 @@ impl Tokenizer {
                         }
                         // Resolved to attr identifier.
                         else if [':', ',', '}'].contains(&char) {
-                            if is_in_block {
+                            if !is_in_block {
                                 if char == '}' {
                                     self.err_unexpected(char);
                                 } else {
@@ -316,7 +319,7 @@ impl Tokenizer {
                             let mut i = 0;
                             loop {
                                 i += 1;
-                                if i > 10000 {
+                                if i > string.len() + 10 {
                                     panic!("infinite");
                                 }
                                 if let Some(next) = peekable.next() {
@@ -329,7 +332,7 @@ impl Tokenizer {
                                         break;
                                     } else if [':', ','].contains(&next.1) {
                                         // Resolved to an attr identifier.
-                                        if is_in_block {
+                                        if !is_in_block {
                                             self.err_msg(
                                                 "Attribute identifiers must be within blocks."
                                                     .to_owned(),
@@ -339,7 +342,7 @@ impl Tokenizer {
                                         self.push_state(ParsedAttrIdentifier, None);
                                         break;
                                     } else if next.1 == '}' {
-                                        if is_in_block {
+                                        if !is_in_block {
                                             self.err_unexpected(next.1);
                                         }
                                         // Resolved to a boolean attribute identifier, and block is now closed
@@ -373,23 +376,36 @@ impl Tokenizer {
                     }
                 }
                 ParsingBlock => {
-                    self.push_token(BlockOpen);
-                    if char.is_whitespace() {
-                        self.push_state(ParsingIdentifier, None);
+                    if self.buf.as_str() == "{" {
+                        self.push_token(BlockOpen);
+                        self.clear_buffer();
                     } else {
-                        self.push_state(ParsingIdentifier, Some(char));
+                        if char.is_ascii_alphabetic() {
+                            self.push_state(ParsingIdentifier, Some(char));
+                        } else if char == '}' {
+                            self.push_state(ParsingBlockClose, Some(char));
+                        } else if !char.is_whitespace() {
+                            self.err_unexpected(char);
+                        }
                     }
                 }
                 ParsingBlockClose => {
                     if self.buf.as_str() != "}" {
-                        self.err_msg("".to_owned());
+                        self.err_msg(
+                            "Error internal implementation. Should only have } in buffer at this point."
+                                .to_owned()
+                        );
                     }
+
+                    self.push_token_pop_state(BlockClose);
                 }
                 ParsedAttrIdentifier => {
                     let buf = self.buf.as_str();
                     if buf == ":" {
                         self.push_token_pop_state(AttrColon);
                         self.push_state(ParsedAttrColon, None);
+                    } else if buf == "," {
+                        todo!()
                     }
                     // was just terminated by whitespace, colon, or comma
                     // expect another attr id, or block id, or close curly
@@ -406,6 +422,12 @@ impl Tokenizer {
                     self.push_state(ParsedAttrColon, Some(char));
                 }
                 ParsedAttrColon => {
+                    if char.is_whitespace() {
+                        self.pop_state();
+                        self.push_state(GatheringExpressionTokens, None);
+                    } else {
+                        self.push_state(GatheringExpressionTokens, Some(char));
+                    }
                     // expect expression
                     // todo create separate tokenizer for expressions?
                 }
@@ -415,6 +437,50 @@ impl Tokenizer {
                 ParsedAttrSeparator => {
                     //
                 }
+                GatheringExpressionTokens => {
+                    let last = self.buf.chars().last();
+
+                    // If a double quote was pushed onto buffer as
+                    // the state changed, mark in_dbl_quo = true.
+                    if let Some(last) = last
+                        && self.buf.len() == 1
+                        && last == '"'
+                    {
+                        in_dbl_quo = true;
+                    }
+
+                    // Gather everything until comma or block close, then pass to expression tokenizer
+                    if !in_dbl_quo && (char == ',' || char == '}') {
+                        let expr_tokenizer = ExpressionTokenizer::new(cursor, &self.buf);
+                        let mut tokens = expr_tokenizer.tokenize();
+                        self.tokens.append(&mut tokens);
+                        self.clear_buffer();
+                        self.pop_state();
+                        self.pop_state(); // Popping State::ParsedAttrColon
+                        self.push_state(ParsedExpressionTokens, Some(char));
+                    } else if char == '"' {
+                        if in_dbl_quo
+                            && let Some(last) = last
+                            && last != '\\'
+                        {
+                            in_dbl_quo = false;
+                        } else {
+                            in_dbl_quo = true;
+                        }
+                        self.buf.push(char);
+                    } else {
+                        self.buf.push(char);
+                    }
+                }
+                ParsedExpressionTokens => match self.buf.as_str() {
+                    "," => {
+                        self.push_token_pop_state(AttrSeparator);
+                    }
+                    "}" => {
+                        self.push_token_pop_state(BlockClose);
+                    }
+                    _ => unimplemented!(),
+                },
                 ParsingEventListener => {
                     let buf = self.buf.as_str();
                     if buf != "@" && buf != "@[" {

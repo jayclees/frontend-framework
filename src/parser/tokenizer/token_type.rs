@@ -20,6 +20,7 @@ pub enum TokenType {
     BlockClose,
     AttrIdentifier(String),
     AttrColon,
+    AttrSeparator,
     Expression,
     DirectiveOpen,
     DirectiveClose,
@@ -31,6 +32,14 @@ pub enum TokenType {
     EventListenerIdentifier(String),
     EventListenerColon,
     EventListenerHandler(String),
+
+    ExprString,
+    ExprNumber,
+    ExprVariable,
+    ExprFunctionCall,
+    ExprOperator(Symbol),
+    ExprParenthesesOpen,
+    ExprParenthesesClose,
 }
 
 impl Display for TokenType {
@@ -45,6 +54,7 @@ impl Display for TokenType {
             BlockClose => write!(f, "BlockClose"),
             AttrIdentifier(str) => write!(f, "AttrIdentifier({str})"),
             AttrColon => write!(f, "AttrColon"),
+            AttrSeparator => write!(f, "AttrSeparator"),
             Expression => write!(f, "Expression"),
             DirectiveOpen => write!(f, "DirectiveOpen"),
             DirectiveClose => write!(f, "DirectiveClose"),
@@ -56,6 +66,50 @@ impl Display for TokenType {
             EventListenerIdentifier(str) => write!(f, "EventListenerIdentifier({str})"),
             EventListenerColon => write!(f, "EventListenerColon"),
             EventListenerHandler(str) => write!(f, "EventListenerHandler({str})"),
+
+            // Expression token
+            ExprString => write!(f, "ExprString"),
+            ExprNumber => write!(f, "ExprNumber"),
+            ExprVariable => write!(f, "ExprVariable"),
+            ExprFunctionCall => write!(f, "ExprFunctionCall"),
+            ExprOperator(Symbol) => write!(f, ")"),
+            ExprParenthesesOpen => write!(f, "ExprParenthesesOpen"),
+            ExprParenthesesClose => write!(f, "ExprParenthesesClose"),
         }
     }
+}
+
+#[derive(Debug, PartialEq)]
+pub enum Symbol {
+    Variable(String),
+
+    // Arithmetic
+    Add,
+    Sub,
+    Multiply,
+    Power, // ^x
+    Divide,
+    Modulus,
+
+    // Assignment operators
+    Assign,      // =
+    Increment,   // ++
+    Decrement,   // --
+    IncrementBy, // +=
+    DecrementBy, // -=
+    MultiplyBy,  // *=
+    DivideBy,    // /=
+
+    // Comparisons
+    EqualTo,
+    NotEqualTo,
+    GreaterThan,
+    GreaterThanOrEqualTo,
+    LessThan,
+    LessThanOrEqualTo,
+
+    // Logical
+    And,
+    Or,
+    Not,
 }

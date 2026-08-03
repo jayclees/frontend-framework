@@ -26,17 +26,17 @@ Page [extends: root] [marker-directive] @[load: do_thing()] {
             [class: "featured" if post.featured elif post.pinned "" else "not-featured"]
             [class: "popular" if post.votes > 5]
         {
-            class: "custom-class"
+            class: "custom-class",
             p {
                 a {
-                    href: "https://sturdyframework.com"
-                    target: "_blank"
+                    href: "https://sturdyframework.com",
+                    target: "_blank",
                     text: post.title
                 }
             }
         }
         CustomComponent {
-            customAttribute:
+            customAttribute: "",
         }
         div {}
     }

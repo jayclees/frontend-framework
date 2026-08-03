@@ -7,5 +7,5 @@ fn main() {
     let mut tokenizer = Tokenizer::new();
 
     let tokens = tokenizer.tokenize();
-    dbg!(tokens);
+    // dbg!(tokens);
 }

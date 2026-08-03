@@ -20,6 +20,9 @@ pub enum State {
     ParsingAttrSeparator,
     ParsedAttrSeparator,
 
+    GatheringExpressionTokens,
+    ParsedExpressionTokens,
+
     ParsingEventListener,
     ParsingEventListenerIdentifier,
     ParsingEventListenerColon,
@@ -55,6 +58,8 @@ impl Display for State {
                 ParsingAttributeColon => "ParsingAttributeColon",
                 ParsingAttrSeparator => "ParsingAttrSeparator",
                 ParsedAttrSeparator => "ParsedAttrSeparator",
+                GatheringExpressionTokens => "GatheringExpressionTokens",
+                ParsedExpressionTokens => "ParsedExpressionTokens",
                 ParsingEventListener => "ParsingEventListener",
                 ParsedEventListener => "ParsedEventListener",
                 ParsingEventListenerIdentifier => "ParsingEventListenerIdentifier",
