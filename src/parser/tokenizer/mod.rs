@@ -3,16 +3,16 @@ mod helper;
 mod state;
 mod token_type;
 
-use expression::ExpressionTokenizer;
-use helper::current;
+use crate::parser::tokenizer::helper::push_state_keep_buf;
+use helper::{reset_buffer, current, pop_state, prev, push_state, push_token, TokenizerContract};
 use regex::Regex;
 use state::State;
 use state::State::*;
 use std::cell::RefCell;
 use std::fs::{read_to_string, OpenOptions};
 use std::io::Write;
-use token_type::Token;
-use token_type::{TokenType, TokenType::*};
+use token_type::{Token, TokenType, TokenType::*};
+use crate::parser::tokenizer::expression::{ExprResult, ExpressionTokenizer};
 
 #[derive(Debug)]
 pub struct Tokenizer {
@@ -40,57 +40,6 @@ impl Tokenizer {
 }
 
 impl Tokenizer {
-    fn state(&self) -> &State {
-        current(&self.state_history)
-    }
-
-    fn prev_state(&self) -> Option<&State> {
-        self.state_history.get(self.state_history.len() - 2)
-    }
-
-    fn push_state(&mut self, state: State, starting_char: Option<char>) {
-        self.state_history.push(state);
-        self.buf.clear();
-        self.buf_start = Some(self.cursor);
-
-        if let Some(char) = starting_char {
-            self.buf.push(char);
-        }
-    }
-
-    fn pop_state(&mut self) {
-        // self.clear_buffer();
-        if !self.buf.is_empty() {
-            // An uncleared buffer may indicate something is wrong somewhere, so panic.
-            dbg!(&self.buf);
-            panic!("Buffer should be already empty here?");
-        }
-        self.state_history.pop();
-    }
-
-    fn push_token(&mut self, r#type: TokenType) {
-        let start = self.buf_start.expect("buf_start should be set.");
-        let end = self.cursor;
-
-        if start == end {
-            dbg!(r#type, start, end);
-            panic!("Token should not be zero length.");
-        }
-
-        self.tokens.push(Token { start, end, r#type });
-        self.clear_buffer();
-    }
-
-    fn push_token_pop_state(&mut self, r#type: TokenType) {
-        self.push_token(r#type);
-        self.pop_state();
-    }
-
-    fn clear_buffer(&mut self) {
-        self.buf.clear();
-        self.buf_start = Some(self.cursor);
-    }
-
     fn err_msg(&self, msg: String) {
         let msg = msg.trim_end_matches(".");
         panic!(
@@ -105,6 +54,7 @@ impl Tokenizer {
     fn err_unexpected(&self, char: char) {
         // todo provide expected tokens based on current tokenizer state
         // dbg!(&self.tokens);
+        // dbg!(&self.state_history);
         panic!(
             r#"Unexpected token "{}" at line: {}, column: {}. State: "{}""#,
             char,
@@ -210,9 +160,11 @@ impl Tokenizer {
         let _attr_id_reg = Regex::new(r#"\A[A-Z][a-zA-Z]\z"#).unwrap();
         let _newline_reg = Regex::new(r#"\n"#).unwrap();
         let mut in_dbl_quo = false;
+        let mut expr_tokenizer = ExpressionTokenizer::new();
 
-        // todo Create method to attempt to recover from unexpected token and keep going? Recovery
-        // todo method will depend on what state it is currently in and the state history.
+        // todo:
+        // Create method to attempt to recover from unexpected token and keep going? Recovery
+        // method will depend on what state it is currently in and the state history.
         let mut peekable = string.chars().enumerate().peekable();
         for (cursor, char) in string.chars().enumerate() {
             self.cursor = cursor;
@@ -378,7 +330,6 @@ impl Tokenizer {
                 ParsingBlock => {
                     if self.buf.as_str() == "{" {
                         self.push_token(BlockOpen);
-                        self.clear_buffer();
                     }
 
                     if char.is_ascii_alphabetic() {
@@ -403,7 +354,7 @@ impl Tokenizer {
                     let buf = self.buf.as_str();
                     if buf == ":" {
                         self.push_token_pop_state(AttrColon);
-                        self.push_state(ParsedAttrColon, None);
+                        self.push_state(GatheringExpressionTokens, Some(char));
                     } else if buf == "," {
                         todo!()
                     }
@@ -419,11 +370,11 @@ impl Tokenizer {
                     }
 
                     self.push_token_pop_state(AttrColon);
-                    self.push_state(ParsedAttrColon, Some(char));
+                    self.push_state(GatheringExpressionTokens, Some(char));
                 }
                 ParsedAttrColon => {
+                    self.pop_state();
                     if char.is_whitespace() {
-                        self.pop_state();
                         self.push_state(GatheringExpressionTokens, None);
                     } else {
                         self.push_state(GatheringExpressionTokens, Some(char));
@@ -435,46 +386,72 @@ impl Tokenizer {
                     // expect
                 }
                 ParsedAttrSeparator => {
-                    //
+                    crate::dd!(&self.buf);
                 }
                 GatheringExpressionTokens => {
-                    let last = self.buf.chars().last();
+                    let result = expr_tokenizer.push_parse(cursor, char);
 
-                    // If a double quote was pushed onto buffer as
-                    // the state changed, mark in_dbl_quo = true.
-                    if let Some(last) = last
-                        && self.buf.len() == 1
-                        && last == '"'
-                    {
-                        in_dbl_quo = true;
-                    }
-
-                    // Gather everything until comma or block close, then pass to expression tokenizer
-                    if !in_dbl_quo && (char == ',' || char == '}') {
-                        let expr_tokenizer = ExpressionTokenizer::new(cursor, &self.buf);
-                        let mut tokens = expr_tokenizer.tokenize();
-                        self.tokens.append(&mut tokens);
-                        self.clear_buffer();
-                        self.pop_state();
-                        self.pop_state(); // Popping State::ParsedAttrColon
-                        self.push_state(ParsedExpressionTokens, Some(char));
-                    } else if char == '"' {
-                        if in_dbl_quo
-                            && let Some(last) = last
-                            && last != '\\'
-                        {
-                            in_dbl_quo = false;
-                        } else {
-                            in_dbl_quo = true;
+                    match result {
+                        ExprResult::StillParsing => {
+                            // continue
                         }
-                        self.buf.push(char);
-                    } else {
-                        self.buf.push(char);
+                        ExprResult::Parsed(mut tokens) => {
+                            self.tokens.append(&mut tokens);
+                            self.pop_state();
+                            self.push_state(ParsedExpressionTokens, Some(char));
+                        }
+                        ExprResult::Err(msg) => {
+                            //
+                        }
+                        ExprResult::ErrUnexpected(msg) => {
+                            eprintln!("{msg}");
+                            self.err_unexpected(char);
+                        }
                     }
+
+                    // let last = self.buf.chars().last();
+                    //
+                    // // If a double quote was pushed onto buffer as
+                    // // the state changed, mark in_dbl_quo = true.
+                    // if let Some(last) = last
+                    //     && self.buf.len() == 1
+                    //     && last == '"'
+                    // {
+                    //     in_dbl_quo = true;
+                    // }
+                    //
+                    // // Gather everything until comma or block close, then pass to expression tokenizer
+                    // // todo Integrate the gathering into ExpressionTokenizer struct to avoid duplicating logic
+                    // if !in_dbl_quo && (char == ',' || char == '}') {
+                    //     // let mut expr_tokenizer = ExpressionTokenizer::new(cursor, &self.buf);
+                    //     // let mut tokens = expr_tokenizer.tokenize();
+                    //     // self.tokens.append(&mut tokens);
+                    //     self.clear_buffer();
+                    //     self.pop_state();
+                    //     self.pop_state(); // Popping State::ParsedAttrColon
+                    //     self.push_state(ParsedExpressionTokens, Some(char));
+                    // } else if char == '"' {
+                    //     if in_dbl_quo
+                    //         && let Some(last) = last
+                    //         && last != '\\'
+                    //     {
+                    //         in_dbl_quo = false;
+                    //     } else {
+                    //         in_dbl_quo = true;
+                    //     }
+                    //     self.buf.push(char);
+                    // } else {
+                    //     self.buf.push(char);
+                    // }
                 }
                 ParsedExpressionTokens => match self.buf.as_str() {
                     "," => {
                         self.push_token_pop_state(AttrSeparator);
+                        // if !char.is_whitespace() {
+                        //     self.push_state(ParsedAttrSeparator, Some(char));
+                        // } else {
+                        //     self.push_state(ParsedAttrSeparator, None);
+                        // }
                     }
                     "}" => {
                         self.push_token_pop_state(BlockClose);
@@ -617,5 +594,50 @@ impl Tokenizer {
         self.match_with_source();
 
         &self.tokens
+    }
+}
+
+impl TokenizerContract for Tokenizer {
+    type TokenizerState = State;
+
+    fn state(&self) -> &State {
+        current(&self.state_history)
+    }
+
+    fn prev_state(&self) -> Option<&State> {
+        prev(&self.state_history)
+    }
+
+    fn push_state(&mut self, state: State, starting_char: Option<char>) {
+        push_state(
+            &mut self.state_history,
+            state,
+            &mut self.buf,
+            &mut self.buf_start,
+            starting_char,
+            self.cursor,
+        );
+    }
+
+    fn push_state_keep_buf(&mut self, state: Self::TokenizerState, starting_char: Option<char>) {
+        push_state_keep_buf(&mut self.state_history, state, &mut self.buf, starting_char);
+    }
+
+    fn pop_state(&mut self) {
+        pop_state(&mut self.state_history);
+    }
+
+    fn push_token(&mut self, r#type: TokenType) {
+        push_token(&mut self.tokens, r#type, &self.buf_start, self.cursor);
+        self.reset_buffer();
+    }
+
+    fn push_token_pop_state(&mut self, r#type: TokenType) {
+        self.push_token(r#type);
+        self.pop_state();
+    }
+
+    fn reset_buffer(&mut self) {
+        reset_buffer(&mut self.buf, &mut self.buf_start, self.cursor);
     }
 }

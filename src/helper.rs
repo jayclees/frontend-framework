@@ -6,6 +6,7 @@ macro_rules! dd {
     };
 }
 
+#[allow(unused_imports)]
 pub use dd;
 
 #[macro_export]
@@ -18,4 +19,5 @@ macro_rules! ddif {
     };
 }
 
+#[allow(unused_imports)]
 pub use ddif;

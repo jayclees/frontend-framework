@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use super::TokenType::*;
 
@@ -33,9 +34,9 @@ pub enum TokenType {
     EventListenerColon,
     EventListenerHandler(String),
 
-    ExprString,
+    ExprString(String),
     ExprNumber,
-    ExprVariable,
+    ExprVariable(String),
     ExprFunctionCall,
     ExprOperator(Symbol),
     ExprParenthesesOpen,
@@ -68,11 +69,11 @@ impl Display for TokenType {
             EventListenerHandler(str) => write!(f, "EventListenerHandler({str})"),
 
             // Expression token
-            ExprString => write!(f, "ExprString"),
+            ExprString(str) => write!(f, "ExprString({str})"),
             ExprNumber => write!(f, "ExprNumber"),
-            ExprVariable => write!(f, "ExprVariable"),
+            ExprVariable(str) => write!(f, "ExprVariable({str})"),
             ExprFunctionCall => write!(f, "ExprFunctionCall"),
-            ExprOperator(Symbol) => write!(f, ")"),
+            ExprOperator(symbol) => write!(f, "ExprOperator({symbol}"),
             ExprParenthesesOpen => write!(f, "ExprParenthesesOpen"),
             ExprParenthesesClose => write!(f, "ExprParenthesesClose"),
         }
@@ -81,8 +82,6 @@ impl Display for TokenType {
 
 #[derive(Debug, PartialEq)]
 pub enum Symbol {
-    Variable(String),
-
     // Arithmetic
     Add,
     Sub,
@@ -112,4 +111,33 @@ pub enum Symbol {
     And,
     Or,
     Not,
+}
+
+impl Display for Symbol {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Symbol::Add => write!(f, "Add"),
+            Symbol::Sub => write!(f, "Sub"),
+            Symbol::Multiply => write!(f, "Multiply"),
+            Symbol::Power => write!(f, "Power"),
+            Symbol::Divide => write!(f, "Divide"),
+            Symbol::Modulus => write!(f, "Modulus"),
+            Symbol::Assign => write!(f, "Assign"),
+            Symbol::Increment => write!(f, "Increment"),
+            Symbol::Decrement => write!(f, "Decrement"),
+            Symbol::IncrementBy => write!(f, "IncrementBy"),
+            Symbol::DecrementBy => write!(f, "DecrementBy"),
+            Symbol::MultiplyBy => write!(f, "MultiplyBy"),
+            Symbol::DivideBy => write!(f, "DivideBy"),
+            Symbol::EqualTo => write!(f, "EqualTo"),
+            Symbol::NotEqualTo => write!(f, "NotEqualTo"),
+            Symbol::GreaterThan => write!(f, "GreaterThan"),
+            Symbol::GreaterThanOrEqualTo => write!(f, "GreaterThanOrEqualTo"),
+            Symbol::LessThan => write!(f, "LessThan"),
+            Symbol::LessThanOrEqualTo => write!(f, "LessThanOrEqualTo"),
+            Symbol::And => write!(f, "And"),
+            Symbol::Or => write!(f, "Or"),
+            Symbol::Not => write!(f, "Not"),
+        }
+    }
 }

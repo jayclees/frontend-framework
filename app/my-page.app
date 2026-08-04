@@ -16,7 +16,7 @@ Page [extends: root] [marker-directive] @[load: do_thing()] {
             text: "Show Paragraph"
         }
         p [if: show_msg] {
-            html: "This is some <b>bold</b> and <em>italic</em> text. This is both <b><em>italic</em></b>"
+            html: "This is some <b>bold</b> and <em>italic</em> text. This is both <b><em>italic and bold</em></b>"
         }
         p {
             text: "my_var = {my_var}"
@@ -31,7 +31,7 @@ Page [extends: root] [marker-directive] @[load: do_thing()] {
                 a {
                     href: "https://sturdyframework.com",
                     target: "_blank",
-                    text: post.title
+                    text: "post.title"
                 }
             }
         }
