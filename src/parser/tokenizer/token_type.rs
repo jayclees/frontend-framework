@@ -1,6 +1,5 @@
-use std::collections::HashMap;
-use std::fmt::{Display, Formatter};
 use super::TokenType::*;
+use std::fmt::{Display, Formatter};
 
 #[derive(Debug)]
 pub struct Token {
@@ -35,10 +34,10 @@ pub enum TokenType {
     EventListenerHandler(String),
 
     ExprString(String),
-    ExprNumber,
+    ExprNumber(String),
     ExprVariable(String),
     ExprFunctionCall,
-    ExprOperator(Symbol),
+    ExprOperator(Operator),
     ExprParenthesesOpen,
     ExprParenthesesClose,
 }
@@ -70,7 +69,7 @@ impl Display for TokenType {
 
             // Expression token
             ExprString(str) => write!(f, "ExprString({str})"),
-            ExprNumber => write!(f, "ExprNumber"),
+            ExprNumber(str) => write!(f, "ExprNumber({str})"),
             ExprVariable(str) => write!(f, "ExprVariable({str})"),
             ExprFunctionCall => write!(f, "ExprFunctionCall"),
             ExprOperator(symbol) => write!(f, "ExprOperator({symbol}"),
@@ -81,7 +80,7 @@ impl Display for TokenType {
 }
 
 #[derive(Debug, PartialEq)]
-pub enum Symbol {
+pub enum Operator {
     // Arithmetic
     Add,
     Sub,
@@ -113,31 +112,70 @@ pub enum Symbol {
     Not,
 }
 
-impl Display for Symbol {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Symbol::Add => write!(f, "Add"),
-            Symbol::Sub => write!(f, "Sub"),
-            Symbol::Multiply => write!(f, "Multiply"),
-            Symbol::Power => write!(f, "Power"),
-            Symbol::Divide => write!(f, "Divide"),
-            Symbol::Modulus => write!(f, "Modulus"),
-            Symbol::Assign => write!(f, "Assign"),
-            Symbol::Increment => write!(f, "Increment"),
-            Symbol::Decrement => write!(f, "Decrement"),
-            Symbol::IncrementBy => write!(f, "IncrementBy"),
-            Symbol::DecrementBy => write!(f, "DecrementBy"),
-            Symbol::MultiplyBy => write!(f, "MultiplyBy"),
-            Symbol::DivideBy => write!(f, "DivideBy"),
-            Symbol::EqualTo => write!(f, "EqualTo"),
-            Symbol::NotEqualTo => write!(f, "NotEqualTo"),
-            Symbol::GreaterThan => write!(f, "GreaterThan"),
-            Symbol::GreaterThanOrEqualTo => write!(f, "GreaterThanOrEqualTo"),
-            Symbol::LessThan => write!(f, "LessThan"),
-            Symbol::LessThanOrEqualTo => write!(f, "LessThanOrEqualTo"),
-            Symbol::And => write!(f, "And"),
-            Symbol::Or => write!(f, "Or"),
-            Symbol::Not => write!(f, "Not"),
+impl Operator {
+    pub(super) fn is_operator_char(char: char) -> bool {
+        ['+', '-', '*', '^', '/', '%', '=', '<', '>', '!', '&', '|'].contains(&char)
+    }
+
+    pub(super) fn get_match(buf: &str) -> OperatorMatchResult {
+        match buf {
+            "+" => OperatorMatchResult::Matched(Operator::Add),
+            "-" => OperatorMatchResult::Matched(Operator::Sub),
+            "*" => OperatorMatchResult::Matched(Operator::Multiply),
+            "^" => OperatorMatchResult::Matched(Operator::Power),
+            "/" => OperatorMatchResult::Matched(Operator::Divide),
+            "%" => OperatorMatchResult::Matched(Operator::Modulus),
+            "=" => OperatorMatchResult::Matched(Operator::Assign),
+            "++" => OperatorMatchResult::Matched(Operator::Increment),
+            "--" => OperatorMatchResult::Matched(Operator::Decrement),
+            "+=" => OperatorMatchResult::Matched(Operator::IncrementBy),
+            "-=" => OperatorMatchResult::Matched(Operator::DecrementBy),
+            "*=" => OperatorMatchResult::Matched(Operator::MultiplyBy),
+            "/=" => OperatorMatchResult::Matched(Operator::DivideBy),
+            "==" => OperatorMatchResult::Matched(Operator::EqualTo),
+            "!=" => OperatorMatchResult::Matched(Operator::NotEqualTo),
+            ">" => OperatorMatchResult::Matched(Operator::GreaterThan),
+            ">=" => OperatorMatchResult::Matched(Operator::GreaterThanOrEqualTo),
+            "<" => OperatorMatchResult::Matched(Operator::LessThan),
+            "<=" => OperatorMatchResult::Matched(Operator::LessThanOrEqualTo),
+            "&&" => OperatorMatchResult::Matched(Operator::And),
+            "||" => OperatorMatchResult::Matched(Operator::Or),
+            "!" => OperatorMatchResult::Matched(Operator::Not),
+            _ => OperatorMatchResult::Failed,
         }
     }
+}
+
+impl Display for Operator {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Operator::Add => write!(f, "Add"),
+            Operator::Sub => write!(f, "Sub"),
+            Operator::Multiply => write!(f, "Multiply"),
+            Operator::Power => write!(f, "Power"),
+            Operator::Divide => write!(f, "Divide"),
+            Operator::Modulus => write!(f, "Modulus"),
+            Operator::Assign => write!(f, "Assign"),
+            Operator::Increment => write!(f, "Increment"),
+            Operator::Decrement => write!(f, "Decrement"),
+            Operator::IncrementBy => write!(f, "IncrementBy"),
+            Operator::DecrementBy => write!(f, "DecrementBy"),
+            Operator::MultiplyBy => write!(f, "MultiplyBy"),
+            Operator::DivideBy => write!(f, "DivideBy"),
+            Operator::EqualTo => write!(f, "EqualTo"),
+            Operator::NotEqualTo => write!(f, "NotEqualTo"),
+            Operator::GreaterThan => write!(f, "GreaterThan"),
+            Operator::GreaterThanOrEqualTo => write!(f, "GreaterThanOrEqualTo"),
+            Operator::LessThan => write!(f, "LessThan"),
+            Operator::LessThanOrEqualTo => write!(f, "LessThanOrEqualTo"),
+            Operator::And => write!(f, "And"),
+            Operator::Or => write!(f, "Or"),
+            Operator::Not => write!(f, "Not"),
+        }
+    }
+}
+
+pub(super) enum OperatorMatchResult {
+    Matched(Operator),
+    Failed,
 }

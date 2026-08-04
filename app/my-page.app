@@ -18,8 +18,23 @@ Page [extends: root] [marker-directive] @[load: do_thing()] {
         p [if: show_msg] {
             html: "This is some <b>bold</b> and <em>italic</em> text. This is both <b><em>italic and bold</em></b>"
         }
-        p {
+        p @[click: hello()] {
             text: "my_var = {my_var}"
+        }
+        input {
+            value: 1
+        }
+        input {
+            value: 1 + 1
+        }
+        input {
+            value: 1 - 1
+        }
+        input {
+            value: my_num + 1
+        }
+        input {
+            value: my_num + my_obj.my_field
         }
         div
             [repeat: post in posts]
