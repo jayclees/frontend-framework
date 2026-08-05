@@ -6,7 +6,6 @@ mod token_type;
 use crate::parser::tokenizer::expression::{ExprResult, ExpressionTokenizer};
 use crate::parser::tokenizer::helper::push_state_keep_buf;
 use helper::{current, pop_state, prev, push_state, push_token, reset_buffer, TokenizerContract};
-use regex::Regex;
 use state::State;
 use state::State::*;
 use std::cell::RefCell;
@@ -94,22 +93,6 @@ impl Tokenizer {
             let string = source.get_mut();
             let whitespace = string.take(ws_stop - ws_start).collect::<String>();
             let token_string = string.take(token.end - token.start).collect::<String>();
-            // match token.r#type {
-            //     BlockIdentifier(_) => println!(r#"BlockIdentifier: '{x}'"#),
-            //     AttrIdentifier(_) => println!(r#"AttrIdentifier: '{x}'"#),
-            //     StringExpr(_) => println!(r#"StringExpr: '{x}'"#),
-            //     LineComment(_) => println!(r#"LineComment: '{x}'"#),
-            //     BlockComment(_) => println!(r#"BlockComment: '{x}'"#),
-            //     Colon => println!(r#"Colon: '{x}'"#),
-            //     BlockOpen => println!(r#"BlockOpen: '{x}'"#),
-            //     BlockClose => println!(r#"BlockClose: '{x}'"#),
-            //     Expression => println!(r#"Expression: '{x}'"#),
-            //     DirectiveOpen => println!(r#"DirectiveOpen: '{x}'"#),
-            //     DirectiveClose => println!(r#"DirectiveClose: '{x}'"#),
-            //     DirectiveIdentifier(_) => println!(r#"DirectiveIdentifier: '{x}'"#),
-            //     DirectiveColon => println!(r#"DirectiveColon: '{x}'"#),
-            //     DirectiveValue(_) => println!(r#"DirectiveValue: '{x}'"#),
-            // }
 
             let token_type = token.r#type.to_string();
             let display = if let Some(i) = token_type.find("(") {
@@ -168,10 +151,6 @@ impl Tokenizer {
     pub fn tokenize(&mut self) -> &Vec<Token> {
         let string = read_to_string("app/my-page.app").unwrap();
         let mut skip: usize = 0;
-        let _block_id_reg = Regex::new(r#"\A[A-Z][a-zA-Z]\z"#).unwrap();
-        let _attr_id_reg = Regex::new(r#"\A[A-Z][a-zA-Z]\z"#).unwrap();
-        let _newline_reg = Regex::new(r#"\n"#).unwrap();
-        let mut in_dbl_quo = false;
         let mut expr_tokenizer = ExpressionTokenizer::new();
 
         // todo:
