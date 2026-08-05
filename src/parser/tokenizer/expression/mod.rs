@@ -2,7 +2,7 @@ use super::helper::{
     current, pop_state, pop_state_type, prev, push_state, push_state_include_ws,
     push_state_keep_buf, push_token, reset_buffer,
 };
-use super::token_type::{Operator, OperatorMatchResult};
+use super::token::{Operator, OperatorMatchResult};
 use super::{Token, TokenType, TokenizerContract};
 use std::fmt::{Display, Formatter};
 use ExprState::*;
@@ -216,20 +216,8 @@ impl TokenizerContract for ExpressionTokenizer {
     fn push_token(&mut self, r#type: TokenType) {
         push_token(
             &mut self.tokens,
-            r#type,
             self.buf_start.expect("Should be set."),
-            self.cursor,
-        );
-        self.reset_buffer();
-    }
-
-    //noinspection ALL
-    fn squeeze_token(&mut self, r#type: TokenType) {
-        push_token(
-            &mut self.tokens,
             r#type,
-            self.buf_start.expect("Should be set.") - 1,
-            self.cursor - 1,
         );
         self.reset_buffer();
     }

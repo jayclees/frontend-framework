@@ -1,4 +1,4 @@
-use crate::parser::tokenizer::token_type::{Token, TokenType};
+use crate::parser::tokenizer::token::{Token, TokenType};
 
 pub trait TokenizerContract {
     type TokenizerState;
@@ -10,7 +10,6 @@ pub trait TokenizerContract {
     fn pop_state(&mut self);
     fn pop_state_type(&mut self, state: Self::TokenizerState);
     fn push_token(&mut self, r#type: TokenType);
-    fn squeeze_token(&mut self, r#type: TokenType);
     fn push_token_pop_state(&mut self, r#type: TokenType);
     fn buf_last(&self) -> Option<char>;
     fn reset_buffer(&mut self);
@@ -37,7 +36,9 @@ pub(super) fn push_state<T>(
     state_history.push(state);
     reset_buffer(buf, buf_start, cursor);
 
-    if let Some(char) = starting_char && !char.is_whitespace() {
+    if let Some(char) = starting_char
+        && !char.is_whitespace()
+    {
         buf.push(char);
     }
 }
@@ -76,7 +77,9 @@ pub(super) fn pop_state<T>(state_history: &mut Vec<T>) {
 }
 
 pub(super) fn pop_state_type<T: PartialEq<T>>(state_history: &mut Vec<T>, state: T) {
-    let last = state_history.last().expect("Should always have at least 1 state_history (State::Start)");
+    let last = state_history
+        .last()
+        .expect("Should always have at least 1 state_history (State::Start)");
     if last != &state {
         panic!("State types do not match.");
     }
@@ -85,19 +88,10 @@ pub(super) fn pop_state_type<T: PartialEq<T>>(state_history: &mut Vec<T>, state:
 
 pub(super) fn push_token(
     tokens: &mut Vec<Token>,
+    start: usize,
     r#type: TokenType,
-    buf_start: usize,
-    buf_end: usize,
 ) {
-    let start = buf_start;
-    let end = buf_end;
-
-    if start == end {
-        dbg!(r#type, start, end);
-        panic!("Token should not be zero length.");
-    }
-
-    tokens.push(Token { start, end, r#type });
+    tokens.push(Token::new(start, r#type));
 }
 
 pub(super) fn reset_buffer(buf: &mut String, buf_start: &mut Option<usize>, cursor: usize) {

@@ -6,5 +6,8 @@ edition = "2024"
 [dependencies]
 html-escape = "0.2.14"
 
+[dev-dependencies]
+fake = { version = "5", features = ["derive"] }
+
 [[bin]]
 name = "get-snippet"

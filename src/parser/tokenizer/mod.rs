@@ -1,10 +1,11 @@
 mod expression;
 mod helper;
 mod state;
-mod token_type;
 #[cfg(test)]
 mod test;
+mod token;
 
+use crate::parser::tokenizer::helper::pop_state_type;
 use expression::ExpressionTokenizer;
 use helper::{
     current, pop_state, prev, push_state, push_state_include_ws, push_state_keep_buf,
@@ -15,9 +16,7 @@ use state::State::*;
 use std::cell::RefCell;
 use std::fs::{read_to_string, OpenOptions};
 use std::io::Write;
-use token_type::{Token, TokenType, TokenType::*};
-use crate::parser::BlockType::P;
-use crate::parser::tokenizer::helper::pop_state_type;
+use token::{Token, TokenType, TokenType::*};
 
 #[derive(Debug)]
 pub struct Tokenizer {
@@ -94,15 +93,15 @@ impl Tokenizer {
         let mut prev: Option<&Token> = None;
         for token in self.tokens.iter().clone() {
             let (ws_start, ws_stop) = if let Some(prev) = prev {
-                (prev.end, token.start)
+                (prev.end(), token.start())
             } else {
-                (0, token.start)
+                (0, token.start())
             };
             let string = source.get_mut();
             let whitespace = string.take(ws_stop - ws_start).collect::<String>();
-            let token_string = string.take(token.end - token.start).collect::<String>();
+            let token_string = string.take(token.end() - token.start()).collect::<String>();
 
-            let token_type = token.r#type.to_string();
+            let token_type = token.r#type().to_string();
             let display = if let Some(i) = token_type.find("(") {
                 token_type[..i].to_owned()
             } else {
@@ -191,8 +190,12 @@ impl Tokenizer {
                         self.push_state(ParsingIdentifier, Some(char));
                     }
                 }
-                InLineComment => {todo!("InLineComment")}
-                InBlockComment => {todo!("InBlockComment")}
+                InLineComment => {
+                    todo!("InLineComment")
+                }
+                InBlockComment => {
+                    todo!("InBlockComment")
+                }
                 ParsingIdentifier => {
                     if char.is_ascii_alphabetic() {
                         self.buf.push(char)
@@ -235,13 +238,23 @@ impl Tokenizer {
                             }
                         } else if self.buf.as_str() == "{" {
                             self.push_token(BlockOpen);
-                            self.pop_state(); // Popping ParsedBlockIdentifier
+                            self.pop_state(); // Popping State::ParsedBlockIdentifier
                             self.push_state(ParsedBlockOpen, None);
+
+                            if char == '}' {
+                                self.buf.push(char);
+                                self.push_token(BlockClose);
+                                self.pop_state(); // Popping State::ParsedBlockOpen
+                            }
                         }
                     }
                 }
-                ParsedAttrIdentifier => {todo!("ParsedAttrIdentifier")}
-                ParsingBlockOpen => {todo!("ParsingBlockOpen")}
+                ParsedAttrIdentifier => {
+                    todo!("ParsedAttrIdentifier")
+                }
+                ParsingBlockOpen => {
+                    todo!("ParsingBlockOpen")
+                }
                 ParsedBlockOpen => {
                     if char.is_ascii_alphabetic() {
                         self.push_state(ParsingIdentifier, Some(char));
@@ -249,22 +262,41 @@ impl Tokenizer {
                         self.reset_buffer();
                         self.buf.push(char);
                         self.push_token(BlockClose);
-
-                        crate::dd!(self.state());
+                        self.pop_state_type(ParsedBlockOpen);
                     } else if !char.is_whitespace() {
-                        self.err_unexpected(char)
+                        self.err_unexpected(char);
                     }
                 }
-                ParsingBlockClose => {todo!("ParsingBlockClose")}
-                ParsingAttributeColon => {todo!("ParsingAttributeColon")}
-                ParsedAttrColon => {todo!("ParsedAttrColon")}
-                ParsingAttrSeparator => {todo!("ParsingAttrSeparator")}
-                ParsedAttrSeparator => {todo!("ParsedAttrSeparator")}
-                GatheringExpressionTokens => {todo!("GatheringExpressionTokens")}
-                ParsedExpressionTokens => {todo!("ParsedExpressionTokens")}
-                ParsingDirective => {todo!("ParsingDirective")}
-                ParsingDirectiveOpen => {todo!("ParsingDirectiveOpen")}
-                ParsedDirectiveOpen => {todo!("ParsedDirectiveOpen")}
+                ParsingBlockClose => {
+                    todo!("ParsingBlockClose")
+                }
+                ParsingAttributeColon => {
+                    todo!("ParsingAttributeColon")
+                }
+                ParsedAttrColon => {
+                    todo!("ParsedAttrColon")
+                }
+                ParsingAttrSeparator => {
+                    todo!("ParsingAttrSeparator")
+                }
+                ParsedAttrSeparator => {
+                    todo!("ParsedAttrSeparator")
+                }
+                GatheringExpressionTokens => {
+                    todo!("GatheringExpressionTokens")
+                }
+                ParsedExpressionTokens => {
+                    todo!("ParsedExpressionTokens")
+                }
+                ParsingDirective => {
+                    todo!("ParsingDirective")
+                }
+                ParsingDirectiveOpen => {
+                    todo!("ParsingDirectiveOpen")
+                }
+                ParsedDirectiveOpen => {
+                    todo!("ParsedDirectiveOpen")
+                }
                 ParsingDirectiveIdentifier => {
                     let buf_empty = self.buf.is_empty();
                     if buf_empty {
@@ -272,7 +304,9 @@ impl Tokenizer {
                     }
                     if buf_empty && char.is_ascii_alphabetic() {
                         self.buf.push(char);
-                    } else if !buf_empty && (char.is_ascii_alphabetic() || ['-', '_'].contains(&char)) {
+                    } else if !buf_empty
+                        && (char.is_ascii_alphabetic() || ['-', '_'].contains(&char))
+                    {
                         self.buf.push(char)
                     } else if char == ':' {
                         self.push_token_pop_state(DirectiveIdentifier(self.buf.clone()));
@@ -288,9 +322,15 @@ impl Tokenizer {
                         self.err_unexpected(char);
                     }
                 }
-                ParsedDirectiveColon => {todo!("ParsedDirectiveColon")}
-                EmptyDirectiveParsed => {todo!("EmptyDirectiveParsed")}
-                ParsingDirectiveColon => {todo!("ParsingDirectiveColon")}
+                ParsedDirectiveColon => {
+                    todo!("ParsedDirectiveColon")
+                }
+                EmptyDirectiveParsed => {
+                    todo!("EmptyDirectiveParsed")
+                }
+                ParsingDirectiveColon => {
+                    todo!("ParsingDirectiveColon")
+                }
                 ParsingDirectiveValue => {
                     if self.buf.is_empty() {
                         self.reset_buffer();
@@ -304,22 +344,44 @@ impl Tokenizer {
                         self.buf.push(char);
                     }
                 }
-                ParsingDirectiveClose => {todo!("ParsingDirectiveClose")}
-                ParsedDirectiveClose => {todo!("ParsedDirectiveClose")}
-                ParsedDirective => {todo!("ParsedDirective")}
-                ParsingEventListenerOpen => {todo!("ParsingEventListenerOpen")}
-                ParsedEventListenerOpen => {todo!("ParsedEventListenerOpen")}
-                ParsingEventListenerIdentifier => {todo!("ParsingEventListenerIdentifier")}
-                ParsingEventListenerColon => {todo!("ParsingEventListenerColon")}
-                ParsingEventListenerHandler => {todo!("ParsingEventListenerHandler")}
-                ParsedEventListener => {todo!("ParsedEventListener")}
-                InDblQuoteUnescaped => {todo!("InDblQuoteUnescaped")}
-                InDblQuoteEscaped => {todo!("InDblQuoteEscaped")}
+                ParsingDirectiveClose => {
+                    todo!("ParsingDirectiveClose")
+                }
+                ParsedDirectiveClose => {
+                    todo!("ParsedDirectiveClose")
+                }
+                ParsedDirective => {
+                    todo!("ParsedDirective")
+                }
+                ParsingEventListenerOpen => {
+                    todo!("ParsingEventListenerOpen")
+                }
+                ParsedEventListenerOpen => {
+                    todo!("ParsedEventListenerOpen")
+                }
+                ParsingEventListenerIdentifier => {
+                    todo!("ParsingEventListenerIdentifier")
+                }
+                ParsingEventListenerColon => {
+                    todo!("ParsingEventListenerColon")
+                }
+                ParsingEventListenerHandler => {
+                    todo!("ParsingEventListenerHandler")
+                }
+                ParsedEventListener => {
+                    todo!("ParsedEventListener")
+                }
+                InDblQuoteUnescaped => {
+                    todo!("InDblQuoteUnescaped")
+                }
+                InDblQuoteEscaped => {
+                    todo!("InDblQuoteEscaped")
+                }
             }
         }
 
         // All states should have been popped, and we should be back to start
-        if self.state() != &Start {
+        if self.state_history.len() != 1 && self.state() != &Start {
             self.err_eof();
         }
 
@@ -376,22 +438,7 @@ impl TokenizerContract for Tokenizer {
 
     fn push_token(&mut self, r#type: TokenType) {
         let buf_start = self.buf_start.expect("Should be set.");
-        push_token(
-            &mut self.tokens,
-            r#type,
-            buf_start,
-            buf_start + self.buf.len(),
-        );
-        self.reset_buffer();
-    }
-
-    fn squeeze_token(&mut self, r#type: TokenType) {
-        push_token(
-            &mut self.tokens,
-            r#type,
-            self.buf_start.expect("Should be set."),
-            self.cursor,
-        );
+        push_token(&mut self.tokens, buf_start, r#type);
         self.reset_buffer();
     }
 

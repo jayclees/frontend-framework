@@ -1,19 +1,73 @@
+use std::env::var;
 use super::TokenType::*;
 use std::fmt::{Display, Formatter};
 
 #[derive(Debug, PartialEq)]
 pub struct Token {
-    pub(super) start: usize,
-    pub(super) end: usize,
-    pub(super) r#type: TokenType,
+    start: usize,
+    end: usize,
+    r#type: TokenType,
 }
 
 impl Token {
-    pub fn new(start: usize, end: usize, r#type: TokenType) -> Token {
+    pub fn new(start: usize, r#type: TokenType) -> Token {
+        // match and validate start/end with token len
+
+        if r#type.len() == 0 {
+            panic!("Token should not be 0 length. TokenType: {}", r#type)
+        }
+
         Token {
             start,
-            end,
+            end: start + r#type.len(),
             r#type,
+        }
+    }
+
+    pub fn start(&self) -> usize {
+        self.start
+    }
+
+    pub fn end(&self) -> usize {
+        self.end
+    }
+
+    pub fn r#type(&self) -> &TokenType {
+        &self.r#type
+    }
+
+    #[cfg(test)]
+    pub fn test(&self, source: &str) -> bool {
+        match &self.r#type {
+            BlockIdentifier(str) |
+            LineComment(str) |
+            BlockComment(str) |
+            AttrIdentifier(str) |
+            DirectiveIdentifier(str) |
+            EventListenerIdentifier(str) |
+            EventListenerHandler(str) |
+            DirectiveValue(str) |
+            ExprString(str) |
+            ExprNumber(str) |
+            ExprVariable(str) |
+            ExprFunctionCall(str) => &source[self.start..self.end] == str,
+
+            Colon => &source[self.start..self.end] == ":",
+            BlockOpen => &source[self.start..self.end] == "{",
+            BlockClose => &source[self.start..self.end] == "}",
+            AttrColon => &source[self.start..self.end] == ":",
+            AttrSeparator => &source[self.start..self.end] == ",",
+            DirectiveOpen => &source[self.start..self.end] == "[",
+            DirectiveClose => &source[self.start..self.end] == "]",
+            DirectiveColon => &source[self.start..self.end] == ":",
+            EventListenerOpen => &source[self.start..self.end] == "@[",
+            EventListenerClose => &source[self.start..self.end] == "]",
+            EventListenerColon => &source[self.start..self.end] == ":",
+            ExprParenthesesOpen => &source[self.start..self.end] == "(",
+            ExprParenthesesClose => &source[self.start..self.end] == ")",
+
+            ExprOperator(operator) => { todo!("Test operator.") }
+            Expression => todo!("Test expression."),
         }
     }
 }
@@ -22,7 +76,6 @@ impl Token {
 pub enum TokenType {
     // Keyword(KeywordEnum),
     BlockIdentifier(String),
-    StringExpr(String),
     LineComment(String),
     BlockComment(String),
     Colon, // todo remove
@@ -46,7 +99,7 @@ pub enum TokenType {
     ExprString(String),
     ExprNumber(String),
     ExprVariable(String),
-    ExprFunctionCall,
+    ExprFunctionCall(String),
     ExprOperator(Operator),
     ExprParenthesesOpen,
     ExprParenthesesClose,
@@ -56,7 +109,6 @@ impl TokenType {
     pub fn len(&self) -> usize {
         match self {
             BlockIdentifier(str) |
-            StringExpr(str) |
             LineComment(str) |
             BlockComment(str) |
             AttrIdentifier(str) |
@@ -66,6 +118,7 @@ impl TokenType {
             ExprString(str) |
             ExprNumber(str) |
             ExprVariable(str) |
+            ExprFunctionCall(str) |
             EventListenerIdentifier(str) => str.len(),
 
             Colon |
@@ -79,14 +132,13 @@ impl TokenType {
             DirectiveColon |
             EventListenerClose |
             EventListenerColon |
-            ExprFunctionCall |
             ExprParenthesesOpen |
             ExprParenthesesClose => 1,
 
-            EventListenerOpen  => 2,
+            EventListenerOpen => 2,
 
-            ExprOperator(_symbol) => {
-                todo!()
+            ExprOperator(op) => {
+                op.symbol().len()
             }
         }
     }
@@ -96,7 +148,6 @@ impl Display for TokenType {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match &self {
             BlockIdentifier(str) => write!(f, "BlockIdentifier({str})"),
-            StringExpr(str) => write!(f, "StringExpr({str})"),
             LineComment(str) => write!(f, "LineComment({str})"),
             BlockComment(str) => write!(f, "BlockComment({str})"),
             Colon => write!(f, "Colon"),
@@ -121,15 +172,15 @@ impl Display for TokenType {
             ExprString(str) => write!(f, "ExprString({str})"),
             ExprNumber(str) => write!(f, "ExprNumber({str})"),
             ExprVariable(str) => write!(f, "ExprVariable({str})"),
-            ExprFunctionCall => write!(f, "ExprFunctionCall"),
-            ExprOperator(symbol) => write!(f, "ExprOperator({symbol}"),
+            ExprFunctionCall(str) => write!(f, "ExprFunctionCall({str})"),
+            ExprOperator(op) => write!(f, "ExprOperator({op})"),
             ExprParenthesesOpen => write!(f, "ExprParenthesesOpen"),
             ExprParenthesesClose => write!(f, "ExprParenthesesClose"),
         }
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Operator {
     // Arithmetic
     Add,
@@ -168,30 +219,64 @@ impl Operator {
     }
 
     pub(super) fn get_match(buf: &str) -> OperatorMatchResult {
-        match buf {
-            "+" => OperatorMatchResult::Matched(Operator::Add),
-            "-" => OperatorMatchResult::Matched(Operator::Sub),
-            "*" => OperatorMatchResult::Matched(Operator::Multiply),
-            "^" => OperatorMatchResult::Matched(Operator::Power),
-            "/" => OperatorMatchResult::Matched(Operator::Divide),
-            "%" => OperatorMatchResult::Matched(Operator::Modulus),
-            "=" => OperatorMatchResult::Matched(Operator::Assign),
-            "++" => OperatorMatchResult::Matched(Operator::Increment),
-            "--" => OperatorMatchResult::Matched(Operator::Decrement),
-            "+=" => OperatorMatchResult::Matched(Operator::IncrementBy),
-            "-=" => OperatorMatchResult::Matched(Operator::DecrementBy),
-            "*=" => OperatorMatchResult::Matched(Operator::MultiplyBy),
-            "/=" => OperatorMatchResult::Matched(Operator::DivideBy),
-            "==" => OperatorMatchResult::Matched(Operator::EqualTo),
-            "!=" => OperatorMatchResult::Matched(Operator::NotEqualTo),
-            ">" => OperatorMatchResult::Matched(Operator::GreaterThan),
-            ">=" => OperatorMatchResult::Matched(Operator::GreaterThanOrEqualTo),
-            "<" => OperatorMatchResult::Matched(Operator::LessThan),
-            "<=" => OperatorMatchResult::Matched(Operator::LessThanOrEqualTo),
-            "&&" => OperatorMatchResult::Matched(Operator::And),
-            "||" => OperatorMatchResult::Matched(Operator::Or),
-            "!" => OperatorMatchResult::Matched(Operator::Not),
-            _ => OperatorMatchResult::Failed,
+        let variants = [
+            Operator::Add,
+            Operator::Sub,
+            Operator::Multiply,
+            Operator::Power,
+            Operator::Divide,
+            Operator::Modulus,
+            Operator::Assign,
+            Operator::Increment,
+            Operator::Decrement,
+            Operator::IncrementBy,
+            Operator::DecrementBy,
+            Operator::MultiplyBy,
+            Operator::DivideBy,
+            Operator::EqualTo,
+            Operator::NotEqualTo,
+            Operator::GreaterThan,
+            Operator::GreaterThanOrEqualTo,
+            Operator::LessThan,
+            Operator::LessThanOrEqualTo,
+            Operator::And,
+            Operator::Or,
+            Operator::Not,
+        ];
+
+        for variant in variants.iter() {
+            if variant.symbol() == buf {
+                return OperatorMatchResult::Matched(variant.clone());
+            }
+        }
+
+        OperatorMatchResult::Failed
+    }
+
+    pub(super) fn symbol(&self) -> &'static str {
+        match self {
+            Operator::Add => "+",
+            Operator::Sub => "-",
+            Operator::Multiply => "*",
+            Operator::Power => "^",
+            Operator::Divide => "/",
+            Operator::Modulus => "%",
+            Operator::Assign => "=",
+            Operator::Increment => "++",
+            Operator::Decrement => "--",
+            Operator::IncrementBy => "+=",
+            Operator::DecrementBy => "-=",
+            Operator::MultiplyBy => "*=",
+            Operator::DivideBy => "/=",
+            Operator::EqualTo => "==",
+            Operator::NotEqualTo => "!=",
+            Operator::GreaterThan => ">",
+            Operator::GreaterThanOrEqualTo => ">=",
+            Operator::LessThan => "<",
+            Operator::LessThanOrEqualTo => "<=",
+            Operator::And => "&&",
+            Operator::Or => "||",
+            Operator::Not => "!",
         }
     }
 }
