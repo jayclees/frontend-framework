@@ -1,5 +1,6 @@
 use super::helper::{
-    current, pop_state, prev, push_state, push_state_keep_buf, push_token, reset_buffer,
+    current, pop_state, pop_state_type, prev, push_state, push_state_include_ws,
+    push_state_keep_buf, push_token, reset_buffer,
 };
 use super::token_type::{Operator, OperatorMatchResult};
 use super::{Token, TokenType, TokenizerContract};
@@ -93,7 +94,6 @@ impl ExpressionTokenizer {
                     }
 
                     let last = self.buf.chars().last().unwrap();
-
                 } else if char.is_ascii_digit() {
                     self.push_state(ParsingNumber, Some(char));
                 } else if char.is_ascii_alphabetic() {
@@ -151,7 +151,7 @@ impl ExpressionTokenizer {
                             }
                         }
                         OperatorMatchResult::Failed => {
-                            return self.err(format!(r#"Failed operator match "{}""#, self.buf))
+                            return self.err(format!(r#"Failed operator match "{}""#, self.buf));
                         }
                     }
                     // todo handle current char
@@ -190,6 +190,17 @@ impl TokenizerContract for ExpressionTokenizer {
         );
     }
 
+    fn push_state_include_ws(&mut self, state: Self::TokenizerState, starting_char: Option<char>) {
+        push_state_include_ws(
+            &mut self.state_history,
+            state,
+            &mut self.buf,
+            &mut self.buf_start,
+            starting_char,
+            self.cursor,
+        );
+    }
+
     fn push_state_keep_buf(&mut self, state: Self::TokenizerState, starting_char: Option<char>) {
         push_state_keep_buf(&mut self.state_history, state, &mut self.buf, starting_char);
     }
@@ -198,8 +209,28 @@ impl TokenizerContract for ExpressionTokenizer {
         pop_state(&mut self.state_history);
     }
 
+    fn pop_state_type(&mut self, state: Self::TokenizerState) {
+        pop_state_type(&mut self.state_history, state);
+    }
+
     fn push_token(&mut self, r#type: TokenType) {
-        push_token(&mut self.tokens, r#type, &self.buf_start, self.cursor);
+        push_token(
+            &mut self.tokens,
+            r#type,
+            self.buf_start.expect("Should be set."),
+            self.cursor,
+        );
+        self.reset_buffer();
+    }
+
+    //noinspection ALL
+    fn squeeze_token(&mut self, r#type: TokenType) {
+        push_token(
+            &mut self.tokens,
+            r#type,
+            self.buf_start.expect("Should be set.") - 1,
+            self.cursor - 1,
+        );
         self.reset_buffer();
     }
 

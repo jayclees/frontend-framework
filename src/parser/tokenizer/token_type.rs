@@ -1,11 +1,21 @@
 use super::TokenType::*;
 use std::fmt::{Display, Formatter};
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct Token {
     pub(super) start: usize,
     pub(super) end: usize,
     pub(super) r#type: TokenType,
+}
+
+impl Token {
+    pub fn new(start: usize, end: usize, r#type: TokenType) -> Token {
+        Token {
+            start,
+            end,
+            r#type,
+        }
+    }
 }
 
 #[derive(Debug, PartialEq)]
@@ -40,6 +50,46 @@ pub enum TokenType {
     ExprOperator(Operator),
     ExprParenthesesOpen,
     ExprParenthesesClose,
+}
+
+impl TokenType {
+    pub fn len(&self) -> usize {
+        match self {
+            BlockIdentifier(str) |
+            StringExpr(str) |
+            LineComment(str) |
+            BlockComment(str) |
+            AttrIdentifier(str) |
+            DirectiveIdentifier(str) |
+            DirectiveValue(str) |
+            EventListenerHandler(str) |
+            ExprString(str) |
+            ExprNumber(str) |
+            ExprVariable(str) |
+            EventListenerIdentifier(str) => str.len(),
+
+            Colon |
+            BlockOpen |
+            BlockClose |
+            AttrColon |
+            AttrSeparator |
+            Expression |
+            DirectiveOpen |
+            DirectiveClose |
+            DirectiveColon |
+            EventListenerClose |
+            EventListenerColon |
+            ExprFunctionCall |
+            ExprParenthesesOpen |
+            ExprParenthesesClose => 1,
+
+            EventListenerOpen  => 2,
+
+            ExprOperator(_symbol) => {
+                todo!()
+            }
+        }
+    }
 }
 
 impl Display for TokenType {

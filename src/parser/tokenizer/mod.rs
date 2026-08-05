@@ -2,16 +2,22 @@ mod expression;
 mod helper;
 mod state;
 mod token_type;
+#[cfg(test)]
+mod test;
 
-use crate::parser::tokenizer::expression::{ExprResult, ExpressionTokenizer};
-use crate::parser::tokenizer::helper::push_state_keep_buf;
-use helper::{current, pop_state, prev, push_state, push_token, reset_buffer, TokenizerContract};
+use expression::ExpressionTokenizer;
+use helper::{
+    current, pop_state, prev, push_state, push_state_include_ws, push_state_keep_buf,
+    push_token, reset_buffer, TokenizerContract,
+};
 use state::State;
 use state::State::*;
 use std::cell::RefCell;
 use std::fs::{read_to_string, OpenOptions};
 use std::io::Write;
 use token_type::{Token, TokenType, TokenType::*};
+use crate::parser::BlockType::P;
+use crate::parser::tokenizer::helper::pop_state_type;
 
 #[derive(Debug)]
 pub struct Tokenizer {
@@ -64,6 +70,8 @@ impl Tokenizer {
     }
 
     fn err_eof(&self) {
+        eprintln!("Unexpected end of file. State history:");
+        dbg!(&self.state_history);
         panic!("Unexpected end of file.");
     }
 
@@ -148,8 +156,7 @@ impl Tokenizer {
         }
     }
 
-    pub fn tokenize(&mut self) -> &Vec<Token> {
-        let string = read_to_string("app/my-page.app").unwrap();
+    pub fn tokenize(&mut self, string: String) -> &Vec<Token> {
         let mut skip: usize = 0;
         let mut expr_tokenizer = ExpressionTokenizer::new();
 
@@ -182,412 +189,141 @@ impl Tokenizer {
                 Start => {
                     if char.is_ascii_alphabetic() {
                         self.push_state(ParsingIdentifier, Some(char));
-                    } else if char == '/' {
-                        let next = peekable.peek();
-
-                        if next.is_none() {
-                            self.err_eof();
-                        }
-
-                        if next.unwrap().1 == '/' {
-                            self.push_state(InLineComment, Some(char));
-                        } else if next.unwrap().1 == '*' {
-                            self.push_state(InBlockComment, Some(char));
-                        } else {
-                            self.err_unexpected(char);
-                        }
-                    } else if char == '#' {
-                        self.push_state(InLineComment, Some(char));
-                    } else if !char.is_whitespace() {
-                        self.err_unexpected(char);
-                    } else {
-                        // ignore
                     }
                 }
-                InLineComment => {
-                    // ignore everything until new line
-                    if char == '\n' {
-                        self.push_token_pop_state(LineComment(self.buf.clone()));
-                    } else {
-                        self.buf.push(char);
-                    }
-                }
-                InBlockComment => {
-                    if self.buf.ends_with("*/") {
-                        self.push_token_pop_state(BlockComment(self.buf.clone()));
-                    } else {
-                        self.buf.push(char);
-                    }
-                }
+                InLineComment => {todo!("InLineComment")}
+                InBlockComment => {todo!("InBlockComment")}
                 ParsingIdentifier => {
-                    // Parsing an identifier which could be either a block or attr identifier.
-                    let is_in_block = self.prev_state().unwrap() == &ParsingBlock;
-
-                    if self.buf.is_empty() && char.is_ascii_alphabetic() {
-                        self.buf.push(char);
-                    } else if !self.buf.is_empty() {
-                        // Allow numbers, -, _ after first char in identifier.
-                        if char.is_ascii_alphanumeric() || ['-', '_'].contains(&char) {
-                            self.buf.push(char);
-                        }
-                        // Resolved to block identifier.
-                        else if ['{', '['].contains(&char) {
-                            self.push_token_pop_state(BlockIdentifier(self.buf.clone()));
-                            self.push_state(ParsedBlockIdentifier, Some(char));
-                        }
-                        // Resolved to attr identifier.
-                        else if [':', ',', '}'].contains(&char) {
-                            if !is_in_block {
-                                if char == '}' {
-                                    self.err_unexpected(char);
-                                } else {
-                                    self.err_msg(
-                                        "Attribute identifiers must be within blocks.".to_owned(),
-                                    );
-                                }
-                            }
-                            self.push_token_pop_state(AttrIdentifier(self.buf.clone()));
-                            // if char == ':' {
-                            //
-                            // } else if char == ',' {
-                            //
-                            // } else if char == '}' {
-                            //
-                            // }
-                            self.push_state(ParsedAttrIdentifier, Some(char));
-                        }
-                        // Peek the following chars, the next valid non whitespace char
-                        // will decide whether this is a block or attr identifier.
-                        else if char.is_whitespace() {
-                            let mut i = 0;
-                            loop {
-                                i += 1;
-                                if i > string.len() + 10 {
-                                    panic!("infinite");
-                                }
-                                if let Some(next) = peekable.next() {
-                                    if ['{', '['].contains(&next.1) {
-                                        // Resolved to a block identifier.
-                                        self.push_token_pop_state(BlockIdentifier(
-                                            self.buf.clone(),
-                                        ));
-                                        self.push_state(ParsedBlockIdentifier, None);
-                                        break;
-                                    } else if [':', ','].contains(&next.1) {
-                                        // Resolved to an attr identifier.
-                                        if !is_in_block {
-                                            self.err_msg(
-                                                "Attribute identifiers must be within blocks."
-                                                    .to_owned(),
-                                            );
-                                        }
-                                        self.push_token_pop_state(AttrIdentifier(self.buf.clone()));
-                                        self.push_state(ParsedAttrIdentifier, None);
-                                        break;
-                                    } else if next.1 == '}' {
-                                        if !is_in_block {
-                                            self.err_unexpected(next.1);
-                                        }
-                                        // Resolved to a boolean attribute identifier, and block is now closed
-                                        self.push_token_pop_state(BlockIdentifier(
-                                            self.buf.clone(),
-                                        ));
-                                        break;
-                                    } else if !char.is_whitespace() {
-                                        self.err_unexpected(next.1);
-                                    }
-                                } else {
-                                    self.err_eof();
-                                }
-                            }
-                        }
+                    if char.is_ascii_alphabetic() {
+                        self.buf.push(char)
+                    } else if char == '[' || char == '{' {
+                        // Resolved to block identifier
+                        self.push_token_pop_state(BlockIdentifier(self.buf.clone()));
+                        self.push_state(ParsedBlockIdentifier, Some(char));
+                    } else if char.is_whitespace() {
+                        self.push_state_keep_buf(ResolvingIdentifier, None);
+                    }
+                }
+                ResolvingIdentifier => {
+                    if char == '[' || char == '@' || char == '{' {
+                        // Resolved to block identifier
+                        self.push_token_pop_state(BlockIdentifier(self.buf.clone()));
+                        self.pop_state(); // Popping State::ParsingIdentifier
+                        self.push_state(ParsedBlockIdentifier, Some(char));
                     } else if !char.is_whitespace() {
-                        // char must start with ascii alphabetic
                         self.err_unexpected(char);
                     }
                 }
                 ParsedBlockIdentifier => {
-                    self.panic_if(
-                        self.buf.len() > 1,
-                        "Buffer should not be greater than 1 at this point".to_owned(),
-                    );
-
-                    // First start state, push token after to fix
-                    // off by one error (cursor was off by -1).
-                    if !char.is_whitespace() {
-                        match char {
-                            '[' => self.push_state(ParsingDirective, Some(char)),
-                            '{' => self.push_state(ParsingBlock, Some(char)),
-                            '@' => self.push_state(ParsingEventListener, Some(char)),
-                            _ => self.err_unexpected(char),
-                        }
-                    }
-                }
-                ParsingBlock => {
-                    if self.buf.as_str() == "{" {
-                        self.push_token(BlockOpen);
-                    }
-
-                    if char.is_ascii_alphabetic() {
-                        self.push_state(ParsingIdentifier, Some(char));
-                    } else if char == '}' {
-                        self.push_state(ParsingBlockClose, Some(char));
-                    } else if !char.is_whitespace() {
-                        self.err_unexpected(char);
-                    }
-                }
-                ParsingBlockClose => {
-                    if self.buf.as_str() != "}" {
-                        self.err_msg(
-                            "Error internal implementation. Should only have } in buffer at this point."
-                                .to_owned()
-                        );
-                    }
-
-                    self.push_token_pop_state(BlockClose);
-                }
-                ParsedAttrIdentifier => {
-                    let buf = self.buf.as_str();
-                    if buf == ":" {
-                        self.push_token_pop_state(AttrColon);
-                        self.push_state(GatheringExpressionTokens, Some(char));
-                    } else if buf == "," {
-                        todo!()
-                    }
-                    // was just terminated by whitespace, colon, or comma
-                    // expect another attr id, or block id, or close curly
-                }
-                ParsingAttributeColon => {
-                    if self.buf.as_str() != ":" {
-                        dbg!(&self.buf);
-                        self.err_msg(
-                            "Error internal implementation. Should only have : in buffer at this point.".to_owned()
-                        );
-                    }
-
-                    self.push_token_pop_state(AttrColon);
-                    self.push_state(GatheringExpressionTokens, Some(char));
-                }
-                ParsedAttrColon => {
-                    self.pop_state();
-                    if char.is_whitespace() {
-                        self.push_state(GatheringExpressionTokens, None);
-                    } else {
-                        self.push_state(GatheringExpressionTokens, Some(char));
-                    }
-                    // expect expression
-                    // todo create separate tokenizer for expressions?
-                }
-                ParsingAttrSeparator => {
-                    // expect
-                }
-                ParsedAttrSeparator => {
-                    crate::dd!(&self.buf);
-                }
-                GatheringExpressionTokens => {
-                    let result = expr_tokenizer.push_parse(cursor, char);
-
-                    match result {
-                        ExprResult::StillParsing => {
-                            // continue
-                        }
-                        ExprResult::Parsed(mut tokens) => {
-                            self.tokens.append(&mut tokens);
-                            self.pop_state();
-                            self.push_state(ParsedExpressionTokens, Some(char));
-                        }
-                        ExprResult::Err(msg) => {
-                            //
-                        }
-                        ExprResult::ErrUnexpected(msg) => {
-                            eprintln!("{msg}");
-                            self.err_unexpected(char);
-                        }
-                    }
-
-                    // let last = self.buf.chars().last();
-                    //
-                    // // If a double quote was pushed onto buffer as
-                    // // the state changed, mark in_dbl_quo = true.
-                    // if let Some(last) = last
-                    //     && self.buf.len() == 1
-                    //     && last == '"'
-                    // {
-                    //     in_dbl_quo = true;
-                    // }
-                    //
-                    // // Gather everything until comma or block close, then pass to expression tokenizer
-                    // // todo Integrate the gathering into ExpressionTokenizer struct to avoid duplicating logic
-                    // if !in_dbl_quo && (char == ',' || char == '}') {
-                    //     // let mut expr_tokenizer = ExpressionTokenizer::new(cursor, &self.buf);
-                    //     // let mut tokens = expr_tokenizer.tokenize();
-                    //     // self.tokens.append(&mut tokens);
-                    //     self.clear_buffer();
-                    //     self.pop_state();
-                    //     self.pop_state(); // Popping State::ParsedAttrColon
-                    //     self.push_state(ParsedExpressionTokens, Some(char));
-                    // } else if char == '"' {
-                    //     if in_dbl_quo
-                    //         && let Some(last) = last
-                    //         && last != '\\'
-                    //     {
-                    //         in_dbl_quo = false;
-                    //     } else {
-                    //         in_dbl_quo = true;
-                    //     }
-                    //     self.buf.push(char);
-                    // } else {
-                    //     self.buf.push(char);
-                    // }
-                }
-                ParsedExpressionTokens => match self.buf.as_str() {
-                    "," => {
-                        self.push_token_pop_state(AttrSeparator);
-                        // if !char.is_whitespace() {
-                        //     self.push_state(ParsedAttrSeparator, Some(char));
-                        // } else {
-                        //     self.push_state(ParsedAttrSeparator, None);
-                        // }
-                    }
-                    "}" => {
-                        self.push_token_pop_state(BlockClose);
-                    }
-                    _ => unimplemented!(),
-                },
-                ParsingEventListener => {
-                    let buf = self.buf.as_str();
-                    if buf != "@" && buf != "@[" {
-                        dbg!(&buf);
-                        self.err_msg(
-                            "Error internal implementation. Should only have @ or @[ in buffer at this point.".to_owned()
-                        );
-                    }
-
-                    if char == '[' {
-                        self.buf.push(char);
-                    } else if buf == "@[" {
-                        self.push_token(EventListenerOpen);
-
-                        if char.is_ascii_alphabetic() {
-                            self.push_state(ParsingEventListenerIdentifier, Some(char));
+                    if self.buf.is_empty() {
+                        if matches!(char, '[' | '@' | '{') {
+                            self.buf.push(char)
                         } else {
                             self.err_unexpected(char);
                         }
                     } else {
-                        self.err_unexpected(char);
+                        if self.buf.as_str() == "[" {
+                            self.push_token(DirectiveOpen);
+                            self.push_state(ParsingDirectiveIdentifier, Some(char));
+                        } else if self.buf.as_str() == "@" {
+                            if char == '[' {
+                                self.buf.push(char);
+                                self.push_token(EventListenerOpen);
+                                self.push_state(ParsedEventListenerOpen, None);
+                            } else {
+                                self.err_unexpected(char);
+                            }
+                        } else if self.buf.as_str() == "{" {
+                            self.push_token(BlockOpen);
+                            self.pop_state(); // Popping ParsedBlockIdentifier
+                            self.push_state(ParsedBlockOpen, None);
+                        }
                     }
                 }
-                ParsingEventListenerIdentifier => {
-                    // This state should be entered with ascii_alphabetic as first char
-                    if char.is_ascii_alphabetic() || char == '.' {
+                ParsedAttrIdentifier => {todo!("ParsedAttrIdentifier")}
+                ParsingBlockOpen => {todo!("ParsingBlockOpen")}
+                ParsedBlockOpen => {
+                    if char.is_ascii_alphabetic() {
+                        self.push_state(ParsingIdentifier, Some(char));
+                    } else if char == '}' {
+                        self.reset_buffer();
                         self.buf.push(char);
-                    } else if char == ':' {
-                        self.push_token_pop_state(EventListenerIdentifier(self.buf.clone()));
-                        self.push_state(ParsingEventListenerColon, Some(char));
-                    } else {
-                        self.err_unexpected(char);
-                    }
-                }
-                ParsingEventListenerColon => {
-                    if self.buf.as_str() != ":" {
-                        dbg!(&self.buf);
-                        panic!(
-                            "Error internal implementation. Should only have : in buffer at this point."
-                        );
-                    }
-                    self.push_token_pop_state(EventListenerColon);
-                    self.push_state(ParsingEventListenerHandler, Some(char));
-                }
-                ParsingEventListenerHandler => {
-                    // todo for now just put everything into this until bracket close
-                    if char == ']' {
-                        self.push_token_pop_state(EventListenerHandler(self.buf.clone()));
-                        self.push_state(ParsedEventListener, Some(char));
-                    } else {
-                        self.buf.push(char);
-                    }
-                }
-                ParsedEventListener => {
-                    self.push_token(EventListenerClose);
-                    self.pop_state();
-                    self.pop_state(); // Popping State::ParsingEventListener
-                }
-                ParsingDirective => {
-                    if !char.is_whitespace() && char.is_ascii_alphabetic() {
-                        self.push_token(DirectiveOpen);
-                        self.push_state(ParsingDirectiveIdentifier, Some(char));
-                    } else if char == '-' {
-                        self.err_msg(r#"Directive identifiers cannot start with '-'."#.to_owned());
+                        self.push_token(BlockClose);
+
+                        crate::dd!(self.state());
                     } else if !char.is_whitespace() {
+                        self.err_unexpected(char)
+                    }
+                }
+                ParsingBlockClose => {todo!("ParsingBlockClose")}
+                ParsingAttributeColon => {todo!("ParsingAttributeColon")}
+                ParsedAttrColon => {todo!("ParsedAttrColon")}
+                ParsingAttrSeparator => {todo!("ParsingAttrSeparator")}
+                ParsedAttrSeparator => {todo!("ParsedAttrSeparator")}
+                GatheringExpressionTokens => {todo!("GatheringExpressionTokens")}
+                ParsedExpressionTokens => {todo!("ParsedExpressionTokens")}
+                ParsingDirective => {todo!("ParsingDirective")}
+                ParsingDirectiveOpen => {todo!("ParsingDirectiveOpen")}
+                ParsedDirectiveOpen => {todo!("ParsedDirectiveOpen")}
+                ParsingDirectiveIdentifier => {
+                    let buf_empty = self.buf.is_empty();
+                    if buf_empty {
+                        self.reset_buffer();
+                    }
+                    if buf_empty && char.is_ascii_alphabetic() {
+                        self.buf.push(char);
+                    } else if !buf_empty && (char.is_ascii_alphabetic() || ['-', '_'].contains(&char)) {
+                        self.buf.push(char)
+                    } else if char == ':' {
+                        self.push_token_pop_state(DirectiveIdentifier(self.buf.clone()));
+                        self.buf.push(char);
+                        self.push_token(DirectiveColon);
+                        self.push_state(ParsingDirectiveValue, None);
+                    } else if char == ']' {
+                        self.push_token(DirectiveIdentifier(self.buf.clone()));
+                        self.buf.push(char);
+                        self.push_token(DirectiveClose);
+                        self.pop_state();
+                    } else {
                         self.err_unexpected(char);
                     }
                 }
-                ParsingDirectiveIdentifier => {
-                    if char.is_ascii_alphabetic() || char == '-' {
-                        self.buf.push(char);
-                    } else if char == ':' {
-                        self.push_token_pop_state(DirectiveIdentifier(self.buf.clone()));
-                        self.push_state(ParsingDirectiveColon, Some(char));
-                    } else if char == ']' {
-                        self.push_token_pop_state(DirectiveIdentifier(self.buf.clone()));
-                        self.push_state(EmptyDirectiveParsed, None);
-                    }
-                }
-                EmptyDirectiveParsed => {
-                    self.push_token_pop_state(DirectiveClose);
-                    self.pop_state(); // Popping State::ParsingDirective
-                }
-                ParsingDirectiveColon => {
-                    if self.buf.as_str() != ":" {
-                        dbg!(&self.buf);
-                        panic!(
-                            "Error internal implementation. Should only have : in buffer at this point."
-                        );
+                ParsedDirectiveColon => {todo!("ParsedDirectiveColon")}
+                EmptyDirectiveParsed => {todo!("EmptyDirectiveParsed")}
+                ParsingDirectiveColon => {todo!("ParsingDirectiveColon")}
+                ParsingDirectiveValue => {
+                    if self.buf.is_empty() {
+                        self.reset_buffer();
                     }
 
-                    self.push_token_pop_state(DirectiveColon);
-                    self.push_state(ParsingDirectiveValue, None);
-                }
-                ParsingDirectiveValue => {
-                    // for now just grab everything until close bracket
                     if char == ']' {
                         self.push_token_pop_state(DirectiveValue(self.buf.clone()));
-                        self.push_state(ParsedDirective, Some(char));
+                        self.buf.push(char);
+                        self.push_token(DirectiveClose);
                     } else {
                         self.buf.push(char);
                     }
-
-                    // potentially create another tokenizer for directive values, parse based
-                    // on directive identifier. e.g. [if: expr], [for post in posts]
-                    // or create a generic (simple) expression tokenizer
                 }
-                ParsedDirective => {
-                    if self.buf.as_str() != "]" {
-                        dbg!(&self.buf);
-                        panic!(
-                            "Error internal implementation. Should only have : in buffer at this point."
-                        );
-                    }
-
-                    self.push_token_pop_state(DirectiveClose);
-                    self.pop_state(); // Popping State::ParsingDirective
-                }
-                InDblQuoteUnescaped => {
-                    // if char is dbl quote, exit current state into X state
-                    // if char is backslash, enter into InDblQuoteEscaped
-                }
-                InDblQuoteEscaped => {
-                    // if char is backslash again, enter into InDblQuoteUnescaped
-                }
+                ParsingDirectiveClose => {todo!("ParsingDirectiveClose")}
+                ParsedDirectiveClose => {todo!("ParsedDirectiveClose")}
+                ParsedDirective => {todo!("ParsedDirective")}
+                ParsingEventListenerOpen => {todo!("ParsingEventListenerOpen")}
+                ParsedEventListenerOpen => {todo!("ParsedEventListenerOpen")}
+                ParsingEventListenerIdentifier => {todo!("ParsingEventListenerIdentifier")}
+                ParsingEventListenerColon => {todo!("ParsingEventListenerColon")}
+                ParsingEventListenerHandler => {todo!("ParsingEventListenerHandler")}
+                ParsedEventListener => {todo!("ParsedEventListener")}
+                InDblQuoteUnescaped => {todo!("InDblQuoteUnescaped")}
+                InDblQuoteEscaped => {todo!("InDblQuoteEscaped")}
             }
         }
 
         // All states should have been popped, and we should be back to start
-        // if self.state() != &Start {
-        //     self.err_eof();
-        // }
+        if self.state() != &Start {
+            self.err_eof();
+        }
 
-        self.match_with_source();
+        // self.match_with_source();
 
         &self.tokens
     }
@@ -615,6 +351,17 @@ impl TokenizerContract for Tokenizer {
         );
     }
 
+    fn push_state_include_ws(&mut self, state: Self::TokenizerState, starting_char: Option<char>) {
+        push_state_include_ws(
+            &mut self.state_history,
+            state,
+            &mut self.buf,
+            &mut self.buf_start,
+            starting_char,
+            self.cursor,
+        );
+    }
+
     fn push_state_keep_buf(&mut self, state: Self::TokenizerState, starting_char: Option<char>) {
         push_state_keep_buf(&mut self.state_history, state, &mut self.buf, starting_char);
     }
@@ -623,8 +370,28 @@ impl TokenizerContract for Tokenizer {
         pop_state(&mut self.state_history);
     }
 
+    fn pop_state_type(&mut self, state: Self::TokenizerState) {
+        pop_state_type(&mut self.state_history, state);
+    }
+
     fn push_token(&mut self, r#type: TokenType) {
-        push_token(&mut self.tokens, r#type, &self.buf_start, self.cursor);
+        let buf_start = self.buf_start.expect("Should be set.");
+        push_token(
+            &mut self.tokens,
+            r#type,
+            buf_start,
+            buf_start + self.buf.len(),
+        );
+        self.reset_buffer();
+    }
+
+    fn squeeze_token(&mut self, r#type: TokenType) {
+        push_token(
+            &mut self.tokens,
+            r#type,
+            self.buf_start.expect("Should be set."),
+            self.cursor,
+        );
         self.reset_buffer();
     }
 

@@ -1,10 +1,3 @@
-// this is a comment
-# and another comment
-/*
-hello
-*/
-
-
 Page [extends: root] [marker-directive] @[load: do_thing()] {
     title: "",
     description: "",
