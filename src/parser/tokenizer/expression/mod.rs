@@ -87,7 +87,14 @@ impl ExpressionTokenizer {
                     _ => unimplemented!(),
                 }
 
-                if char.is_ascii_digit() {
+                if !self.buf.is_empty() {
+                    if self.buf.len() > 1 {
+                        panic!("Buffer should not be greater than 1 at this point.")
+                    }
+
+                    let last = self.buf.chars().last().unwrap();
+
+                } else if char.is_ascii_digit() {
                     self.push_state(ParsingNumber, Some(char));
                 } else if char.is_ascii_alphabetic() {
                     self.push_state(ParsingIdentifier, Some(char));
@@ -135,7 +142,13 @@ impl ExpressionTokenizer {
                 } else {
                     match Operator::get_match(&self.buf) {
                         OperatorMatchResult::Matched(operator) => {
-                            self.push_token(TokenType::ExprOperator(operator))
+                            self.push_token(TokenType::ExprOperator(operator));
+                            // expect next token to be string, number, variable, function call
+                            if !char.is_whitespace() {
+                                self.push_state(ParsedExprToken, Some(char));
+                            } else {
+                                self.push_state(ParsedExprToken, None);
+                            }
                         }
                         OperatorMatchResult::Failed => {
                             return self.err(format!(r#"Failed operator match "{}""#, self.buf))
@@ -193,6 +206,10 @@ impl TokenizerContract for ExpressionTokenizer {
     fn push_token_pop_state(&mut self, r#type: TokenType) {
         self.push_token(r#type);
         self.pop_state();
+    }
+
+    fn buf_last(&self) -> Option<char> {
+        self.buf.chars().last()
     }
 
     fn reset_buffer(&mut self) {

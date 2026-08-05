@@ -3,8 +3,9 @@ mod helper;
 mod state;
 mod token_type;
 
+use crate::parser::tokenizer::expression::{ExprResult, ExpressionTokenizer};
 use crate::parser::tokenizer::helper::push_state_keep_buf;
-use helper::{reset_buffer, current, pop_state, prev, push_state, push_token, TokenizerContract};
+use helper::{current, pop_state, prev, push_state, push_token, reset_buffer, TokenizerContract};
 use regex::Regex;
 use state::State;
 use state::State::*;
@@ -12,7 +13,6 @@ use std::cell::RefCell;
 use std::fs::{read_to_string, OpenOptions};
 use std::io::Write;
 use token_type::{Token, TokenType, TokenType::*};
-use crate::parser::tokenizer::expression::{ExprResult, ExpressionTokenizer};
 
 #[derive(Debug)]
 pub struct Tokenizer {
@@ -66,6 +66,18 @@ impl Tokenizer {
 
     fn err_eof(&self) {
         panic!("Unexpected end of file.");
+    }
+
+    fn panic_if(&self, condition: bool, msg: String) {
+        if condition {
+            panic!(
+                r#"{}. At line: {}, column: {}. State: "{}""#,
+                msg,
+                self.line,
+                self.column,
+                self.state()
+            );
+        }
     }
 
     fn match_with_source(&self) {
@@ -316,6 +328,11 @@ impl Tokenizer {
                     }
                 }
                 ParsedBlockIdentifier => {
+                    self.panic_if(
+                        self.buf.len() > 1,
+                        "Buffer should not be greater than 1 at this point".to_owned(),
+                    );
+
                     // First start state, push token after to fix
                     // off by one error (cursor was off by -1).
                     if !char.is_whitespace() {
@@ -635,6 +652,10 @@ impl TokenizerContract for Tokenizer {
     fn push_token_pop_state(&mut self, r#type: TokenType) {
         self.push_token(r#type);
         self.pop_state();
+    }
+
+    fn buf_last(&self) -> Option<char> {
+        self.buf.chars().last()
     }
 
     fn reset_buffer(&mut self) {

@@ -9,6 +9,7 @@ pub trait TokenizerContract {
     fn pop_state(&mut self);
     fn push_token(&mut self, r#type: TokenType);
     fn push_token_pop_state(&mut self, r#type: TokenType);
+    fn buf_last(&self) -> Option<char>;
     fn reset_buffer(&mut self);
 }
 
