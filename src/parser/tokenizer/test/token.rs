@@ -96,5 +96,26 @@ fn test_token_len_static() {
 
 #[test]
 fn test_symbol_len() {
-    let operator = TokenType::ExprOperator(Operator::Add);
+    assert_eq!(1, TokenType::ExprOperator(Operator::Add).len());
+    assert_eq!(1, TokenType::ExprOperator(Operator::Sub).len());
+    assert_eq!(1, TokenType::ExprOperator(Operator::Multiply).len());
+    assert_eq!(1, TokenType::ExprOperator(Operator::Power).len());
+    assert_eq!(1, TokenType::ExprOperator(Operator::Divide).len());
+    assert_eq!(1, TokenType::ExprOperator(Operator::Modulus).len());
+    assert_eq!(1, TokenType::ExprOperator(Operator::Assign).len());
+    assert_eq!(2, TokenType::ExprOperator(Operator::Increment).len());
+    assert_eq!(2, TokenType::ExprOperator(Operator::Decrement).len());
+    assert_eq!(2, TokenType::ExprOperator(Operator::IncrementBy).len());
+    assert_eq!(2, TokenType::ExprOperator(Operator::DecrementBy).len());
+    assert_eq!(2, TokenType::ExprOperator(Operator::MultiplyBy).len());
+    assert_eq!(2, TokenType::ExprOperator(Operator::DivideBy).len());
+    assert_eq!(2, TokenType::ExprOperator(Operator::EqualTo).len());
+    assert_eq!(2, TokenType::ExprOperator(Operator::NotEqualTo).len());
+    assert_eq!(1, TokenType::ExprOperator(Operator::GreaterThan).len());
+    assert_eq!(2, TokenType::ExprOperator(Operator::GreaterThanOrEqualTo).len());
+    assert_eq!(1, TokenType::ExprOperator(Operator::LessThan).len());
+    assert_eq!(2, TokenType::ExprOperator(Operator::LessThanOrEqualTo).len());
+    assert_eq!(2, TokenType::ExprOperator(Operator::And).len());
+    assert_eq!(2, TokenType::ExprOperator(Operator::Or).len());
+    assert_eq!(1, TokenType::ExprOperator(Operator::Not).len());
 }

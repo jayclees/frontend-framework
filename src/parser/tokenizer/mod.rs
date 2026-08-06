@@ -190,12 +190,8 @@ impl Tokenizer {
                         self.push_state(ParsingIdentifier, Some(char));
                     }
                 }
-                InLineComment => {
-                    todo!("InLineComment")
-                }
-                InBlockComment => {
-                    todo!("InBlockComment")
-                }
+                InLineComment => todo!("InLineComment"),
+                InBlockComment => todo!("InBlockComment"),
                 ParsingIdentifier => {
                     if char.is_ascii_alphabetic() {
                         self.buf.push(char)
@@ -220,8 +216,9 @@ impl Tokenizer {
                 ParsedBlockIdentifier => {
                     if self.buf.is_empty() {
                         if matches!(char, '[' | '@' | '{') {
+                            self.reset_buffer();
                             self.buf.push(char)
-                        } else {
+                        } else if !char.is_whitespace() {
                             self.err_unexpected(char);
                         }
                     } else {
@@ -249,12 +246,8 @@ impl Tokenizer {
                         }
                     }
                 }
-                ParsedAttrIdentifier => {
-                    todo!("ParsedAttrIdentifier")
-                }
-                ParsingBlockOpen => {
-                    todo!("ParsingBlockOpen")
-                }
+                ParsedAttrIdentifier => todo!("ParsedAttrIdentifier"),
+                ParsingBlockOpen => todo!("ParsingBlockOpen"),
                 ParsedBlockOpen => {
                     if char.is_ascii_alphabetic() {
                         self.push_state(ParsingIdentifier, Some(char));
@@ -267,36 +260,16 @@ impl Tokenizer {
                         self.err_unexpected(char);
                     }
                 }
-                ParsingBlockClose => {
-                    todo!("ParsingBlockClose")
-                }
-                ParsingAttributeColon => {
-                    todo!("ParsingAttributeColon")
-                }
-                ParsedAttrColon => {
-                    todo!("ParsedAttrColon")
-                }
-                ParsingAttrSeparator => {
-                    todo!("ParsingAttrSeparator")
-                }
-                ParsedAttrSeparator => {
-                    todo!("ParsedAttrSeparator")
-                }
-                GatheringExpressionTokens => {
-                    todo!("GatheringExpressionTokens")
-                }
-                ParsedExpressionTokens => {
-                    todo!("ParsedExpressionTokens")
-                }
-                ParsingDirective => {
-                    todo!("ParsingDirective")
-                }
-                ParsingDirectiveOpen => {
-                    todo!("ParsingDirectiveOpen")
-                }
-                ParsedDirectiveOpen => {
-                    todo!("ParsedDirectiveOpen")
-                }
+                ParsingBlockClose => todo!("ParsingBlockClose"),
+                ParsingAttributeColon => todo!("ParsingAttributeColon"),
+                ParsedAttrColon => todo!("ParsedAttrColon"),
+                ParsingAttrSeparator => todo!("ParsingAttrSeparator"),
+                ParsedAttrSeparator => todo!("ParsedAttrSeparator"),
+                GatheringExpressionTokens => todo!("GatheringExpressionTokens"),
+                ParsedExpressionTokens => todo!("ParsedExpressionTokens"),
+                ParsingDirective => todo!("ParsingDirective"),
+                ParsingDirectiveOpen => todo!("ParsingDirectiveOpen"),
+                ParsedDirectiveOpen => todo!("ParsedDirectiveOpen"),
                 ParsingDirectiveIdentifier => {
                     let buf_empty = self.buf.is_empty();
                     if buf_empty {
@@ -322,15 +295,9 @@ impl Tokenizer {
                         self.err_unexpected(char);
                     }
                 }
-                ParsedDirectiveColon => {
-                    todo!("ParsedDirectiveColon")
-                }
-                EmptyDirectiveParsed => {
-                    todo!("EmptyDirectiveParsed")
-                }
-                ParsingDirectiveColon => {
-                    todo!("ParsingDirectiveColon")
-                }
+                ParsedDirectiveColon => todo!("ParsedDirectiveColon"),
+                EmptyDirectiveParsed => todo!("EmptyDirectiveParsed"),
+                ParsingDirectiveColon => todo!("ParsingDirectiveColon"),
                 ParsingDirectiveValue => {
                     if self.buf.is_empty() {
                         self.reset_buffer();
@@ -344,39 +311,17 @@ impl Tokenizer {
                         self.buf.push(char);
                     }
                 }
-                ParsingDirectiveClose => {
-                    todo!("ParsingDirectiveClose")
-                }
-                ParsedDirectiveClose => {
-                    todo!("ParsedDirectiveClose")
-                }
-                ParsedDirective => {
-                    todo!("ParsedDirective")
-                }
-                ParsingEventListenerOpen => {
-                    todo!("ParsingEventListenerOpen")
-                }
-                ParsedEventListenerOpen => {
-                    todo!("ParsedEventListenerOpen")
-                }
-                ParsingEventListenerIdentifier => {
-                    todo!("ParsingEventListenerIdentifier")
-                }
-                ParsingEventListenerColon => {
-                    todo!("ParsingEventListenerColon")
-                }
-                ParsingEventListenerHandler => {
-                    todo!("ParsingEventListenerHandler")
-                }
-                ParsedEventListener => {
-                    todo!("ParsedEventListener")
-                }
-                InDblQuoteUnescaped => {
-                    todo!("InDblQuoteUnescaped")
-                }
-                InDblQuoteEscaped => {
-                    todo!("InDblQuoteEscaped")
-                }
+                ParsingDirectiveClose => todo!("ParsingDirectiveClose"),
+                ParsedDirectiveClose => todo!("ParsedDirectiveClose"),
+                ParsedDirective => todo!("ParsedDirective"),
+                ParsingEventListenerOpen => todo!("ParsingEventListenerOpen"),
+                ParsedEventListenerOpen => todo!("ParsedEventListenerOpen"),
+                ParsingEventListenerIdentifier => todo!("ParsingEventListenerIdentifier"),
+                ParsingEventListenerColon => todo!("ParsingEventListenerColon"),
+                ParsingEventListenerHandler => todo!("ParsingEventListenerHandler"),
+                ParsedEventListener => todo!("ParsedEventListener"),
+                InDblQuoteUnescaped => todo!("InDblQuoteUnescaped"),
+                InDblQuoteEscaped => todo!("InDblQuoteEscaped"),
             }
         }
 
