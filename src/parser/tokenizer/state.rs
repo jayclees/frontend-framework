@@ -14,7 +14,6 @@ pub enum State {
 
     ParsingBlockOpen,
     ParsedBlockOpen,
-    // ResolvingIdentifierType,
     ParsingBlockClose,
 
     ParsingAttributeColon,
@@ -41,6 +40,7 @@ pub enum State {
     ParsedEventListenerOpen,
     ParsingEventListenerIdentifier,
     ParsingEventListenerColon,
+    ParsedEventListenerColon,
     ParsingEventListenerHandler,
     ParsedEventListener,
 
@@ -57,19 +57,24 @@ impl Display for State {
                 Start => "Start",
                 InLineComment => "InLineComment",
                 InBlockComment => "InBlockComment",
+
                 ParsingIdentifier => "ParsingIdentifier",
                 ResolvingIdentifier => "ResolvingIdentifier",
                 ParsedBlockIdentifier => "ParsedBlockIdentifier",
                 ParsedAttrIdentifier => "ParsedAttrIdentifier",
+
                 ParsingBlockOpen => "ParsingBlockOpen",
                 ParsedBlockOpen => "ParsedBlockOpen",
                 ParsingBlockClose => "ParsingBlockClose",
+
                 ParsingAttributeColon => "ParsingAttributeColon",
                 ParsedAttrColon => "ParsedAttrColon",
                 ParsingAttrSeparator => "ParsingAttrSeparator",
                 ParsedAttrSeparator => "ParsedAttrSeparator",
+
                 GatheringExpressionTokens => "GatheringExpressionTokens",
                 ParsedExpressionTokens => "ParsedExpressionTokens",
+
                 ParsingDirective => "ParsingDirective",
                 ParsingDirectiveOpen => "ParsingDirectiveOpen",
                 ParsedDirectiveOpen => "ParsedDirectiveOpen",
@@ -81,11 +86,14 @@ impl Display for State {
                 ParsingDirectiveClose => "ParsingDirectiveClose",
                 ParsedDirectiveClose => "ParsedDirectiveClose",
                 ParsedDirective => "ParsedDirective",
+
                 ParsingEventListenerOpen => "ParsingEventListenerOpen",
                 ParsedEventListenerOpen => "ParsedEventListenerOpen",
                 ParsingEventListenerIdentifier => "ParsingEventListenerIdentifier",
                 ParsingEventListenerColon => "ParsingEventListenerColon",
+                ParsedEventListenerColon => "ParsedEventListenerColon",
                 ParsingEventListenerHandler => "ParsingEventListenerHandler",
+
                 ParsedEventListener => "ParsedEventListener",
                 InDblQuoteUnescaped => "InDblQuoteUnescaped",
                 InDblQuoteEscaped => "InDblQuoteEscaped",

@@ -1,4 +1,3 @@
-use std::env::var;
 use super::TokenType::*;
 use std::fmt::{Display, Formatter};
 
@@ -66,7 +65,7 @@ impl Token {
             ExprParenthesesOpen => &source[self.start..self.end] == "(",
             ExprParenthesesClose => &source[self.start..self.end] == ")",
 
-            ExprOperator(operator) => { todo!("Test operator.") }
+            ExprOperator(_operator) => { todo!("Test operator.") }
             Expression => todo!("Test expression."),
         }
     }

@@ -1,6 +1,7 @@
 mod basic;
 mod token;
 mod directive;
+mod event;
 
 use super::Tokenizer;
 use crate::parser::tokenizer::token::{Token, TokenType};

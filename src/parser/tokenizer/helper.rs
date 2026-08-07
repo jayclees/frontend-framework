@@ -76,12 +76,12 @@ pub(super) fn pop_state<T>(state_history: &mut Vec<T>) {
     state_history.pop();
 }
 
-pub(super) fn pop_state_type<T: PartialEq<T>>(state_history: &mut Vec<T>, state: T) {
+pub(super) fn pop_state_type<T: PartialEq<T> + std::fmt::Display>(state_history: &mut Vec<T>, state: T) {
     let last = state_history
         .last()
         .expect("Should always have at least 1 state_history (State::Start)");
     if last != &state {
-        panic!("State types do not match.");
+        panic!(r#"Expected to pop "{state}", found "{last}"."#);
     }
     state_history.pop();
 }

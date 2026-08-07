@@ -186,6 +186,9 @@ impl Tokenizer {
 
             match self.state() {
                 Start => {
+                    // can_have_comments(char)
+                    // can_have_line_comment!()
+                    // can_have_block_comment!()
                     if char.is_ascii_alphabetic() {
                         self.push_state(ParsingIdentifier, Some(char));
                     }
@@ -195,12 +198,10 @@ impl Tokenizer {
                 ParsingIdentifier => {
                     if char.is_ascii_alphabetic() {
                         self.buf.push(char)
-                    } else if char == '[' || char == '{' {
-                        // Resolved to block identifier
-                        self.push_token_pop_state(BlockIdentifier(self.buf.clone()));
-                        self.push_state(ParsedBlockIdentifier, Some(char));
                     } else if char.is_whitespace() {
                         self.push_state_keep_buf(ResolvingIdentifier, None);
+                    } else {
+                        self.err_unexpected(char);
                     }
                 }
                 ResolvingIdentifier => {
@@ -229,7 +230,7 @@ impl Tokenizer {
                             if char == '[' {
                                 self.buf.push(char);
                                 self.push_token(EventListenerOpen);
-                                self.push_state(ParsedEventListenerOpen, None);
+                                self.push_state(ParsingEventListenerIdentifier, None);
                             } else {
                                 self.err_unexpected(char);
                             }
@@ -291,13 +292,28 @@ impl Tokenizer {
                         self.buf.push(char);
                         self.push_token(DirectiveClose);
                         self.pop_state();
+                    } else if char.is_whitespace() {
+                        self.push_token_pop_state(DirectiveIdentifier(self.buf.clone()));
+                        self.push_state(ParsingDirectiveColon, None);
                     } else {
                         self.err_unexpected(char);
                     }
                 }
                 ParsedDirectiveColon => todo!("ParsedDirectiveColon"),
                 EmptyDirectiveParsed => todo!("EmptyDirectiveParsed"),
-                ParsingDirectiveColon => todo!("ParsingDirectiveColon"),
+                ParsingDirectiveColon => {
+                    if self.buf.is_empty() {
+                        self.reset_buffer();
+                    }
+                    if self.buf.as_str() == ":" {
+                        self.push_token_pop_state(DirectiveColon);
+                        self.push_state(ParsingDirectiveValue, None);
+                    } else if char == ':' {
+                        self.buf.push(char);
+                    } else {
+                        self.err_unexpected(char);
+                    }
+                },
                 ParsingDirectiveValue => {
                     if self.buf.is_empty() {
                         self.reset_buffer();
@@ -316,9 +332,51 @@ impl Tokenizer {
                 ParsedDirective => todo!("ParsedDirective"),
                 ParsingEventListenerOpen => todo!("ParsingEventListenerOpen"),
                 ParsedEventListenerOpen => todo!("ParsedEventListenerOpen"),
-                ParsingEventListenerIdentifier => todo!("ParsingEventListenerIdentifier"),
-                ParsingEventListenerColon => todo!("ParsingEventListenerColon"),
-                ParsingEventListenerHandler => todo!("ParsingEventListenerHandler"),
+                ParsingEventListenerIdentifier => match self.buf.is_empty() {
+                    true => {
+                        self.reset_buffer();
+                        if char.is_ascii_alphabetic() {
+                            self.buf.push(char);
+                        } else if !char.is_whitespace() {
+                            self.err_unexpected(char);
+                        }
+                    }
+                    false => {
+                        if char.is_ascii_alphanumeric() {
+                            self.buf.push(char);
+                        } else if char == ':' {
+                            self.push_token_pop_state(EventListenerIdentifier(self.buf.clone()));
+                            self.buf.push(char);
+                            self.push_token(EventListenerColon);
+                            self.push_state(ParsingEventListenerHandler, None);
+                        } else if char.is_whitespace() {
+                            self.push_token_pop_state(EventListenerIdentifier(self.buf.clone()));
+                            self.push_state(ParsingEventListenerColon, None);
+                        } else {
+                            self.err_unexpected(char);
+                        }
+                    }
+                },
+                ParsingEventListenerColon => {
+                    if char == ':' {
+                        self.buf.push(char);
+                        self.push_token_pop_state(EventListenerColon);
+                    }
+                }
+                ParsedEventListenerColon => todo!("ParsedEventListenerColon"),
+                ParsingEventListenerHandler => {
+                    if self.buf.is_empty() {
+                        self.reset_buffer();
+                    }
+                    // push everything to buf and end on close bracket for now
+                    if char == ']' {
+                        self.push_token_pop_state(EventListenerHandler(self.buf.clone()));
+                        self.buf.push(char);
+                        self.push_token(EventListenerClose);
+                    } else {
+                        self.buf.push(char);
+                    }
+                }
                 ParsedEventListener => todo!("ParsedEventListener"),
                 InDblQuoteUnescaped => todo!("InDblQuoteUnescaped"),
                 InDblQuoteEscaped => todo!("InDblQuoteEscaped"),
