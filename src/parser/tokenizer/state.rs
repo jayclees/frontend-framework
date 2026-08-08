@@ -13,7 +13,7 @@ pub enum State {
     ParsedAttrIdentifier,
 
     ParsingBlockOpen,
-    ParsedBlockOpen,
+    ParsingBlock,
     ParsingBlockClose,
 
     ParsingAttributeColon,
@@ -66,7 +66,7 @@ impl Display for State {
                 ParsedAttrIdentifier => "ParsedAttrIdentifier",
 
                 ParsingBlockOpen => "ParsingBlockOpen",
-                ParsedBlockOpen => "ParsedBlockOpen",
+                ParsingBlock => "ParsingBlock",
                 ParsingBlockClose => "ParsingBlockClose",
 
                 ParsingAttributeColon => "ParsingAttributeColon",

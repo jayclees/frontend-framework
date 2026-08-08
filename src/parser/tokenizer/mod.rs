@@ -5,6 +5,7 @@ mod state;
 mod test;
 mod token;
 
+use crate::parser::tokenizer::expression::ExprResult;
 use crate::parser::tokenizer::helper::pop_state_type;
 use expression::ExpressionTokenizer;
 use helper::{
@@ -70,6 +71,7 @@ impl Tokenizer {
 
     fn err_eof(&self) {
         eprintln!("Unexpected end of file. State history:");
+        dbg!(&self.tokens);
         dbg!(&self.state_history);
         panic!("Unexpected end of file.");
     }
@@ -198,6 +200,15 @@ impl Tokenizer {
                 ParsingIdentifier => {
                     if char.is_ascii_alphabetic() {
                         self.buf.push(char)
+                    } else if char == ':' {
+                        if self.prev_state().expect("Should have state") != &ParsingBlock {
+                            eprintln!("Cannot have attribute identifier outside of block.");
+                            self.err_unexpected(char);
+                        }
+                        self.push_token_pop_state(AttrIdentifier(self.buf.clone()));
+                        self.buf.push(char);
+                        self.push_token(AttrColon);
+                        self.push_state(GatheringExpressionTokens, None);
                     } else if char.is_whitespace() {
                         self.push_state_keep_buf(ResolvingIdentifier, None);
                     } else {
@@ -210,6 +221,19 @@ impl Tokenizer {
                         self.push_token_pop_state(BlockIdentifier(self.buf.clone()));
                         self.pop_state_type(ParsingIdentifier);
                         self.push_state(ParsedBlockIdentifier, Some(char));
+                    } else if char == ':' || char == ',' {
+                        // Resolved to attr identifier
+                        self.push_token_pop_state(AttrIdentifier(self.buf.clone()));
+                        self.pop_state_type(ParsingIdentifier);
+                        if char == ':' {
+                            self.reset_buffer();
+                            self.push_token(AttrColon);
+                            self.push_state(GatheringExpressionTokens, None);
+                        } else if char == ',' {
+                            self.reset_buffer();
+                            self.push_token(AttrSeparator);
+                            self.push_state(GatheringExpressionTokens, None);
+                        }
                     } else if !char.is_whitespace() {
                         self.err_unexpected(char);
                     }
@@ -218,7 +242,7 @@ impl Tokenizer {
                     if self.buf.is_empty() {
                         if matches!(char, '[' | '@' | '{') {
                             self.reset_buffer();
-                            self.buf.push(char)
+                            self.buf.push(char);
                         } else if !char.is_whitespace() {
                             self.err_unexpected(char);
                         }
@@ -241,26 +265,25 @@ impl Tokenizer {
                         } else if self.buf.as_str() == "{" {
                             self.push_token(BlockOpen);
                             self.pop_state_type(ParsedBlockIdentifier);
-                            self.push_state(ParsedBlockOpen, None);
+                            self.push_state(ParsingBlock, None);
 
                             if char == '}' {
                                 self.buf.push(char);
                                 self.push_token(BlockClose);
-                                self.pop_state_type(ParsedBlockOpen);
+                                self.pop_state_type(ParsingBlock);
                             }
                         }
                     }
                 }
                 ParsedAttrIdentifier => todo!("ParsedAttrIdentifier"),
                 ParsingBlockOpen => todo!("ParsingBlockOpen"),
-                ParsedBlockOpen => {
+                ParsingBlock => {
                     if char.is_ascii_alphabetic() {
                         self.push_state(ParsingIdentifier, Some(char));
                     } else if char == '}' {
                         self.reset_buffer();
                         self.buf.push(char);
-                        self.push_token(BlockClose);
-                        self.pop_state_type(ParsedBlockOpen);
+                        self.push_token_pop_state(BlockClose);
                     } else if !char.is_whitespace() {
                         self.err_unexpected(char);
                     }
@@ -270,8 +293,37 @@ impl Tokenizer {
                 ParsedAttrColon => todo!("ParsedAttrColon"),
                 ParsingAttrSeparator => todo!("ParsingAttrSeparator"),
                 ParsedAttrSeparator => todo!("ParsedAttrSeparator"),
-                GatheringExpressionTokens => todo!("GatheringExpressionTokens"),
-                ParsedExpressionTokens => todo!("ParsedExpressionTokens"),
+                GatheringExpressionTokens => {
+                    match expr_tokenizer.push_parse(cursor, char) {
+                        ExprResult::StillParsing => {
+                            // continue
+                        }
+                        ExprResult::Parsed(mut tokens) => {
+                            self.tokens.append(&mut tokens);
+                            self.pop_state();
+                            if char == '}' {
+                                self.reset_buffer();
+                                self.push_token(BlockClose);
+                                self.pop_state_type(ParsingBlock);
+                            } else if char == ',' {
+                                self.reset_buffer();
+                                self.push_token(AttrSeparator);
+                            } else {
+                                self.push_state(ParsedExpressionTokens, Some(char));
+                            }
+                        }
+                        ExprResult::Err(msg) => {
+                            self.err_msg(msg);
+                        }
+                        ExprResult::ErrUnexpected(msg) => {
+                            eprintln!("{msg}");
+                            self.err_unexpected(char);
+                        }
+                    }
+                }
+                ParsedExpressionTokens => {
+                    todo!("ParsedExpressionTokens")
+                },
                 ParsingDirective => todo!("ParsingDirective"),
                 ParsingDirectiveOpen => todo!("ParsingDirectiveOpen"),
                 ParsedDirectiveOpen => {
@@ -281,7 +333,7 @@ impl Tokenizer {
                     } else if !char.is_whitespace() {
                         self.err_unexpected(char);
                     }
-                },
+                }
                 ParsingDirectiveIdentifier => {
                     let buf_empty = self.buf.is_empty();
                     if buf_empty {
@@ -323,7 +375,7 @@ impl Tokenizer {
                     } else if !char.is_whitespace() {
                         self.err_unexpected(char);
                     }
-                },
+                }
                 ParsedDirectiveColon => todo!("ParsedDirectiveColon"),
                 EmptyDirectiveParsed => todo!("EmptyDirectiveParsed"),
                 ParsingDirectiveColon => {
@@ -338,7 +390,7 @@ impl Tokenizer {
                     } else {
                         self.err_unexpected(char);
                     }
-                },
+                }
                 ParsingDirectiveValue => {
                     if self.buf.is_empty() {
                         self.reset_buffer();
@@ -415,7 +467,7 @@ impl Tokenizer {
                     } else {
                         self.err_unexpected(char);
                     }
-                },
+                }
                 InDblQuoteUnescaped => todo!("InDblQuoteUnescaped"),
                 InDblQuoteEscaped => todo!("InDblQuoteEscaped"),
             }

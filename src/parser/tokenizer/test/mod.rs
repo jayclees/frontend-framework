@@ -2,6 +2,7 @@ mod basic;
 mod token;
 mod directive;
 mod event;
+mod attribute;
 
 use super::Tokenizer;
 use crate::parser::tokenizer::token::{Token, TokenType};
@@ -28,7 +29,6 @@ fn assert_fails<R, F: FnOnce() -> R + UnwindSafe>(f: F, expected_msg: &'static s
     assert_eq!(expected_msg, *msg);
 }
 
-// todo
 fn match_tokens_to_source(source: String, tokens: &Vec<Token>) {
     for token in tokens {
         dbg!(token, &source[token.start()..token.end()]);
