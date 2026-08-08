@@ -20,10 +20,7 @@ fn basic_0002_fail() {
 fn basic_0003() {
     let string = file("basic/basic_0003").unwrap();
     let mut tokenizer = Tokenizer::new();
-    let tokens = tokenizer.tokenize(string.clone());
-    for token in tokens {
-        assert!(token.test(string.as_ref()))
-    }
+    match_tokens_to_source(string.clone(), tokenizer.tokenize(string));
 }
 
 #[test]

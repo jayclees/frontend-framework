@@ -1,15 +1,11 @@
-use crate::parser::tokenizer::test::{assert_fails, file};
+use crate::parser::tokenizer::test::{assert_fails, file, match_tokens_to_source};
 use crate::parser::tokenizer::Tokenizer;
 
 #[test]
 fn event_0001() {
     let string = file("event/event_0001").unwrap();
     let mut tokenizer = Tokenizer::new();
-    let tokens = tokenizer.tokenize(string.clone());
-    for token in tokens {
-        dbg!(token);
-        assert!(token.test(string.as_ref()))
-    }
+    match_tokens_to_source(string.clone(), tokenizer.tokenize(string));
 }
 
 #[test]
@@ -45,42 +41,26 @@ fn event_0004_fail() {
 fn event_0005() {
     let string = file("event/event_0005").unwrap();
     let mut tokenizer = Tokenizer::new();
-    let tokens = tokenizer.tokenize(string.clone());
-    for token in tokens {
-        dbg!(token);
-        assert!(token.test(string.as_ref()))
-    }
+    match_tokens_to_source(string.clone(), tokenizer.tokenize(string));
 }
 
 #[test]
 fn event_0006() {
     let string = file("event/event_0006").unwrap();
     let mut tokenizer = Tokenizer::new();
-    let tokens = tokenizer.tokenize(string.clone());
-    for token in tokens {
-        dbg!(token);
-        assert!(token.test(string.as_ref()))
-    }
+    match_tokens_to_source(string.clone(), tokenizer.tokenize(string));
 }
 
 #[test]
 fn event_0007() {
     let string = file("event/event_0007").unwrap();
     let mut tokenizer = Tokenizer::new();
-    let tokens = tokenizer.tokenize(string.clone());
-    for token in tokens {
-        dbg!(token);
-        assert!(token.test(string.as_ref()))
-    }
+    match_tokens_to_source(string.clone(), tokenizer.tokenize(string));
 }
 
 #[test]
 fn event_0008() {
     let string = file("event/event_0008").unwrap();
     let mut tokenizer = Tokenizer::new();
-    let tokens = tokenizer.tokenize(string.clone());
-    for token in tokens {
-        dbg!(token);
-        assert!(token.test(string.as_ref()))
-    }
+    match_tokens_to_source(string.clone(), tokenizer.tokenize(string));
 }
