@@ -57,7 +57,7 @@ impl Tokenizer {
 
     fn err_unexpected(&self, char: char) {
         // todo provide expected tokens based on current tokenizer state
-        // dbg!(&self.tokens);
+        dbg!(&self.tokens);
         // dbg!(&self.state_history);
         panic!(
             r#"Unexpected token "{}" at line: {}, column: {}. State: "{}""#,
@@ -225,7 +225,11 @@ impl Tokenizer {
                     } else {
                         if self.buf.as_str() == "[" {
                             self.push_token(DirectiveOpen);
-                            self.push_state(ParsingDirectiveIdentifier, Some(char));
+                            if char.is_whitespace() {
+                                self.push_state(ParsedDirectiveOpen, None);
+                            } else {
+                                self.push_state(ParsingDirectiveIdentifier, Some(char));
+                            }
                         } else if self.buf.as_str() == "@" {
                             if char == '[' {
                                 self.buf.push(char);
@@ -270,7 +274,14 @@ impl Tokenizer {
                 ParsedExpressionTokens => todo!("ParsedExpressionTokens"),
                 ParsingDirective => todo!("ParsingDirective"),
                 ParsingDirectiveOpen => todo!("ParsingDirectiveOpen"),
-                ParsedDirectiveOpen => todo!("ParsedDirectiveOpen"),
+                ParsedDirectiveOpen => {
+                    if char.is_ascii_alphabetic() {
+                        self.pop_state();
+                        self.push_state(ParsingDirectiveIdentifier, Some(char));
+                    } else if !char.is_whitespace() {
+                        self.err_unexpected(char);
+                    }
+                },
                 ParsingDirectiveIdentifier => {
                     let buf_empty = self.buf.is_empty();
                     if buf_empty {
@@ -294,11 +305,25 @@ impl Tokenizer {
                         self.pop_state();
                     } else if char.is_whitespace() {
                         self.push_token_pop_state(DirectiveIdentifier(self.buf.clone()));
-                        self.push_state(ParsingDirectiveColon, None);
+                        self.push_state(ParsedDirectiveIdentifier, None);
                     } else {
                         self.err_unexpected(char);
                     }
                 }
+                ParsedDirectiveIdentifier => {
+                    if char == ':' {
+                        self.reset_buffer();
+                        self.buf.push(char);
+                        self.push_token_pop_state(DirectiveColon);
+                        self.push_state(ParsingDirectiveValue, None);
+                    } else if char == ']' {
+                        self.reset_buffer();
+                        self.buf.push(char);
+                        self.push_token_pop_state(DirectiveClose);
+                    } else if !char.is_whitespace() {
+                        self.err_unexpected(char);
+                    }
+                },
                 ParsedDirectiveColon => todo!("ParsedDirectiveColon"),
                 EmptyDirectiveParsed => todo!("EmptyDirectiveParsed"),
                 ParsingDirectiveColon => {

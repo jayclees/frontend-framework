@@ -13,7 +13,7 @@ impl Token {
         // match and validate start/end with token len
 
         if r#type.len() == 0 {
-            panic!("Token should not be 0 length. TokenType: {}", r#type)
+            panic!("Token should not be 0 length. TokenType: {}, cursor: {}", r#type, start)
         }
 
         Token {

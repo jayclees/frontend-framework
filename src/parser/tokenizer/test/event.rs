@@ -1,4 +1,4 @@
-use crate::parser::tokenizer::test::file;
+use crate::parser::tokenizer::test::{assert_fails, file};
 use crate::parser::tokenizer::Tokenizer;
 
 #[test]
@@ -13,12 +13,12 @@ fn event_0001() {
 }
 
 #[test]
-#[should_panic = "test"]
 fn event_0002_fail() {
-    // Expect failure
-    let string = file("event/event_0002_fail").unwrap();
-    let mut tokenizer = Tokenizer::new();
-    tokenizer.tokenize(string.clone());
+    assert_fails(|| {
+        let string = file("event/event_0002_fail").unwrap();
+        let mut tokenizer = Tokenizer::new();
+        tokenizer.tokenize(string.clone());
+    }, r#"Unexpected token "@" at line: 1, column: 5. State: "ParsingIdentifier""#);
 }
 
 #[test]

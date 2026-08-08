@@ -1,1 +1,1 @@
-Page [ extends :"layout"]{}
+Page [ extends :"layout"] {}
