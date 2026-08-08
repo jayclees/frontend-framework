@@ -348,20 +348,12 @@ impl Tokenizer {
                         self.push_token_pop_state(DirectiveValue(self.buf.clone()));
                         self.buf.push(char);
                         self.push_token(DirectiveClose);
-                        self.push_state(ParsedDirectiveClose, None);
+                        self.push_state(ParsedDirectiveOrEventClose, None);
                     } else {
                         self.buf.push(char);
                     }
                 }
                 ParsingDirectiveClose => todo!("ParsingDirectiveClose"),
-                ParsedDirectiveClose => {
-                    // just make sure the first char is whitespace
-                    if char.is_whitespace() {
-                        self.pop_state();
-                    } else {
-                        self.err_unexpected(char);
-                    }
-                },
                 ParsedDirective => todo!("ParsedDirective"),
                 ParsingEventListenerOpen => todo!("ParsingEventListenerOpen"),
                 ParsedEventListenerOpen => todo!("ParsedEventListenerOpen"),
@@ -392,8 +384,12 @@ impl Tokenizer {
                 },
                 ParsingEventListenerColon => {
                     if char == ':' {
+                        self.reset_buffer();
                         self.buf.push(char);
                         self.push_token_pop_state(EventListenerColon);
+                        self.push_state(ParsingEventListenerHandler, None);
+                    } else if !char.is_whitespace() {
+                        self.err_unexpected(char);
                     }
                 }
                 ParsedEventListenerColon => todo!("ParsedEventListenerColon"),
@@ -406,11 +402,20 @@ impl Tokenizer {
                         self.push_token_pop_state(EventListenerHandler(self.buf.clone()));
                         self.buf.push(char);
                         self.push_token(EventListenerClose);
+                        self.push_state(ParsedDirectiveOrEventClose, None);
                     } else {
                         self.buf.push(char);
                     }
                 }
                 ParsedEventListener => todo!("ParsedEventListener"),
+                ParsedDirectiveOrEventClose => {
+                    // just make sure the first char is whitespace
+                    if char.is_whitespace() {
+                        self.pop_state();
+                    } else {
+                        self.err_unexpected(char);
+                    }
+                },
                 InDblQuoteUnescaped => todo!("InDblQuoteUnescaped"),
                 InDblQuoteEscaped => todo!("InDblQuoteEscaped"),
             }

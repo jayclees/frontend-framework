@@ -25,7 +25,7 @@ fn directive_0003_fail() {
         let string = file("directive/directive_0003_fail").unwrap();
         let mut tokenizer = Tokenizer::new();
         tokenizer.tokenize(string.clone());
-    }, r#"Unexpected token "{" at line: 1, column: 24. State: "ParsedDirectiveClose""#);
+    }, r#"Unexpected token "{" at line: 1, column: 24. State: "ParsedDirectiveOrEventClose""#);
 }
 
 #[test]
@@ -96,7 +96,7 @@ fn directives_0002_fail() {
         let string = file("directive/directives_0002_fail").unwrap();
         let mut tokenizer = Tokenizer::new();
         tokenizer.tokenize(string.clone());
-    }, r#"Unexpected token "[" at line: 1, column: 25. State: "ParsedDirectiveClose""#);
+    }, r#"Unexpected token "[" at line: 1, column: 25. State: "ParsedDirectiveOrEventClose""#);
 }
 
 #[test]

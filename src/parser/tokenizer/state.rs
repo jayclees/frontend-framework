@@ -34,7 +34,6 @@ pub enum State {
     ParsingDirectiveColon,
     ParsingDirectiveValue,
     ParsingDirectiveClose,
-    ParsedDirectiveClose,
     ParsedDirective,
 
     ParsingEventListenerOpen,
@@ -44,6 +43,8 @@ pub enum State {
     ParsedEventListenerColon,
     ParsingEventListenerHandler,
     ParsedEventListener,
+
+    ParsedDirectiveOrEventClose,
 
     InDblQuoteUnescaped,
     InDblQuoteEscaped,
@@ -86,7 +87,6 @@ impl Display for State {
                 ParsingDirectiveColon => "ParsingDirectiveColon",
                 ParsingDirectiveValue => "ParsingDirectiveValue",
                 ParsingDirectiveClose => "ParsingDirectiveClose",
-                ParsedDirectiveClose => "ParsedDirectiveClose",
                 ParsedDirective => "ParsedDirective",
 
                 ParsingEventListenerOpen => "ParsingEventListenerOpen",
@@ -95,8 +95,10 @@ impl Display for State {
                 ParsingEventListenerColon => "ParsingEventListenerColon",
                 ParsedEventListenerColon => "ParsedEventListenerColon",
                 ParsingEventListenerHandler => "ParsingEventListenerHandler",
-
                 ParsedEventListener => "ParsedEventListener",
+
+                ParsedDirectiveOrEventClose => "ParsedDirectiveOrEventClose",
+
                 InDblQuoteUnescaped => "InDblQuoteUnescaped",
                 InDblQuoteEscaped => "InDblQuoteEscaped",
             }
