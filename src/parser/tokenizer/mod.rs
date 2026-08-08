@@ -208,7 +208,7 @@ impl Tokenizer {
                     if char == '[' || char == '@' || char == '{' {
                         // Resolved to block identifier
                         self.push_token_pop_state(BlockIdentifier(self.buf.clone()));
-                        self.pop_state(); // Popping State::ParsingIdentifier
+                        self.pop_state_type(ParsingIdentifier);
                         self.push_state(ParsedBlockIdentifier, Some(char));
                     } else if !char.is_whitespace() {
                         self.err_unexpected(char);
@@ -240,13 +240,13 @@ impl Tokenizer {
                             }
                         } else if self.buf.as_str() == "{" {
                             self.push_token(BlockOpen);
-                            self.pop_state(); // Popping State::ParsedBlockIdentifier
+                            self.pop_state_type(ParsedBlockIdentifier);
                             self.push_state(ParsedBlockOpen, None);
 
                             if char == '}' {
                                 self.buf.push(char);
                                 self.push_token(BlockClose);
-                                self.pop_state(); // Popping State::ParsedBlockOpen
+                                self.pop_state_type(ParsedBlockOpen);
                             }
                         }
                     }
