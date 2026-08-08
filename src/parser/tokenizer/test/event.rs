@@ -13,7 +13,7 @@ fn event_0001() {
 }
 
 #[test]
-#[should_panic]
+#[should_panic = "test"]
 fn event_0002_fail() {
     // Expect failure
     let string = file("event/event_0002_fail").unwrap();

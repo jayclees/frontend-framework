@@ -186,7 +186,7 @@ impl Tokenizer {
 
             match self.state() {
                 Start => {
-                    // can_have_comments(char)
+                    // can_have_comments!()
                     // can_have_line_comment!()
                     // can_have_block_comment!()
                     if char.is_ascii_alphabetic() {
@@ -323,12 +323,20 @@ impl Tokenizer {
                         self.push_token_pop_state(DirectiveValue(self.buf.clone()));
                         self.buf.push(char);
                         self.push_token(DirectiveClose);
+                        self.push_state(ParsedDirectiveClose, None);
                     } else {
                         self.buf.push(char);
                     }
                 }
                 ParsingDirectiveClose => todo!("ParsingDirectiveClose"),
-                ParsedDirectiveClose => todo!("ParsedDirectiveClose"),
+                ParsedDirectiveClose => {
+                    // just make sure the first char is whitespace
+                    if char.is_whitespace() {
+                        self.pop_state();
+                    } else {
+                        self.err_unexpected(char);
+                    }
+                },
                 ParsedDirective => todo!("ParsedDirective"),
                 ParsingEventListenerOpen => todo!("ParsingEventListenerOpen"),
                 ParsedEventListenerOpen => todo!("ParsedEventListenerOpen"),

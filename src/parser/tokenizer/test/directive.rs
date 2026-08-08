@@ -11,7 +11,7 @@ fn directive_0001() {
 }
 
 #[test]
-#[should_panic]
+#[should_panic = "test"]
 fn directive_0002_fail() {
     let string = file("directive/directive_0002_fail").unwrap();
     let mut tokenizer = Tokenizer::new();
@@ -81,8 +81,8 @@ fn directive_0008() {
 
 
 #[test]
-fn t_0006_directives() {
-    let string = file("directive/t_0006_directives").unwrap();
+fn directives_0001() {
+    let string = file("directive/directives_0001").unwrap();
     let mut tokenizer = Tokenizer::new();
     let tokens = tokenizer.tokenize(string.clone());
     for token in tokens {
@@ -91,8 +91,16 @@ fn t_0006_directives() {
 }
 
 #[test]
-fn t_0007_directives() {
-    let string = file("directive/t_0007_directives").unwrap();
+#[should_panic = "test"]
+fn directives_0002_fail() {
+    let string = file("directive/directives_0002_fail").unwrap();
+    let mut tokenizer = Tokenizer::new();
+    tokenizer.tokenize(string.clone());
+}
+
+#[test]
+fn directives_0003() {
+    let string = file("directive/directives_0003").unwrap();
     let mut tokenizer = Tokenizer::new();
     let tokens = tokenizer.tokenize(string.clone());
     for token in tokens {
@@ -101,8 +109,8 @@ fn t_0007_directives() {
 }
 
 #[test]
-fn t_0008_directives() {
-    let string = file("directive/t_0008_directives").unwrap();
+fn directives_0004() {
+    let string = file("directive/directives_0004").unwrap();
     let mut tokenizer = Tokenizer::new();
     let tokens = tokenizer.tokenize(string.clone());
     for token in tokens {
@@ -111,8 +119,8 @@ fn t_0008_directives() {
 }
 
 #[test]
-fn t_0009_directives() {
-    let string = file("directive/t_0009_directives").unwrap();
+fn directives_0005() {
+    let string = file("directive/directives_0005").unwrap();
     let mut tokenizer = Tokenizer::new();
     let tokens = tokenizer.tokenize(string.clone());
     for token in tokens {
@@ -121,41 +129,25 @@ fn t_0009_directives() {
 }
 
 #[test]
-fn t_0010_directives() {
-    let string = file("directive/t_0010_directives").unwrap();
+#[should_panic = "test"]
+fn directives_0006_fail() {
+    let string = file("directive/directives_0006_fail").unwrap();
     let mut tokenizer = Tokenizer::new();
-    let tokens = tokenizer.tokenize(string.clone());
-    for token in tokens {
-        assert!(token.test(string.as_ref()))
-    }
+    tokenizer.tokenize(string.clone());
 }
 
 #[test]
-fn t_0011_directives() {
-    let string = file("directive/t_0011_directives").unwrap();
+#[should_panic = "test"]
+fn directives_0007_fail() {
+    let string = file("directive/directives_0007_fail").unwrap();
     let mut tokenizer = Tokenizer::new();
-    let tokens = tokenizer.tokenize(string.clone());
-    for token in tokens {
-        assert!(token.test(string.as_ref()))
-    }
+    tokenizer.tokenize(string.clone());
 }
 
 #[test]
-fn t_0012_directives() {
-    let string = file("directive/t_0012_directives").unwrap();
+#[should_panic = "test"]
+fn directives_0008_fail() {
+    let string = file("directive/directives_0008_fail").unwrap();
     let mut tokenizer = Tokenizer::new();
-    let tokens = tokenizer.tokenize(string.clone());
-    for token in tokens {
-        assert!(token.test(string.as_ref()))
-    }
-}
-
-#[test]
-fn t_0013_directives() {
-    let string = file("directive/t_0013_directives").unwrap();
-    let mut tokenizer = Tokenizer::new();
-    let tokens = tokenizer.tokenize(string.clone());
-    for token in tokens {
-        assert!(token.test(string.as_ref()))
-    }
+    tokenizer.tokenize(string.clone());
 }

@@ -1,1 +1,4 @@
-Page[extends:"layout"][marker] [meta: "hello"] { }
+Page [
+    extends: "layout"
+] [ marker ] [
+meta : "hello" ] { }

@@ -4,21 +4,16 @@ use super::*;
 fn basic_0001() {
     let string = file("basic/basic_0001").unwrap();
     let mut tokenizer = Tokenizer::new();
-    let tokens = tokenizer.tokenize(string.clone());
-    for token in tokens {
-        assert!(token.test(string.as_ref()))
-    }
+    match_tokens_to_source(string.clone(), tokenizer.tokenize(string));
 }
 
 #[test]
-#[should_panic]
 fn basic_0002_fail() {
-    let string = file("basic/basic_0002_fail").unwrap();
-    let mut tokenizer = Tokenizer::new();
-    let tokens = tokenizer.tokenize(string.clone());
-    for token in tokens {
-        assert!(token.test(string.as_ref()))
-    }
+    assert_fails(|| {
+        let string = file("basic/basic_0002_fail").unwrap();
+        let mut tokenizer = Tokenizer::new();
+        tokenizer.tokenize(string.clone());
+    }, r#"Unexpected token "{" at line: 1, column: 5. State: "ParsingIdentifier""#);
 }
 
 #[test]
@@ -32,12 +27,10 @@ fn basic_0003() {
 }
 
 #[test]
-#[should_panic]
 fn basic_0004_fail() {
-    let string = file("basic/basic_0004_fail").unwrap();
-    let mut tokenizer = Tokenizer::new();
-    let tokens = tokenizer.tokenize(string.clone());
-    for token in tokens {
-        assert!(token.test(string.as_ref()))
-    }
+    assert_fails(|| {
+        let string = file("basic/basic_0004_fail").unwrap();
+        let mut tokenizer = Tokenizer::new();
+        tokenizer.tokenize(string.clone());
+    }, r#"Unexpected token "{" at line: 1, column: 5. State: "ParsingIdentifier""#);
 }
