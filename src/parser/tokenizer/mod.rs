@@ -266,8 +266,9 @@ impl Tokenizer {
                             self.push_token(BlockOpen);
                             self.pop_state_type(ParsedBlockIdentifier);
                             self.push_state(ParsingBlock, None);
-
-                            if char == '}' {
+                            if char.is_ascii_alphabetic() {
+                                self.push_state(ParsingIdentifier, Some(char));
+                            } else if char == '}' {
                                 self.buf.push(char);
                                 self.push_token(BlockClose);
                                 self.pop_state_type(ParsingBlock);

@@ -1,16 +1,21 @@
+mod attribute;
 mod basic;
-mod token;
 mod directive;
 mod event;
-mod attribute;
+mod expression;
+mod token;
 
 use super::Tokenizer;
+use crate::parser::tokenizer::token::TokenType::{
+    BlockClose, BlockOpen, DirectiveClose, DirectiveColon, DirectiveIdentifier, DirectiveOpen,
+    DirectiveValue, EventListenerClose, EventListenerColon, EventListenerHandler,
+    EventListenerIdentifier, EventListenerOpen,
+};
 use crate::parser::tokenizer::token::{Token, TokenType};
 use std::fs::read_to_string;
 use std::io;
 use std::panic::UnwindSafe;
 use std::path::PathBuf;
-use crate::parser::tokenizer::token::TokenType::{BlockClose, BlockOpen, DirectiveClose, DirectiveColon, DirectiveIdentifier, DirectiveOpen, DirectiveValue, EventListenerClose, EventListenerColon, EventListenerHandler, EventListenerIdentifier, EventListenerOpen};
 
 fn base_path(path: &'static str) -> PathBuf {
     PathBuf::from("app").join(path)
@@ -30,9 +35,37 @@ fn assert_fails<R, F: FnOnce() -> R + UnwindSafe>(f: F, expected_msg: &'static s
 }
 
 fn match_tokens_to_source(source: String, tokens: &Vec<Token>) {
+    let mut start = 0;
+    dbg!(&tokens);
     for token in tokens {
-        dbg!(token, &source[token.start()..token.end()]);
-        assert!(token.test(source.as_ref()))
+        // If there are any non-whitespace characters in the gaps between tokens, that is an error.
+        let non_tokenized = &source[start..token.start()];
+        for (i, char) in non_tokenized.chars().enumerate() {
+            assert!(
+                char.is_whitespace(),
+                r#"Not tokenized: "{}" at {}..{}"#,
+                char,
+                start + i,
+                start + i + 1
+            );
+        }
+
+        dbg!(&source[token.start()..token.end()]);
+        assert!(token.test(source.as_ref()));
+
+        start = token.end();
+    }
+
+    // Check remaining chars at tail end
+    let non_tokenized = &source[start..];
+    for (i, char) in non_tokenized.chars().enumerate() {
+        assert!(
+            char.is_whitespace(),
+            r#"Not tokenized: "{}" at {}..{}"#,
+            char,
+            start + i,
+            start + i + 1
+        );
     }
 }
 
@@ -98,21 +131,147 @@ fn test_match_tokens_to_source() {
 }
 
 #[test]
+fn test_untokenized_non_whitespace_chars_are_caught_1() {
+    let source = r#"Page [hello: "world"] @[click: do_thing()] {}"#.to_owned();
+    let tokens = vec![
+        Token::new(1, DirectiveIdentifier("age".to_owned())),
+        Token::new(5, DirectiveOpen),
+        Token::new(6, DirectiveIdentifier("hello".to_owned())),
+        Token::new(11, DirectiveColon),
+        Token::new(12, DirectiveValue(r#" "world""#.to_owned())),
+        Token::new(20, DirectiveClose),
+        Token::new(22, EventListenerOpen),
+        Token::new(24, EventListenerIdentifier("click".to_owned())),
+        Token::new(29, EventListenerColon),
+        Token::new(30, EventListenerHandler(" do_thing()".to_owned())),
+        Token::new(41, EventListenerClose),
+        Token::new(43, BlockOpen),
+        Token::new(44, BlockClose),
+    ];
+    assert_fails(
+        || match_tokens_to_source(source, &tokens),
+        r#"Not tokenized: "P" at 0..1"#,
+    );
+}
+
+#[test]
+fn test_untokenized_non_whitespace_chars_are_caught_2() {
+    let source = r#"Page [hello: "world"] @[click: do_thing()] {}"#.to_owned();
+    let tokens = vec![
+        // Token::new(0, DirectiveIdentifier("Page".to_owned())),
+        Token::new(5, DirectiveOpen),
+        Token::new(6, DirectiveIdentifier("hello".to_owned())),
+        Token::new(11, DirectiveColon),
+        Token::new(12, DirectiveValue(r#" "world""#.to_owned())),
+        Token::new(20, DirectiveClose),
+        Token::new(22, EventListenerOpen),
+        Token::new(24, EventListenerIdentifier("click".to_owned())),
+        Token::new(29, EventListenerColon),
+        Token::new(30, EventListenerHandler(" do_thing()".to_owned())),
+        Token::new(41, EventListenerClose),
+        Token::new(43, BlockOpen),
+        Token::new(44, BlockClose),
+    ];
+    assert_fails(
+        || match_tokens_to_source(source, &tokens),
+        r#"Not tokenized: "P" at 0..1"#,
+    );
+}
+
+#[test]
+fn test_untokenized_non_whitespace_chars_are_caught_3() {
+    let source = r#"Page [hello: "world"] @[click: do_thing()] {}"#.to_owned();
+    let tokens = vec![
+        Token::new(0, DirectiveIdentifier("Page".to_owned())),
+        Token::new(5, DirectiveOpen),
+        Token::new(6, DirectiveIdentifier("hello".to_owned())),
+        Token::new(11, DirectiveColon),
+        Token::new(12, DirectiveValue(r#" "world""#.to_owned())),
+        Token::new(20, DirectiveClose),
+        Token::new(22, EventListenerOpen),
+        Token::new(24, EventListenerIdentifier("click".to_owned())),
+        Token::new(29, EventListenerColon),
+        Token::new(30, EventListenerHandler(" do_thing()".to_owned())),
+        Token::new(41, EventListenerClose),
+        Token::new(43, BlockOpen),
+        // Token::new(44, BlockClose),
+    ];
+    assert_fails(
+        || match_tokens_to_source(source, &tokens),
+        r#"Not tokenized: "}" at 44..45"#,
+    );
+}
+
+#[test]
+fn test_untokenized_non_whitespace_chars_are_caught_4() {
+    let source = r#"Page [hello: "world"] @[click: do_thing()] {}"#.to_owned();
+    let tokens = vec![
+        Token::new(0, DirectiveIdentifier("Page".to_owned())),
+        Token::new(5, DirectiveOpen),
+        Token::new(6, DirectiveIdentifier("hello".to_owned())),
+        // Token::new(11, DirectiveColon),
+        Token::new(12, DirectiveValue(r#" "world""#.to_owned())),
+        Token::new(20, DirectiveClose),
+        Token::new(22, EventListenerOpen),
+        Token::new(24, EventListenerIdentifier("click".to_owned())),
+        Token::new(29, EventListenerColon),
+        Token::new(30, EventListenerHandler(" do_thing()".to_owned())),
+        Token::new(41, EventListenerClose),
+        Token::new(43, BlockOpen),
+        Token::new(44, BlockClose),
+    ];
+    assert_fails(
+        || match_tokens_to_source(source, &tokens),
+        r#"Not tokenized: ":" at 11..12"#,
+    );
+}
+
+#[test]
+fn test_untokenized_non_whitespace_chars_are_caught_5() {
+    let source = r#"Page [hello: "world"] @[click: do_thing()] {}"#.to_owned();
+    let tokens = vec![
+        Token::new(0, DirectiveIdentifier("Page".to_owned())),
+        Token::new(5, DirectiveOpen),
+        Token::new(6, DirectiveIdentifier("hello".to_owned())),
+        Token::new(11, DirectiveColon),
+        // Token::new(12, DirectiveValue(r#" "world""#.to_owned())),
+        Token::new(20, DirectiveClose),
+        Token::new(22, EventListenerOpen),
+        Token::new(24, EventListenerIdentifier("click".to_owned())),
+        Token::new(29, EventListenerColon),
+        Token::new(30, EventListenerHandler(" do_thing()".to_owned())),
+        Token::new(41, EventListenerClose),
+        Token::new(43, BlockOpen),
+        Token::new(44, BlockClose),
+    ];
+    assert_fails(
+        || match_tokens_to_source(source, &tokens),
+        r#"Not tokenized: """ at 13..14"#,
+    );
+}
+
+#[test]
 fn test_assert_fn_passes_when_panic_occurs() {
-    assert_fails(|| {
-        let string = "Page{}".to_owned();
-        let mut tokenizer = Tokenizer::new();
-        tokenizer.tokenize(string);
-    }, r#"Unexpected token "{" at line: 1, column: 5. State: "ParsingIdentifier""#);
+    assert_fails(
+        || {
+            let string = "Page{}".to_owned();
+            let mut tokenizer = Tokenizer::new();
+            tokenizer.tokenize(string);
+        },
+        r#"Unexpected token "{" at line: 1, column: 5. State: "ParsingIdentifier""#,
+    );
 }
 
 #[test]
 #[should_panic = "panic! was expected, but no panic! occurred."]
 fn test_assert_fails_fn_fails_when_no_panic_occurs() {
-    assert_fails(|| {
-        // This is properly formatted string that will throw no errors
-        let string = "Page {}".to_owned();
-        let mut tokenizer = Tokenizer::new();
-        tokenizer.tokenize(string);
-    }, "");
+    assert_fails(
+        || {
+            // This is properly formatted string that will throw no errors
+            let string = "Page {}".to_owned();
+            let mut tokenizer = Tokenizer::new();
+            tokenizer.tokenize(string);
+        },
+        "",
+    );
 }
