@@ -5,12 +5,10 @@ mod state;
 mod test;
 mod token;
 
-use crate::parser::tokenizer::expression::ExprResult;
-use crate::parser::tokenizer::helper::pop_state_type;
-use expression::ExpressionTokenizer;
+use expression::{ExprResult, ExpressionTokenizer};
 use helper::{
-    current, pop_state, prev, push_state, push_state_include_ws, push_state_keep_buf,
-    push_token, reset_buffer, TokenizerContract,
+    current, pop_state, pop_state_type, prev, push_state, push_state_keep_buf, push_token,
+    reset_buffer, TokenizerContract,
 };
 use state::State;
 use state::State::*;
@@ -48,7 +46,7 @@ impl Tokenizer {
     fn err_msg(&self, msg: String) {
         let msg = msg.trim_end_matches(".");
         panic!(
-            r#"Error: {}. At line: {}, column: {}. State: "{}""#,
+            r#"{}. At line: {}, column: {}. State: "{}""#,
             msg,
             self.line,
             self.column,
@@ -322,9 +320,7 @@ impl Tokenizer {
                         }
                     }
                 }
-                ParsedExpressionTokens => {
-                    todo!("ParsedExpressionTokens")
-                },
+                ParsedExpressionTokens => todo!("ParsedExpressionTokens"),
                 ParsingDirective => todo!("ParsingDirective"),
                 ParsingDirectiveOpen => todo!("ParsingDirectiveOpen"),
                 ParsedDirectiveOpen => {
@@ -498,17 +494,6 @@ impl TokenizerContract for Tokenizer {
 
     fn push_state(&mut self, state: State, starting_char: Option<char>) {
         push_state(
-            &mut self.state_history,
-            state,
-            &mut self.buf,
-            &mut self.buf_start,
-            starting_char,
-            self.cursor,
-        );
-    }
-
-    fn push_state_include_ws(&mut self, state: Self::TokenizerState, starting_char: Option<char>) {
-        push_state_include_ws(
             &mut self.state_history,
             state,
             &mut self.buf,

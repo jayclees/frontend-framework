@@ -1,12 +1,12 @@
 use super::helper::{
-    current, pop_state, pop_state_type, prev, push_state, push_state_include_ws,
-    push_state_keep_buf, push_token, reset_buffer,
+    current, pop_state, pop_state_type, prev, push_state, push_state_keep_buf, push_token,
+    reset_buffer,
 };
 use super::token::{Operator, OperatorMatchResult};
 use super::{Token, TokenType, TokenizerContract};
+use crate::parser::tokenizer::token::TokenType::ExprNumber;
 use std::fmt::{Display, Formatter};
 use ExprState::*;
-use crate::parser::tokenizer::token::TokenType::{AttrSeparator, BlockClose, ExprNumber};
 
 pub(super) struct ExpressionTokenizer {
     state_history: Vec<ExprState>,
@@ -69,7 +69,9 @@ impl ExpressionTokenizer {
                     }
                     if !self.buf.is_empty() {
                         eprintln!(r#"Buffer: "{}""#, self.buf);
-                        panic!("Internal error: Buffer not empty when attempting to exit expression tokenizer.")
+                        panic!(
+                            "Internal error: Buffer not empty when attempting to exit expression tokenizer."
+                        )
                     }
 
                     return self.get_tokens_and_reset();
@@ -132,7 +134,8 @@ impl ExpressionTokenizer {
             ParsingNumber => {
                 if char.is_ascii_digit() {
                     self.buf.push(char)
-                } else if char == '.' { // period
+                } else if char == '.' {
+                    // period
                     if self.buf.contains('.') {
                         return self.err("Number can only have one dot.".to_owned());
                     }
@@ -194,17 +197,6 @@ impl TokenizerContract for ExpressionTokenizer {
 
     fn push_state(&mut self, state: ExprState, starting_char: Option<char>) {
         push_state(
-            &mut self.state_history,
-            state,
-            &mut self.buf,
-            &mut self.buf_start,
-            starting_char,
-            self.cursor,
-        );
-    }
-
-    fn push_state_include_ws(&mut self, state: Self::TokenizerState, starting_char: Option<char>) {
-        push_state_include_ws(
             &mut self.state_history,
             state,
             &mut self.buf,

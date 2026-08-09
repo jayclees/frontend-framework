@@ -5,7 +5,6 @@ pub trait TokenizerContract {
     fn state(&self) -> &Self::TokenizerState;
     fn prev_state(&self) -> Option<&Self::TokenizerState>;
     fn push_state(&mut self, state: Self::TokenizerState, starting_char: Option<char>);
-    fn push_state_include_ws(&mut self, state: Self::TokenizerState, starting_char: Option<char>);
     fn push_state_keep_buf(&mut self, state: Self::TokenizerState, starting_char: Option<char>);
     fn pop_state(&mut self);
     fn pop_state_type(&mut self, state: Self::TokenizerState);
@@ -39,22 +38,6 @@ pub(super) fn push_state<T>(
     if let Some(char) = starting_char
         && !char.is_whitespace()
     {
-        buf.push(char);
-    }
-}
-
-pub(super) fn push_state_include_ws<T>(
-    state_history: &mut Vec<T>,
-    state: T,
-    buf: &mut String,
-    buf_start: &mut Option<usize>,
-    starting_char: Option<char>,
-    cursor: usize,
-) {
-    state_history.push(state);
-    reset_buffer(buf, buf_start, cursor);
-
-    if let Some(char) = starting_char {
         buf.push(char);
     }
 }
