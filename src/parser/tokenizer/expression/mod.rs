@@ -6,6 +6,7 @@ use super::token::{Operator, OperatorMatchResult};
 use super::{Token, TokenType, TokenizerContract};
 use std::fmt::{Display, Formatter};
 use ExprState::*;
+use crate::parser::tokenizer::token::TokenType::{AttrSeparator, BlockClose, ExprNumber};
 
 pub(super) struct ExpressionTokenizer {
     state_history: Vec<ExprState>,
@@ -56,13 +57,21 @@ impl ExpressionTokenizer {
                     self.push_state(ParsingString, Some(char));
                 } else if char.is_ascii_alphabetic() {
                     self.push_state(ParsingIdentifier, Some(char));
-                } else if char.is_ascii_digit() || char == '-' {
+                } else if char.is_ascii_digit() {
                     self.push_state(ParsingNumber, Some(char));
+                } else if char == '-' {
+                    todo!();
+                    // self.push_token(OperatorOrNegativeSign);
+                    // self.push_state(ResolvingMinusSignType, Some(char));
                 } else if char == ',' || char == '}' {
-                    // todo:
-                    // Potentially check if any tokens were parsed, if empty, or if
-                    // buffer is not empty, return an error.
-                    dbg!("hello");
+                    if self.tokens.is_empty() {
+                        return self.err("Expected expression.".to_owned());
+                    }
+                    if !self.buf.is_empty() {
+                        eprintln!(r#"Buffer: "{}""#, self.buf);
+                        panic!("Internal error: Buffer not empty when attempting to exit expression tokenizer.")
+                    }
+
                     return self.get_tokens_and_reset();
                 } else if !char.is_whitespace() {
                     return self.err_expected_expr_start();
@@ -123,13 +132,16 @@ impl ExpressionTokenizer {
             ParsingNumber => {
                 if char.is_ascii_digit() {
                     self.buf.push(char)
-                } else if char == '.' {
-                    if self.buf.is_empty() {
-                        return self.err("Number cannot start with period.".to_owned());
+                } else if char == '.' { // period
+                    if self.buf.contains('.') {
+                        return self.err("Number can only have one dot.".to_owned());
                     }
-                    self.buf.push(char)
+                    self.buf.push(char);
+                } else if char == ',' || char == '}' {
+                    self.push_token(ExprNumber(self.buf.clone()));
+                    return self.get_tokens_and_reset();
                 } else if char.is_whitespace() || char == ',' || char == '}' {
-                    self.push_token(TokenType::ExprNumber(self.buf.clone()));
+                    self.push_token(ExprNumber(self.buf.clone()));
                     self.push_state(ParsedExprToken, Some(char));
                 }
             }
