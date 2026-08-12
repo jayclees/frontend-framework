@@ -1,6 +1,6 @@
 use crate::parser::tokenizer::token::Expr;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct Block {
     tag: String,
     attributes: Vec<Attr>,
@@ -21,7 +21,7 @@ impl Block {
     }
 }
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Clone)]
 pub struct BlockBuilder {
     tag: Option<String>,
     attributes: Vec<Attr>,
@@ -86,19 +86,26 @@ impl BlockBuilder {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct Attr {
     handle: String,
     expression: Vec<Expr>,
 }
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Clone)]
 pub struct AttrBuilder {
     handle: Option<String>,
     expression: Vec<Expr>,
 }
 
 impl AttrBuilder {
+    pub fn new(handle: String) -> AttrBuilder {
+        AttrBuilder {
+            handle: Some(handle),
+            expression: vec![],
+        }
+    }
+
     pub fn append_expr(&mut self, expr: Expr) {
         self.expression.push(expr);
     }
