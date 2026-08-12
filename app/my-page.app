@@ -39,7 +39,7 @@ Page [extends: root] [marker-directive] @[load: do_thing()] {
                 a {
                     href: "https://sturdyframework.com",
                     target: "_blank",
-                    text: "post.title"
+                    text: post.title
                 }
             }
         }
