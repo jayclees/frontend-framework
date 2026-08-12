@@ -37,6 +37,7 @@ impl Token {
 
     #[cfg(test)]
     pub fn test(&self, source: &str) -> bool {
+        let source_str = &source[self.start..self.end];
         match &self.r#type {
             BlockIdentifier(str) |
             LineComment(str) |
@@ -45,28 +46,34 @@ impl Token {
             DirectiveIdentifier(str) |
             EventListenerIdentifier(str) |
             EventListenerHandler(str) |
-            DirectiveValue(str) |
-            ExprString(str) |
-            ExprNumber(str) |
-            ExprVariable(str) |
-            ExprFunctionCall(str) => &source[self.start..self.end] == str,
+            DirectiveValue(str) => source_str == str,
 
-            Colon => &source[self.start..self.end] == ":",
-            BlockOpen => &source[self.start..self.end] == "{",
-            BlockClose => &source[self.start..self.end] == "}",
-            AttrColon => &source[self.start..self.end] == ":",
-            AttrSeparator => &source[self.start..self.end] == ",",
-            DirectiveOpen => &source[self.start..self.end] == "[",
-            DirectiveClose => &source[self.start..self.end] == "]",
-            DirectiveColon => &source[self.start..self.end] == ":",
-            EventListenerOpen => &source[self.start..self.end] == "@[",
-            EventListenerClose => &source[self.start..self.end] == "]",
-            EventListenerColon => &source[self.start..self.end] == ":",
-            ExprParenthesesOpen => &source[self.start..self.end] == "(",
-            ExprParenthesesClose => &source[self.start..self.end] == ")",
+            BlockOpen => source_str == "{",
+            BlockClose => source_str == "}",
+            AttrColon => source_str == ":",
+            AttrSeparator => source_str == ",",
+            DirectiveOpen => source_str == "[",
+            DirectiveClose => source_str == "]",
+            DirectiveColon => source_str == ":",
+            EventListenerOpen => source_str == "@[",
+            EventListenerClose => source_str == "]",
+            EventListenerColon => source_str == ":",
 
-            ExprOperator(_operator) => { todo!("Test operator.") }
-            Expression => todo!("Test expression."),
+            ExprToken(expr) => match expr {
+                Expr::String(str) => source_str == str,
+                Expr::Number(str) => source_str == str,
+                Expr::Operator(op) => source_str == op.symbol(),
+                Expr::Var(str) => source_str == str,
+                Expr::VarDotAccessor => source_str == ".",
+                Expr::VarBracketAccessorOpen => source_str == "[",
+                Expr::VarBracketAccessorClose => source_str == "]",
+                Expr::FunctionArgsOpen => source_str == "(",
+                Expr::FunctionArgsClose => source_str == ")",
+                Expr::ParenthesesOpen => source_str == "(",
+                Expr::ParenthesesClose => source_str == ")",
+                Expr::ArrayOpen => source_str == "[",
+                Expr::ArrayClose => source_str == "]",
+            },
         }
     }
 }
@@ -77,13 +84,12 @@ pub enum TokenType {
     BlockIdentifier(String),
     LineComment(String),
     BlockComment(String),
-    Colon, // todo remove
     BlockOpen,
     BlockClose,
     AttrIdentifier(String),
     AttrColon,
     AttrSeparator,
-    Expression,
+    ExprToken(Expr),
     DirectiveOpen,
     DirectiveClose,
     DirectiveIdentifier(String),
@@ -94,14 +100,6 @@ pub enum TokenType {
     EventListenerIdentifier(String),
     EventListenerColon,
     EventListenerHandler(String),
-
-    ExprString(String),
-    ExprNumber(String),
-    ExprVariable(String),
-    ExprFunctionCall(String),
-    ExprOperator(Operator),
-    ExprParenthesesOpen,
-    ExprParenthesesClose,
 }
 
 impl TokenType {
@@ -114,31 +112,21 @@ impl TokenType {
             DirectiveIdentifier(str) |
             DirectiveValue(str) |
             EventListenerHandler(str) |
-            ExprString(str) |
-            ExprNumber(str) |
-            ExprVariable(str) |
-            ExprFunctionCall(str) |
             EventListenerIdentifier(str) => str.len(),
 
-            Colon |
             BlockOpen |
             BlockClose |
             AttrColon |
             AttrSeparator |
-            Expression |
             DirectiveOpen |
             DirectiveClose |
-            DirectiveColon |
             EventListenerClose |
             EventListenerColon |
-            ExprParenthesesOpen |
-            ExprParenthesesClose => 1,
+            DirectiveColon => 1,
 
             EventListenerOpen => 2,
 
-            ExprOperator(op) => {
-                op.symbol().len()
-            }
+            ExprToken(expr) => expr.len(),
         }
     }
 }
@@ -149,13 +137,12 @@ impl Display for TokenType {
             BlockIdentifier(str) => write!(f, "BlockIdentifier({str})"),
             LineComment(str) => write!(f, "LineComment({str})"),
             BlockComment(str) => write!(f, "BlockComment({str})"),
-            Colon => write!(f, "Colon"),
             BlockOpen => write!(f, "BlockOpen"),
             BlockClose => write!(f, "BlockClose"),
             AttrIdentifier(str) => write!(f, "AttrIdentifier({str})"),
             AttrColon => write!(f, "AttrColon"),
             AttrSeparator => write!(f, "AttrSeparator"),
-            Expression => write!(f, "Expression"),
+            ExprToken(expr) => write!(f, "ExpressionToken({expr})"),
             DirectiveOpen => write!(f, "DirectiveOpen"),
             DirectiveClose => write!(f, "DirectiveClose"),
             DirectiveIdentifier(_) => write!(f, "DirectiveIdentifier"),
@@ -168,13 +155,63 @@ impl Display for TokenType {
             EventListenerHandler(str) => write!(f, "EventListenerHandler({str})"),
 
             // Expression token
-            ExprString(str) => write!(f, "ExprString({str})"),
-            ExprNumber(str) => write!(f, "ExprNumber({str})"),
-            ExprVariable(str) => write!(f, "ExprVariable({str})"),
-            ExprFunctionCall(str) => write!(f, "ExprFunctionCall({str})"),
-            ExprOperator(op) => write!(f, "ExprOperator({op})"),
-            ExprParenthesesOpen => write!(f, "ExprParenthesesOpen"),
-            ExprParenthesesClose => write!(f, "ExprParenthesesClose"),
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum Expr {
+    String(String),
+    Number(String),
+    Operator(Operator),
+    Var(String),
+    VarDotAccessor,
+    VarBracketAccessorOpen,
+    VarBracketAccessorClose,
+    FunctionArgsOpen,
+    FunctionArgsClose,
+    ParenthesesOpen,
+    ParenthesesClose,
+    ArrayOpen,
+    ArrayClose,
+}
+
+impl Expr {
+    fn len(&self) -> usize {
+        match self {
+            Expr::String(str) => str.len(),
+            Expr::Number(str) => str.len(),
+            Expr::Operator(op) => op.symbol().len(),
+            Expr::Var(str) => str.len(),
+            Expr::VarDotAccessor => 1,
+            Expr::VarBracketAccessorOpen => 1,
+            Expr::VarBracketAccessorClose => 1,
+            Expr::FunctionArgsOpen => 1,
+            Expr::FunctionArgsClose => 1,
+            Expr::ParenthesesOpen => 1,
+            Expr::ParenthesesClose => 1,
+            Expr::ArrayOpen => 1,
+            Expr::ArrayClose => 1,
+        }
+    }
+}
+
+impl Display for Expr {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Expr::String(str) => write!(f, "String({str})"),
+            Expr::Number(str) => write!(f, "Number({str})"),
+            Expr::Operator(op) => write!(f, "Operator({op})"),
+            Expr::Var(str) => write!(f, "Variable({str})"),
+            Expr::VarDotAccessor => write!(f, "VariableDotAccessor"),
+            Expr::VarBracketAccessorOpen => write!(f, "VarBracketAccessorOpen"),
+            Expr::VarBracketAccessorClose => write!(f, "VarBracketAccessorClose"),
+            Expr::FunctionArgsOpen => write!(f, "FunctionArgsOpen"),
+            Expr::FunctionArgsClose => write!(f, "FunctionArgsClose"),
+            Expr::ParenthesesOpen => write!(f, "ParenthesesOpen"),
+            Expr::ParenthesesClose => write!(f, "ParenthesesClose"),
+            Expr::ArrayOpen => write!(f, "ArrayOpen"),
+            Expr::ArrayClose => write!(f, "ArrayClose"),
         }
     }
 }

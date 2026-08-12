@@ -3,7 +3,7 @@ mod helper;
 mod state;
 #[cfg(test)]
 mod test;
-mod token;
+pub(crate) mod token;
 
 use expression::{ExprResult, ExpressionTokenizer};
 use helper::{

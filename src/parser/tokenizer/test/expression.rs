@@ -86,6 +86,55 @@ fn number_0006() {
 }
 
 #[test]
+fn neg_number_0001() {
+    let string = file("expression/neg_number_0001").unwrap();
+    let mut tokenizer = Tokenizer::new();
+    match_tokens_to_source(string.clone(), tokenizer.tokenize(string));
+}
+
+#[test]
+fn neg_number_0002() {
+    let string = file("expression/neg_number_0002").unwrap();
+    let mut tokenizer = Tokenizer::new();
+    match_tokens_to_source(string.clone(), tokenizer.tokenize(string));
+}
+
+#[test]
+fn neg_number_0003() {
+    let string = file("expression/neg_number_0003").unwrap();
+    let mut tokenizer = Tokenizer::new();
+    match_tokens_to_source(string.clone(), tokenizer.tokenize(string));
+}
+
+#[test]
+fn neg_number_0004() {
+    let string = file("expression/neg_number_0004").unwrap();
+    let mut tokenizer = Tokenizer::new();
+    match_tokens_to_source(string.clone(), tokenizer.tokenize(string));
+}
+
+#[test]
+fn neg_number_0005() {
+    let string = file("expression/neg_number_0005").unwrap();
+    let mut tokenizer = Tokenizer::new();
+    match_tokens_to_source(string.clone(), tokenizer.tokenize(string));
+}
+
+#[test]
+fn neg_number_0006() {
+    let string = file("expression/neg_number_0006").unwrap();
+    let mut tokenizer = Tokenizer::new();
+    match_tokens_to_source(string.clone(), tokenizer.tokenize(string));
+}
+
+#[test]
+fn neg_number_0007() {
+    let string = file("expression/neg_number_0007").unwrap();
+    let mut tokenizer = Tokenizer::new();
+    match_tokens_to_source(string.clone(), tokenizer.tokenize(string));
+}
+
+#[test]
 fn decimal_0001() {
     let string = file("expression/decimal_0001").unwrap();
     let mut tokenizer = Tokenizer::new();

@@ -2,9 +2,9 @@ use super::helper::{
     current, pop_state, pop_state_type, prev, push_state, push_state_keep_buf, push_token,
     reset_buffer,
 };
-use super::token::{Operator, OperatorMatchResult};
+use super::token::{Expr, Operator, OperatorMatchResult};
 use super::{Token, TokenType, TokenizerContract};
-use crate::parser::tokenizer::token::TokenType::ExprNumber;
+use crate::parser::tokenizer::token::TokenType::ExprToken;
 use std::fmt::{Display, Formatter};
 use ExprState::*;
 
@@ -60,9 +60,7 @@ impl ExpressionTokenizer {
                 } else if char.is_ascii_digit() {
                     self.push_state(ParsingNumber, Some(char));
                 } else if char == '-' {
-                    todo!();
-                    // self.push_token(OperatorOrNegativeSign);
-                    // self.push_state(ResolvingMinusSignType, Some(char));
+                    self.push_state(ResolvingMinusSignType, Some(char));
                 } else if char == ',' || char == '}' {
                     if self.tokens.is_empty() {
                         return self.err("Expected expression.".to_owned());
@@ -82,7 +80,9 @@ impl ExpressionTokenizer {
             ParsedExprToken => {
                 match self.prev_state().expect("Should have prev state.") {
                     ParsingString => {
-                        self.push_token_pop_state(TokenType::ExprString(self.buf.clone()));
+                        self.push_token_pop_state(TokenType::ExprToken(Expr::String(
+                            self.buf.clone(),
+                        )));
                         self.pop_state();
                     }
                     ParsingNumber => {
@@ -91,12 +91,13 @@ impl ExpressionTokenizer {
                         self.pop_state();
                     }
                     ParsingIdentifier => {
+                        todo!("ParsingIdentifier");
                         // decide whether it's a variable or function declaration
                     }
-                    ParsingFunctionCall => {}
-                    ParsingOperator => {}
-                    ParsingParenthesesOpen => {}
-                    ParsingParenthesesClosed => {}
+                    ParsingFunctionCall => todo!("ParsingFunctionCall"),
+                    ParsingOperator => todo!("ParsingOperator"),
+                    ParsingParenthesesOpen => todo!("ParsingParenthesesOpen"),
+                    ParsingParenthesesClosed => todo!("ParsingParenthesesClosed"),
                     _ => unimplemented!(),
                 }
 
@@ -141,24 +142,24 @@ impl ExpressionTokenizer {
                     }
                     self.buf.push(char);
                 } else if char == ',' || char == '}' {
-                    self.push_token(ExprNumber(self.buf.clone()));
+                    self.push_token(TokenType::ExprToken(Expr::Number(self.buf.clone())));
                     return self.get_tokens_and_reset();
                 } else if char.is_whitespace() || char == ',' || char == '}' {
-                    self.push_token(ExprNumber(self.buf.clone()));
+                    self.push_token(TokenType::ExprToken(Expr::Number(self.buf.clone())));
                     self.push_state(ParsedExprToken, Some(char));
                 }
             }
-            ParsedNumber => {}
-            ParsingIdentifier => {}
-            ParsingFunctionCall => {}
-            ParsedFunctionCall => {}
+            ParsedNumber => todo!("ParsedNumber"),
+            ParsingIdentifier => todo!("ParsingIdentifier"),
+            ParsingFunctionCall => todo!("ParsingFunctionCall"),
+            ParsedFunctionCall => todo!("ParsedFunctionCall"),
             ParsingOperator => {
                 if Operator::is_operator_char(char) {
                     self.buf.push(char);
                 } else {
                     match Operator::get_match(&self.buf) {
                         OperatorMatchResult::Matched(operator) => {
-                            self.push_token(TokenType::ExprOperator(operator));
+                            self.push_token(TokenType::ExprToken(Expr::Operator(operator)));
                             // expect next token to be string, number, variable, function call
                             if !char.is_whitespace() {
                                 self.push_state(ParsedExprToken, Some(char));
@@ -173,11 +174,24 @@ impl ExpressionTokenizer {
                     // todo handle current char
                 }
             }
-            ParsedOperator => {}
-            ParsingParenthesesOpen => {}
-            ParsedParenthesesOpen => {}
-            ParsingParenthesesClosed => {}
-            ParsedParenthesesClosed => {}
+            ParsedOperator => todo!("ParsedOperator"),
+            ParsingParenthesesOpen => todo!("ParsingParenthesesOpen"),
+            ParsedParenthesesOpen => todo!("ParsedParenthesesOpen"),
+            ParsingParenthesesClosed => todo!("ParsingParenthesesClosed"),
+            ParsedParenthesesClosed => todo!("ParsedParenthesesClosed"),
+            ResolvingMinusSignType => {
+                // if prev_type == number && buf == "-", expect
+                if self.buf.as_str() == "-" && char == '-' {
+                    //
+                }
+                // if previous token is a number, expect either number
+                else if let Some(token) = self.tokens.last()
+                    && let ExprToken(expr) = token.r#type()
+                    && let Expr::Number(num) = expr
+                {
+                    //
+                }
+            }
         }
 
         ExprResult::StillParsing
@@ -258,6 +272,7 @@ pub(super) enum ExprState {
     ParsedParenthesesOpen,
     ParsingParenthesesClosed,
     ParsedParenthesesClosed,
+    ResolvingMinusSignType,
 }
 
 impl Display for ExprState {
@@ -278,6 +293,7 @@ impl Display for ExprState {
             ParsedParenthesesOpen => write!(f, "ParsedParenthesesOpen"),
             ParsingParenthesesClosed => write!(f, "ParsingParenthesesClosed"),
             ParsedParenthesesClosed => write!(f, "ParsedParenthesesClosed"),
+            ResolvingMinusSignType => write!(f, "ResolvingMinusSignType"),
         }
     }
 }
