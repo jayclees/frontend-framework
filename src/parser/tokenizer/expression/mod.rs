@@ -4,7 +4,6 @@ use super::helper::{
 };
 use super::token::{Expr, Operator, OperatorMatchResult};
 use super::{Token, TokenType, TokenizerContract};
-use crate::parser::tokenizer::token::TokenType::ExprToken;
 use std::fmt::{Display, Formatter};
 use ExprState::*;
 
@@ -60,7 +59,9 @@ impl ExpressionTokenizer {
                 } else if char.is_ascii_digit() {
                     self.push_state(ParsingNumber, Some(char));
                 } else if char == '-' {
-                    self.push_state(ResolvingMinusSignType, Some(char));
+                    self.reset_buffer();
+                    self.buf.push(char);
+                    self.push_token(TokenType::ExprToken(Expr::Operator(Operator::Minus)));
                 } else if char == ',' || char == '}' {
                     if self.tokens.is_empty() {
                         return self.err("Expected expression.".to_owned());
@@ -180,13 +181,24 @@ impl ExpressionTokenizer {
             ParsingParenthesesClosed => todo!("ParsingParenthesesClosed"),
             ParsedParenthesesClosed => todo!("ParsedParenthesesClosed"),
             ResolvingMinusSignType => {
-                // if prev_type == number && buf == "-", expect
+                // maybe keep pushing to buffer until we know for sure if it's a minus operator
+                // or negative sign, then break up the buffer into known tokens
+                // potential cases:
+                // -1
+                // var--
+                // --var
+                // prev_token - 1
+                // prev_token - -1
+
+                // todo figure out when buffer is ready to be parsed
+
+                // if prev token == number && buf == "-", expect '-'
                 if self.buf.as_str() == "-" && char == '-' {
                     //
                 }
                 // if previous token is a number, expect either number
                 else if let Some(token) = self.tokens.last()
-                    && let ExprToken(expr) = token.r#type()
+                    && let TokenType::ExprToken(expr) = token.r#type()
                     && let Expr::Number(num) = expr
                 {
                     //

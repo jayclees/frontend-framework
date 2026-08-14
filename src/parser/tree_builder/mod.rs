@@ -1,9 +1,11 @@
-mod block;
+pub mod block;
 mod html;
+mod expression;
 
 use super::tokenizer::token::{Token, TokenType};
-use crate::parser::tree_builder::block::AttrBuilder;
+use super::tree_builder::block::{AttrBuilder, BlockContent};
 use block::{Block, BlockBuilder};
+use expression::Expression;
 
 pub struct TreeBuilder {
     state_history: Vec<State>,
@@ -30,6 +32,7 @@ impl TreeBuilder {
         let mut blocks = vec![];
         let mut block_builders: Vec<BlockBuilder> = vec![];
         let mut attr_builders: Vec<AttrBuilder> = vec![];
+        let mut expression: Expression = Expression::new();
 
         for token in tokens {
             match self.state() {
@@ -51,14 +54,40 @@ impl TreeBuilder {
                         )
                         // else find parent block and add as child
                     } else if let TokenType::AttrIdentifier(id) = token.r#type() {
-                        attr_builders.push(AttrBuilder::new(id.clone()));
-                        self.push_state(State::BuildingAttr);
+                        // There will be reserved attr identifier keywords: text, html
+                        match id.as_str() {
+                            "text" => self.push_state(State::BuildingTextNode),
+                            "html" => self.push_state(State::BuildingHtmlNode),
+                            _ => {
+                                attr_builders.push(AttrBuilder::new(id.clone()));
+                                self.push_state(State::BuildingAttr);
+                            }
+                        }
                     }
+                }
+                State::BuildingTextNode => {
+                    // expect expressions
+                    if let TokenType::ExprToken(tok) = token.r#type() {
+                        expression.push_token(tok);
+                    } else {
+                        match expression.is_empty() {
+                            true => panic!("Expected expression."),
+                            false => {
+                                let block_builder =
+                                    active_block(&mut block_builders).expect("Should be set");
+
+                                // block_builder.add_content(BlockContent::Text());
+                                self.state_history.pop();
+                            }
+                        }
+                    }
+                }
+                State::BuildingHtmlNode => {
+                    // expect expressions
                 }
                 State::BuildingAttr => {
                     let attr_builder =
                         active_attr(&mut attr_builders).expect("Should have attr builder.");
-
                     if let TokenType::ExprToken(expr) = token.r#type() {
                         attr_builder.append_expr(expr.clone());
                     } else if matches!(
@@ -97,5 +126,7 @@ enum State {
     Start,
     BuildingBlock,
     BuildingAttr,
+    BuildingTextNode,
+    BuildingHtmlNode,
     ExpectAttrExpression,
 }

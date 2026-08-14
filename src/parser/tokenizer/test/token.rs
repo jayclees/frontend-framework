@@ -102,8 +102,8 @@ fn test_token_len_static() {
 
 #[test]
 fn test_symbol_len() {
-    assert_eq!(1, TokenType::ExprToken(Expr::Operator(Operator::Add)).len());
-    assert_eq!(1, TokenType::ExprToken(Expr::Operator(Operator::Sub)).len());
+    assert_eq!(1, TokenType::ExprToken(Expr::Operator(Operator::Plus)).len());
+    assert_eq!(1, TokenType::ExprToken(Expr::Operator(Operator::Minus)).len());
     assert_eq!(1, TokenType::ExprToken(Expr::Operator(Operator::Multiply)).len());
     assert_eq!(1, TokenType::ExprToken(Expr::Operator(Operator::Power)).len());
     assert_eq!(1, TokenType::ExprToken(Expr::Operator(Operator::Divide)).len());

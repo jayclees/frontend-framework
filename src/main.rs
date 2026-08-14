@@ -1,9 +1,10 @@
 mod helper;
 mod parser;
+mod generator;
 
-use std::cell::RefCell;
 use std::fs::read_to_string;
-use std::rc::Rc;
+use std::path::PathBuf;
+use crate::generator::Generator;
 use crate::parser::tokenizer::Tokenizer;
 use crate::parser::tree_builder::TreeBuilder;
 
@@ -13,5 +14,6 @@ fn main() {
     let tokens = tokenizer.tokenize(read_to_string("app/counter.app").unwrap());
     let mut builder = TreeBuilder::new();
     let tree = builder.build(tokens);
-    dbg!(tree);
+    let mut generator = Generator::new(&tree, PathBuf::from("dist"));
+    dbg!(generator.generate());
 }

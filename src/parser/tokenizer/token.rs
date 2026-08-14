@@ -219,8 +219,8 @@ impl Display for Expr {
 #[derive(Debug, Clone, PartialEq)]
 pub enum Operator {
     // Arithmetic
-    Add,
-    Sub,
+    Plus,
+    Minus,
     Multiply,
     Power, // ^x
     Divide,
@@ -256,8 +256,8 @@ impl Operator {
 
     pub(super) fn get_match(buf: &str) -> OperatorMatchResult {
         let variants = [
-            Operator::Add,
-            Operator::Sub,
+            Operator::Plus,
+            Operator::Minus,
             Operator::Multiply,
             Operator::Power,
             Operator::Divide,
@@ -291,8 +291,8 @@ impl Operator {
 
     pub(super) fn symbol(&self) -> &'static str {
         match self {
-            Operator::Add => "+",
-            Operator::Sub => "-",
+            Operator::Plus => "+",
+            Operator::Minus => "-",
             Operator::Multiply => "*",
             Operator::Power => "^",
             Operator::Divide => "/",
@@ -320,8 +320,8 @@ impl Operator {
 impl Display for Operator {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            Operator::Add => write!(f, "Add"),
-            Operator::Sub => write!(f, "Sub"),
+            Operator::Plus => write!(f, "Add"),
+            Operator::Minus => write!(f, "Sub"),
             Operator::Multiply => write!(f, "Multiply"),
             Operator::Power => write!(f, "Power"),
             Operator::Divide => write!(f, "Divide"),
