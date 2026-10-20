@@ -28,20 +28,38 @@ impl TreeBuilder {
         self.state_history.push(state);
     }
 
+    fn pop_state(&mut self, state: Option<State>) {
+        match state {
+            Some(state) => {
+                if *self.state_history.last().expect("Should be set.") == state {
+                    self.state_history.pop();
+                } else {
+                    panic!("State attempting to be popped is not current one.")
+                }
+            }
+            None => {
+                self.state_history.pop();
+            }
+        }
+    }
+
     pub fn build(&mut self, tokens: &Vec<Token>) -> Vec<Block> {
         let mut blocks = vec![];
         let mut block_builders: Vec<BlockBuilder> = vec![];
         let mut attr_builders: Vec<AttrBuilder> = vec![];
         let mut expression: Expression = Expression::new();
 
+        // dbg!(&tokens);
+
         for token in tokens {
             match self.state() {
                 State::Start => {
-                    if let TokenType::BlockIdentifier(id) = token.r#type() {
-                        block_builders.push(BlockBuilder::new(id.clone()));
-                        self.push_state(State::BuildingBlock);
-                    } else {
-                        panic!("Invalid token at position.")
+                    match token.r#type() {
+                        TokenType::BlockIdentifier(id) => {
+                            block_builders.push(BlockBuilder::new(id.clone()));
+                            self.push_state(State::BuildingBlock);
+                        }
+                        _ => panic!("Invalid token at position.")
                     }
                 }
                 State::BuildingBlock => {
@@ -58,6 +76,7 @@ impl TreeBuilder {
                         match id.as_str() {
                             "text" => self.push_state(State::BuildingTextNode),
                             "html" => self.push_state(State::BuildingHtmlNode),
+                            // todo handle other specific attrs
                             _ => {
                                 attr_builders.push(AttrBuilder::new(id.clone()));
                                 self.push_state(State::BuildingAttr);
@@ -67,17 +86,27 @@ impl TreeBuilder {
                 }
                 State::BuildingTextNode => {
                     // expect expressions
+                    if let TokenType::AttrColon = token.r#type() {
+                        continue;
+                    }
+
                     if let TokenType::ExprToken(tok) = token.r#type() {
                         expression.push_token(tok);
+                        self.pop_state(Some(State::BuildingTextNode));
                     } else {
                         match expression.is_empty() {
-                            true => panic!("Expected expression."),
+                            true => {
+                                dbg!(tokens);
+                                dbg!(token);
+                                panic!("Expected expression.");
+                            },
                             false => {
                                 let block_builder =
                                     active_block(&mut block_builders).expect("Should be set");
-
-                                // block_builder.add_content(BlockContent::Text());
-                                self.state_history.pop();
+                                // block_builder.add_content(expression.resolve_text());
+                                //
+                                // // block_builder.add_content(BlockContent::Text());
+                                // self.state_history.pop();
                             }
                         }
                     }
@@ -121,7 +150,7 @@ impl TreeBuilder {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq)]
 enum State {
     Start,
     BuildingBlock,

@@ -1,4 +1,5 @@
 use crate::parser::tokenizer::token::{Expr, Operator};
+use crate::parser::tree_builder::block::BlockContent;
 
 pub struct Expression<'a> {
     parts: Vec<ExpressionPart<'a>>,
@@ -26,6 +27,10 @@ impl<'a> Expression<'a> {
     pub fn push_token(&mut self, token: &Expr) {
         //
     }
+
+    // pub fn resolve_text(&self) -> BlockContent {
+    //     "".to_owned()
+    // }
 
     // pub fn resolve_sub_expressions(&mut self) {
     //     // 1 + (2 / (3 + 1)) * (2 + 2) / ((2 - 1) ^ 2)
