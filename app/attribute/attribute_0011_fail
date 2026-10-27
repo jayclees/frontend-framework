@@ -1,1 +1,4 @@
-test: "hello"
+Page {
+    class: "test"
+    class: "test"
+}

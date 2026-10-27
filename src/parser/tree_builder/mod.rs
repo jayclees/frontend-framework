@@ -1,6 +1,6 @@
 pub mod block;
-mod html;
 mod expression;
+mod html;
 
 use super::tokenizer::token::{Token, TokenType};
 use super::tree_builder::block::{AttrBuilder, BlockContent};
@@ -53,23 +53,17 @@ impl TreeBuilder {
 
         for token in tokens {
             match self.state() {
-                State::Start => {
-                    match token.r#type() {
-                        TokenType::BlockIdentifier(id) => {
-                            block_builders.push(BlockBuilder::new(id.clone()));
-                            self.push_state(State::BuildingBlock);
-                        }
-                        _ => panic!("Invalid token at position.")
+                State::Start => match token.r#type() {
+                    TokenType::BlockIdentifier(id) => {
+                        block_builders.push(BlockBuilder::new(id.clone()));
+                        self.push_state(State::BuildingBlock);
                     }
-                }
+                    _ => panic!("Invalid token at position."),
+                },
                 State::BuildingBlock => {
                     if token.r#type() == &TokenType::BlockClose {
                         // if root block, add to blocks vec
-                        blocks.push(
-                            active_block(&mut block_builders)
-                                .expect("Block builder should be set.")
-                                .build(),
-                        )
+                        blocks.push(build_active_block(&mut block_builders))
                         // else find parent block and add as child
                     } else if let TokenType::AttrIdentifier(id) = token.r#type() {
                         // There will be reserved attr identifier keywords: text, html
@@ -85,30 +79,26 @@ impl TreeBuilder {
                     }
                 }
                 State::BuildingTextNode => {
-                    // expect expressions
-                    if let TokenType::AttrColon = token.r#type() {
-                        continue;
-                    }
-
                     if let TokenType::ExprToken(tok) = token.r#type() {
                         expression.push_token(tok);
-                        self.pop_state(Some(State::BuildingTextNode));
-                    } else {
-                        match expression.is_empty() {
-                            true => {
-                                dbg!(tokens);
-                                dbg!(token);
-                                panic!("Expected expression.");
-                            },
-                            false => {
-                                let block_builder =
-                                    active_block(&mut block_builders).expect("Should be set");
-                                // block_builder.add_content(expression.resolve_text());
-                                //
-                                // // block_builder.add_content(BlockContent::Text());
-                                // self.state_history.pop();
-                            }
+                    } else if matches!(token.r#type(), TokenType::AttrSeparator | TokenType::BlockClose) {
+                        dbg!(&expression);
+                        if expression.is_empty() {
+                            // dbg!(tokens, token);
+                            panic!("Expected expression.");
+                        } else {
+                            let block_builder = active_block(&mut block_builders);
+                            // block_builder.add_content(expression.resolve());
+                            block_builder.add_content(BlockContent::Text("foobar".to_owned()));
+                            blocks.push(build_active_block(&mut block_builders));
+                            self.pop_state(None);
                         }
+                    } else {
+                        if let TokenType::AttrColon = token.r#type() {
+                            continue;
+                        }
+                        dbg!(token);
+                        unimplemented!()
                     }
                 }
                 State::BuildingHtmlNode => {
@@ -123,14 +113,13 @@ impl TreeBuilder {
                         token.r#type(),
                         TokenType::AttrSeparator | TokenType::BlockClose
                     ) {
-                        let block_builder =
-                            active_block(&mut block_builders).expect("Should have block builder.");
+                        let block_builder = active_block(&mut block_builders);
                         block_builder.add_attr(attr_builder.build());
                         attr_builders.pop();
-                        self.state_history.pop();
+                        self.pop_state(None);
                         if token.r#type() == &TokenType::BlockClose {
                             blocks.push(block_builder.build());
-                            self.state_history.pop();
+                            self.pop_state(Some(State::BuildingBlock));
                         }
                     }
                 }
@@ -138,13 +127,21 @@ impl TreeBuilder {
             }
         }
 
-        fn active_block(builders: &mut [BlockBuilder]) -> Option<&mut BlockBuilder> {
-            builders.last_mut()
+        fn active_block(builders: &mut [BlockBuilder]) -> &mut BlockBuilder {
+            builders.last_mut().expect("Should be set")
+        }
+
+        fn build_active_block(builders: &mut Vec<BlockBuilder>) -> Block {
+            let block = active_block(builders).build();
+            builders.pop();
+            block
         }
 
         fn active_attr(builders: &mut [AttrBuilder]) -> Option<&mut AttrBuilder> {
             builders.last_mut()
         }
+
+        dbg!(&blocks);
 
         blocks
     }

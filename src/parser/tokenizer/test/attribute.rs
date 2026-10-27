@@ -72,9 +72,75 @@ fn attribute_0010() {
 }
 
 #[test]
+fn attribute_0011() {
+    let string = file("attribute/attribute_0011").unwrap();
+    let mut tokenizer = Tokenizer::new();
+    match_tokens_to_source(string.clone(), tokenizer.tokenize(string));
+}
+
+#[test]
 fn attribute_0011_fail() {
     assert_fails(|| {
         let string = file("attribute/attribute_0011_fail").unwrap();
+        let mut tokenizer = Tokenizer::new();
+        tokenizer.tokenize(string.clone());
+    }, r#"test"#);
+}
+
+
+#[test]
+fn attribute_0012() {
+    let string = file("attribute/attribute_0012").unwrap();
+    let mut tokenizer = Tokenizer::new();
+    match_tokens_to_source(string.clone(), tokenizer.tokenize(string));
+}
+
+#[test]
+fn attribute_0013() {
+    let string = file("attribute/attribute_0013").unwrap();
+    let mut tokenizer = Tokenizer::new();
+    match_tokens_to_source(string.clone(), tokenizer.tokenize(string));
+}
+
+#[test]
+fn attribute_0014() {
+    let string = file("attribute/attribute_0014").unwrap();
+    let mut tokenizer = Tokenizer::new();
+    match_tokens_to_source(string.clone(), tokenizer.tokenize(string));
+}
+
+#[test]
+fn attribute_0015() {
+    let string = file("attribute/attribute_0015").unwrap();
+    let mut tokenizer = Tokenizer::new();
+    match_tokens_to_source(string.clone(), tokenizer.tokenize(string));
+}
+
+#[test]
+fn attribute_0016() {
+    let string = file("attribute/attribute_0016").unwrap();
+    let mut tokenizer = Tokenizer::new();
+    match_tokens_to_source(string.clone(), tokenizer.tokenize(string));
+}
+
+#[test]
+fn attribute_0017() {
+    let string = file("attribute/attribute_0017").unwrap();
+    let mut tokenizer = Tokenizer::new();
+    match_tokens_to_source(string.clone(), tokenizer.tokenize(string));
+}
+
+#[test]
+fn attribute_0018() {
+    let string = file("attribute/attribute_0018").unwrap();
+    let mut tokenizer = Tokenizer::new();
+    match_tokens_to_source(string.clone(), tokenizer.tokenize(string));
+}
+
+#[test]
+fn attribute_0019_fail() {
+    assert_fails(|| {
+        let string = file("attribute/attribute_0019_fail").unwrap();
         let mut tokenizer = Tokenizer::new();
         tokenizer.tokenize(string.clone());
     }, r#"Unexpected token ":" at line: 1, column: 5. State: "ParsingIdentifier""#);

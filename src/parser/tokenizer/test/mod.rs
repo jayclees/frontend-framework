@@ -34,9 +34,10 @@ fn assert_fails<R, F: FnOnce() -> R + UnwindSafe>(f: F, expected_msg: &'static s
     assert_eq!(expected_msg, *msg);
 }
 
+/// Loop through tokens and check with source string if token matches original source.
 fn match_tokens_to_source(source: String, tokens: &Vec<Token>) {
     let mut start = 0;
-    dbg!(&tokens);
+    // dbg!(&tokens);
     for token in tokens {
         // If there are any non-whitespace characters in the gaps between tokens, that is an error.
         let non_tokenized = &source[start..token.start()];

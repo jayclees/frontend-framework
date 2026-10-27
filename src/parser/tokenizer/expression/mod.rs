@@ -19,7 +19,7 @@ pub(super) struct ExpressionTokenizer {
 impl ExpressionTokenizer {
     pub(super) fn new() -> ExpressionTokenizer {
         ExpressionTokenizer {
-            state_history: vec![Start],
+            state_history: vec![ExpectOperandStart],
             tokens: vec![],
             cursor: 0,
             sub_cursor: 0,
@@ -30,7 +30,7 @@ impl ExpressionTokenizer {
 
     fn get_tokens_and_reset(&mut self) -> ExprResult {
         self.reset_buffer();
-        self.state_history = vec![Start];
+        self.state_history = vec![ExpectOperandStart];
         let mut taken = Vec::new();
         taken.append(&mut self.tokens);
         ExprResult::Parsed(taken)
@@ -40,18 +40,26 @@ impl ExpressionTokenizer {
         ExprResult::Err(msg)
     }
 
+    fn err_unexpected(&self) -> ExprResult {
+        ExprResult::ErrUnexpected
+    }
+
     fn err_expected_expr_start(&self) -> ExprResult {
-        ExprResult::ErrUnexpected(format!(
+        ExprResult::ErrExpectedExprStart(format!(
             r#"Expected ", alphabetic, or number. ExprState: "{}""#,
             self.state()
         ))
+    }
+
+    fn is_operator(&self, char: char) -> bool {
+        false
     }
 
     pub(super) fn push_parse(&mut self, cursor: usize, char: char) -> ExprResult {
         self.cursor = cursor;
 
         match self.state() {
-            Start => {
+            ExpectOperandStart => {
                 if char == '"' {
                     self.push_state(ParsingString, Some(char));
                 } else if char.is_ascii_alphabetic() {
@@ -78,13 +86,21 @@ impl ExpressionTokenizer {
                     return self.err_expected_expr_start();
                 }
             }
-            ParsedExprToken => {
+            ExpectOperatorOrEnd => {
+                //
+            }
+            ParsedOperand => {
+                // First handle whatever type of token was just parsed
                 match self.prev_state().expect("Should have prev state.") {
                     ParsingString => {
-                        self.push_token_pop_state(TokenType::ExprToken(Expr::String(
+                        let token = TokenType::ExprToken(Expr::String(
                             self.buf.clone(),
-                        )));
+                        ));
+                        self.push_token_pop_state(token);
                         self.pop_state();
+
+                        // todo move this outside of match statement
+                        // self.push_state(ExpectOperatorOrEnd, Some(char));
                     }
                     ParsingNumber => {
                         // self.push_token_pop_state(TokenType::ExprNumber(self.buf.clone()));
@@ -102,29 +118,66 @@ impl ExpressionTokenizer {
                     _ => unimplemented!(),
                 }
 
-                if !self.buf.is_empty() {
-                    if self.buf.len() > 1 {
-                        panic!("Buffer should not be greater than 1 at this point.")
-                    }
-
-                    let last = self.buf.chars().last().unwrap();
-                } else if char.is_ascii_digit() {
-                    self.push_state(ParsingNumber, Some(char));
-                } else if char.is_ascii_alphabetic() {
-                    self.push_state(ParsingIdentifier, Some(char));
-                } else if Operator::is_operator_char(char) {
-                    self.push_state(ParsingOperator, Some(char));
-                } else if char == ',' || char == '}' {
+                // now we should expect an operator or comma
+                if char == ',' || char == '}' {
                     return self.get_tokens_and_reset();
+                } else if self.is_operator(char) {
+                    // todo push state ParsingOperator
+                    self.pop_state();
+                    self.push_state(ParsingOperator, Some(char));
+                    todo!();
                 } else if !char.is_whitespace() {
-                    return self.err_expected_expr_start();
+                    return self.err_unexpected();
                 }
+
+
+                // match self.prev_state().expect("Should have prev state.") {
+                //     ParsingString => {
+                //         let token = TokenType::ExprToken(Expr::String(
+                //             self.buf.clone(),
+                //         ));
+                //         self.push_token_pop_state(token);
+                //         self.pop_state();
+                //     }
+                //     ParsingNumber => {
+                //         // self.push_token_pop_state(TokenType::ExprNumber(self.buf.clone()));
+                //         self.pop_state();
+                //         self.pop_state();
+                //     }
+                //     ParsingIdentifier => {
+                //         todo!("ParsingIdentifier");
+                //         // decide whether it's a variable or function declaration
+                //     }
+                //     ParsingFunctionCall => todo!("ParsingFunctionCall"),
+                //     ParsingOperator => todo!("ParsingOperator"),
+                //     ParsingParenthesesOpen => todo!("ParsingParenthesesOpen"),
+                //     ParsingParenthesesClosed => todo!("ParsingParenthesesClosed"),
+                //     _ => unimplemented!(),
+                // }
+                //
+                // if !self.buf.is_empty() {
+                //     if self.buf.len() > 1 {
+                //         panic!("Buffer should not be greater than 1 at this point.")
+                //     }
+                //
+                //     let last = self.buf.chars().last().unwrap();
+                // } else if char.is_ascii_digit() {
+                //     self.push_state(ParsingNumber, Some(char));
+                // } else if char.is_ascii_alphabetic() {
+                //     return self.err_expected_expr_start();
+                // } else if Operator::is_operator_char(char) {
+                //     self.push_state(ParsingOperator, Some(char));
+                // } else if char == ',' || char == '}' {
+                //     return self.get_tokens_and_reset();
+                // } else if !char.is_whitespace() {
+                //     return self.err_expected_expr_start();
+                // }
             }
             ParsingString => {
                 if char == '\\' {
                     self.push_state_keep_buf(ParsingStringEscaped, Some(char));
                 } else if char == '"' {
-                    self.push_state_keep_buf(ParsedExprToken, Some(char));
+                    self.push_state_keep_buf(ParsedOperand, Some(char));
                 } else {
                     self.buf.push(char);
                 }
@@ -147,11 +200,13 @@ impl ExpressionTokenizer {
                     return self.get_tokens_and_reset();
                 } else if char.is_whitespace() || char == ',' || char == '}' {
                     self.push_token(TokenType::ExprToken(Expr::Number(self.buf.clone())));
-                    self.push_state(ParsedExprToken, Some(char));
+                    self.push_state(ParsedOperand, Some(char));
                 }
             }
             ParsedNumber => todo!("ParsedNumber"),
-            ParsingIdentifier => todo!("ParsingIdentifier"),
+            ParsingIdentifier => {
+                todo!("ParsingIdentifier")
+            },
             ParsingFunctionCall => todo!("ParsingFunctionCall"),
             ParsedFunctionCall => todo!("ParsedFunctionCall"),
             ParsingOperator => {
@@ -163,9 +218,9 @@ impl ExpressionTokenizer {
                             self.push_token(TokenType::ExprToken(Expr::Operator(operator)));
                             // expect next token to be string, number, variable, function call
                             if !char.is_whitespace() {
-                                self.push_state(ParsedExprToken, Some(char));
+                                self.push_state(ParsedOperand, Some(char));
                             } else {
-                                self.push_state(ParsedExprToken, None);
+                                self.push_state(ParsedOperand, None);
                             }
                         }
                         OperatorMatchResult::Failed => {
@@ -269,8 +324,9 @@ impl TokenizerContract for ExpressionTokenizer {
 
 #[derive(Debug, PartialEq)]
 pub(super) enum ExprState {
-    Start,
-    ParsedExprToken,
+    ExpectOperandStart,
+    ExpectOperatorOrEnd,
+    ParsedOperand,
     ParsingString,
     ParsingStringEscaped,
     ParsingNumber,
@@ -290,8 +346,9 @@ pub(super) enum ExprState {
 impl Display for ExprState {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            Start => write!(f, "Start"),
-            ParsedExprToken => write!(f, "ParsedExprToken"),
+            ExpectOperandStart => write!(f, "ExpectOperandStart"),
+            ExpectOperatorOrEnd => write!(f, "ExpectOperatorOrEnd"),
+            ParsedOperand => write!(f, "ParsedExprToken"),
             ParsingString => write!(f, "ParsingString"),
             ParsingStringEscaped => write!(f, "ParsingStringEscaped"),
             ParsingNumber => write!(f, "ParsingNumber"),
@@ -314,5 +371,6 @@ pub(super) enum ExprResult {
     StillParsing,
     Parsed(Vec<Token>),
     Err(String),
-    ErrUnexpected(String),
+    ErrExpectedExprStart(String),
+    ErrUnexpected
 }

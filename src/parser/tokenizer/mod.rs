@@ -314,8 +314,11 @@ impl Tokenizer {
                         ExprResult::Err(msg) => {
                             self.err_msg(msg);
                         }
-                        ExprResult::ErrUnexpected(msg) => {
+                        ExprResult::ErrExpectedExprStart(msg) => {
                             eprintln!("{msg}");
+                            self.err_unexpected(char);
+                        }
+                        ExprResult::ErrUnexpected => {
                             self.err_unexpected(char);
                         }
                     }

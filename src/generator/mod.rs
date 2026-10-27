@@ -28,7 +28,7 @@ impl<'a> Generator<'a> {
 
         match file.write(html.as_bytes()) {
             Ok(written) => {
-                println!("{written} bytes written");
+                println!("{written} bytes written to {}", self.target_dir.to_str().unwrap());
             }
             Err(e) => {
                 eprintln!("{e}");
