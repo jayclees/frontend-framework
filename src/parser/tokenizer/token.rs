@@ -60,19 +60,19 @@ impl Token {
             EventListenerColon => source_str == ":",
 
             ExprToken(expr) => match expr {
-                Expr::String(str) => source_str == str,
-                Expr::Number(str) => source_str == str,
-                Expr::Operator(op) => source_str == op.symbol(),
-                Expr::Var(str) => source_str == str,
-                Expr::VarDotAccessor => source_str == ".",
-                Expr::VarBracketAccessorOpen => source_str == "[",
-                Expr::VarBracketAccessorClose => source_str == "]",
-                Expr::FunctionArgsOpen => source_str == "(",
-                Expr::FunctionArgsClose => source_str == ")",
-                Expr::ParenthesesOpen => source_str == "(",
-                Expr::ParenthesesClose => source_str == ")",
-                Expr::ArrayOpen => source_str == "[",
-                Expr::ArrayClose => source_str == "]",
+                ExprToken::String(str) => source_str == str,
+                ExprToken::Number(str) => source_str == str,
+                ExprToken::Operator(op) => source_str == op.symbol(),
+                ExprToken::Var(str) => source_str == str,
+                ExprToken::VarDotAccessor => source_str == ".",
+                ExprToken::VarBracketAccessorOpen => source_str == "[",
+                ExprToken::VarBracketAccessorClose => source_str == "]",
+                ExprToken::FunctionArgsOpen => source_str == "(",
+                ExprToken::FunctionArgsClose => source_str == ")",
+                ExprToken::ParenthesesOpen => source_str == "(",
+                ExprToken::ParenthesesClose => source_str == ")",
+                ExprToken::ArrayOpen => source_str == "[",
+                ExprToken::ArrayClose => source_str == "]",
             },
         }
     }
@@ -89,7 +89,7 @@ pub enum TokenType {
     AttrIdentifier(String),
     AttrColon,
     AttrSeparator,
-    ExprToken(Expr),
+    ExprToken(ExprToken),
     DirectiveOpen,
     DirectiveClose,
     DirectiveIdentifier(String),
@@ -160,7 +160,7 @@ impl Display for TokenType {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub enum Expr {
+pub enum ExprToken {
     String(String),
     Number(String),
     Operator(Operator),
@@ -176,42 +176,42 @@ pub enum Expr {
     ArrayClose,
 }
 
-impl Expr {
+impl ExprToken {
     fn len(&self) -> usize {
         match self {
-            Expr::String(str) => str.len(),
-            Expr::Number(str) => str.len(),
-            Expr::Operator(op) => op.symbol().len(),
-            Expr::Var(str) => str.len(),
-            Expr::VarDotAccessor => 1,
-            Expr::VarBracketAccessorOpen => 1,
-            Expr::VarBracketAccessorClose => 1,
-            Expr::FunctionArgsOpen => 1,
-            Expr::FunctionArgsClose => 1,
-            Expr::ParenthesesOpen => 1,
-            Expr::ParenthesesClose => 1,
-            Expr::ArrayOpen => 1,
-            Expr::ArrayClose => 1,
+            ExprToken::String(str) => str.len(),
+            ExprToken::Number(str) => str.len(),
+            ExprToken::Operator(op) => op.symbol().len(),
+            ExprToken::Var(str) => str.len(),
+            ExprToken::VarDotAccessor => 1,
+            ExprToken::VarBracketAccessorOpen => 1,
+            ExprToken::VarBracketAccessorClose => 1,
+            ExprToken::FunctionArgsOpen => 1,
+            ExprToken::FunctionArgsClose => 1,
+            ExprToken::ParenthesesOpen => 1,
+            ExprToken::ParenthesesClose => 1,
+            ExprToken::ArrayOpen => 1,
+            ExprToken::ArrayClose => 1,
         }
     }
 }
 
-impl Display for Expr {
+impl Display for ExprToken {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            Expr::String(str) => write!(f, "String({str})"),
-            Expr::Number(str) => write!(f, "Number({str})"),
-            Expr::Operator(op) => write!(f, "Operator({op})"),
-            Expr::Var(str) => write!(f, "Variable({str})"),
-            Expr::VarDotAccessor => write!(f, "VariableDotAccessor"),
-            Expr::VarBracketAccessorOpen => write!(f, "VarBracketAccessorOpen"),
-            Expr::VarBracketAccessorClose => write!(f, "VarBracketAccessorClose"),
-            Expr::FunctionArgsOpen => write!(f, "FunctionArgsOpen"),
-            Expr::FunctionArgsClose => write!(f, "FunctionArgsClose"),
-            Expr::ParenthesesOpen => write!(f, "ParenthesesOpen"),
-            Expr::ParenthesesClose => write!(f, "ParenthesesClose"),
-            Expr::ArrayOpen => write!(f, "ArrayOpen"),
-            Expr::ArrayClose => write!(f, "ArrayClose"),
+            ExprToken::String(str) => write!(f, "String({str})"),
+            ExprToken::Number(str) => write!(f, "Number({str})"),
+            ExprToken::Operator(op) => write!(f, "Operator({op})"),
+            ExprToken::Var(str) => write!(f, "Variable({str})"),
+            ExprToken::VarDotAccessor => write!(f, "VariableDotAccessor"),
+            ExprToken::VarBracketAccessorOpen => write!(f, "VarBracketAccessorOpen"),
+            ExprToken::VarBracketAccessorClose => write!(f, "VarBracketAccessorClose"),
+            ExprToken::FunctionArgsOpen => write!(f, "FunctionArgsOpen"),
+            ExprToken::FunctionArgsClose => write!(f, "FunctionArgsClose"),
+            ExprToken::ParenthesesOpen => write!(f, "ParenthesesOpen"),
+            ExprToken::ParenthesesClose => write!(f, "ParenthesesClose"),
+            ExprToken::ArrayOpen => write!(f, "ArrayOpen"),
+            ExprToken::ArrayClose => write!(f, "ArrayClose"),
         }
     }
 }

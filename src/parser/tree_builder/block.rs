@@ -1,4 +1,5 @@
-use crate::parser::tokenizer::token::Expr;
+use crate::parser::tokenizer::token::ExprToken;
+use crate::parser::tree_builder::expr_parser::ExprParser;
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct Block {
@@ -19,7 +20,23 @@ impl Block {
     pub fn to_html(&self) -> String {
         let mut html = String::new();
 
-        html.push_str(format!("<{}>", self.tag).as_str());
+        // todo handle custom components
+        html.push_str(format!("<{}", self.tag).as_str());
+
+        for attr in &self.attributes {
+            html.push_str(
+                format!(
+                    r#" {}="{}""#,
+                    attr.handle,
+                    html_escape::encode_double_quoted_attribute(&attr.value)
+                )
+                .as_ref(),
+            );
+        }
+
+        // todo add attributes
+
+        html.push('>');
 
         for child in &self.content {
             match child {
@@ -98,33 +115,33 @@ impl BlockBuilder {
 #[derive(Debug, PartialEq, Clone)]
 pub struct Attr {
     handle: String,
-    expression: Vec<Expr>,
+    value: String,
 }
 
-#[derive(PartialEq, Clone)]
-pub struct AttrBuilder {
+pub struct AttrBuilder<'a> {
     handle: Option<String>,
-    expression: Vec<Expr>,
+    expr_parser: ExprParser<'a>,
 }
 
-impl AttrBuilder {
-    pub fn new(handle: String) -> AttrBuilder {
+impl<'a> AttrBuilder<'a> {
+    pub fn new(handle: String) -> AttrBuilder<'a> {
         AttrBuilder {
             handle: Some(handle),
-            expression: vec![],
+            expr_parser: ExprParser::new(),
         }
     }
 
-    pub fn append_expr(&mut self, expr: Expr) {
-        self.expression.push(expr);
+    pub fn add_expr_token(&mut self, tok: &'a ExprToken) {
+        self.expr_parser.add(tok);
     }
 
     pub fn build(&mut self) -> Attr {
-        let mut expression = vec![];
-        expression.append(&mut self.expression);
+        // let mut expression = vec![];
+        // expression.append(&mut self.expression);
         Attr {
             handle: self.handle.take().expect("Should be set"),
-            expression,
+            // value: self.expr_parser.build_tree().resolve(),
+            value: "value".to_owned(),
         }
     }
 }

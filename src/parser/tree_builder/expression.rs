@@ -1,35 +1,50 @@
-use crate::parser::tokenizer::token::{Expr, Operator};
+use crate::parser::tokenizer::token::{ExprToken, Operator};
 use crate::parser::tree_builder::block::BlockContent;
 
 #[derive(Debug)]
-pub struct Expression<'a> {
-    parts: Vec<ExpressionPart<'a>>,
-    sub_expressions: Vec<Expression<'a>>,
-    buf: Vec<&'a Expr>,
+pub struct BinaryOperation {
+    left: Expression,
+    right: Expression,
+    operator: Operator,
 }
 
-impl<'a> Expression<'a> {
-    pub fn new() -> Expression<'a> {
-        Expression {
-            parts: vec![],
-            sub_expressions: vec![],
-            buf: vec![],
+impl BinaryOperation {
+    pub fn new(left: Expression, right: Expression, operator: Operator) -> BinaryOperation {
+        BinaryOperation {
+            left,
+            right,
+            operator,
         }
     }
 
-    pub fn add_part(&mut self, token: &Expr) {
-        if token == &Expr::ParenthesesOpen {
-            for item in &self.parts {
-                //
-            }
-        }
-    }
-
-    pub fn push_token(&mut self, token: &'a Expr) {
-        self.parts.push(ExpressionPart::OperandSingle(vec![token]))
-    }
-
-    pub fn resolve_text(&self) -> BlockContent {
+    pub fn resolve(&self) -> BlockContent {
+        let t = match self.operator {
+            Operator::Plus => {},
+            Operator::Minus => {}
+            Operator::Multiply => {}
+            Operator::Power => {}
+            Operator::Divide => {}
+            Operator::Modulus => {}
+            Operator::Assign => {}
+            Operator::Increment => {}
+            Operator::Decrement => {}
+            Operator::IncrementBy => {}
+            Operator::DecrementBy => {}
+            Operator::MultiplyBy => {}
+            Operator::DivideBy => {}
+            Operator::EqualTo => {}
+            Operator::NotEqualTo => {}
+            Operator::GreaterThan => {}
+            Operator::GreaterThanOrEqualTo => {}
+            Operator::LessThan => {}
+            Operator::LessThanOrEqualTo => {}
+            Operator::And => {}
+            Operator::Or => {}
+            Operator::Not => {}
+        };
+        // "foo"."bar".(1 + 1)
+        // 1 + 2 * 3 / 4 ^ 2
+        // parenthesis, exponent, multiplication, division, addition, subtraction
         BlockContent::Text("".to_owned())
     }
 
@@ -45,23 +60,32 @@ impl<'a> Expression<'a> {
     //     }
     // }
 
-    pub fn is_empty(&self) -> bool {
-        self.parts.is_empty()
-    }
+    // pub fn is_empty(&self) -> bool {
+    //     self.parts.is_empty()
+    // }
 
-    pub fn clear_tokens(&mut self) {
-        self.parts.clear()
-    }
+    // pub fn clear_tokens(&mut self) {
+    //     self.parts.clear()
+    // }
+}
+
+#[derive(Debug)]
+pub enum Expression {
+    Integer(usize),
+    Float(f64),
+    String(String),
+    Variable {
+        handle: String,
+        value: Box<Expression>,
+    },
+    Function {
+        handle: String,
+        value: Box<Expression>,
+        parameters: Vec<Expression>,
+    },
 }
 
 pub enum ExpressionResult {
     Number(String),
     String(String),
-}
-
-#[derive(Debug)]
-pub enum ExpressionPart<'a> {
-    OperandSingle(Vec<&'a Expr>),
-    OperandGroup(Expression<'a>),
-    Operator(Operator),
 }

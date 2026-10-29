@@ -2,7 +2,7 @@ use super::helper::{
     current, pop_state, pop_state_type, prev, push_state, push_state_keep_buf, push_token,
     reset_buffer,
 };
-use super::token::{Expr, Operator, OperatorMatchResult};
+use super::token::{ExprToken, Operator, OperatorMatchResult};
 use super::{Token, TokenType, TokenizerContract};
 use std::fmt::{Display, Formatter};
 use ExprState::*;
@@ -69,7 +69,7 @@ impl ExpressionTokenizer {
                 } else if char == '-' {
                     self.reset_buffer();
                     self.buf.push(char);
-                    self.push_token(TokenType::ExprToken(Expr::Operator(Operator::Minus)));
+                    self.push_token(TokenType::ExprToken(ExprToken::Operator(Operator::Minus)));
                 } else if char == ',' || char == '}' {
                     if self.tokens.is_empty() {
                         return self.err("Expected expression.".to_owned());
@@ -93,7 +93,7 @@ impl ExpressionTokenizer {
                 // First handle whatever type of token was just parsed
                 match self.prev_state().expect("Should have prev state.") {
                     ParsingString => {
-                        let token = TokenType::ExprToken(Expr::String(
+                        let token = TokenType::ExprToken(ExprToken::String(
                             self.buf.clone(),
                         ));
                         self.push_token_pop_state(token);
@@ -196,10 +196,10 @@ impl ExpressionTokenizer {
                     }
                     self.buf.push(char);
                 } else if char == ',' || char == '}' {
-                    self.push_token(TokenType::ExprToken(Expr::Number(self.buf.clone())));
+                    self.push_token(TokenType::ExprToken(ExprToken::Number(self.buf.clone())));
                     return self.get_tokens_and_reset();
                 } else if char.is_whitespace() || char == ',' || char == '}' {
-                    self.push_token(TokenType::ExprToken(Expr::Number(self.buf.clone())));
+                    self.push_token(TokenType::ExprToken(ExprToken::Number(self.buf.clone())));
                     self.push_state(ParsedOperand, Some(char));
                 }
             }
@@ -215,7 +215,7 @@ impl ExpressionTokenizer {
                 } else {
                     match Operator::get_match(&self.buf) {
                         OperatorMatchResult::Matched(operator) => {
-                            self.push_token(TokenType::ExprToken(Expr::Operator(operator)));
+                            self.push_token(TokenType::ExprToken(ExprToken::Operator(operator)));
                             // expect next token to be string, number, variable, function call
                             if !char.is_whitespace() {
                                 self.push_state(ParsedOperand, Some(char));
@@ -254,7 +254,7 @@ impl ExpressionTokenizer {
                 // if previous token is a number, expect either number
                 else if let Some(token) = self.tokens.last()
                     && let TokenType::ExprToken(expr) = token.r#type()
-                    && let Expr::Number(num) = expr
+                    && let ExprToken::Number(num) = expr
                 {
                     //
                 }
