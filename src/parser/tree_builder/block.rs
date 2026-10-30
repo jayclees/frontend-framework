@@ -23,6 +23,7 @@ impl Block {
         // todo handle custom components
         html.push_str(format!("<{}", self.tag).as_str());
 
+        // Append attributes to string
         for attr in &self.attributes {
             html.push_str(
                 format!(
@@ -33,8 +34,6 @@ impl Block {
                 .as_ref(),
             );
         }
-
-        // todo add attributes
 
         html.push('>');
 

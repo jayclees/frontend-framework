@@ -18,7 +18,7 @@ use std::panic::UnwindSafe;
 use std::path::PathBuf;
 
 fn base_path(path: &'static str) -> PathBuf {
-    PathBuf::from("app").join(path)
+    PathBuf::from("test-stubs").join(path)
 }
 
 fn file(path: &'static str) -> io::Result<String> {

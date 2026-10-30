@@ -87,7 +87,6 @@ fn attribute_0011_fail() {
     }, r#"test"#);
 }
 
-
 #[test]
 fn attribute_0012() {
     let string = file("attribute/attribute_0012").unwrap();

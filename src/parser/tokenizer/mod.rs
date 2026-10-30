@@ -321,6 +321,7 @@ impl Tokenizer {
                         ExprResult::ErrUnexpected => {
                             self.err_unexpected(char);
                         }
+                        ExprResult::ParsedBlockIdentifier(_) => {}
                     }
                 }
                 ParsedExpressionTokens => todo!("ParsedExpressionTokens"),

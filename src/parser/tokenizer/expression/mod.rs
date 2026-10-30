@@ -4,8 +4,8 @@ use super::helper::{
 };
 use super::token::{ExprToken, Operator, OperatorMatchResult};
 use super::{Token, TokenType, TokenizerContract};
-use std::fmt::{Display, Formatter};
 use ExprState::*;
+use std::fmt::{Display, Formatter};
 
 pub(super) struct ExpressionTokenizer {
     state_history: Vec<ExprState>,
@@ -93,9 +93,7 @@ impl ExpressionTokenizer {
                 // First handle whatever type of token was just parsed
                 match self.prev_state().expect("Should have prev state.") {
                     ParsingString => {
-                        let token = TokenType::ExprToken(ExprToken::String(
-                            self.buf.clone(),
-                        ));
+                        let token = TokenType::ExprToken(ExprToken::String(self.buf.clone()));
                         self.push_token_pop_state(token);
                         self.pop_state();
 
@@ -109,7 +107,8 @@ impl ExpressionTokenizer {
                     }
                     ParsingIdentifier => {
                         todo!("ParsingIdentifier");
-                        // decide whether it's a variable or function declaration
+                        // decide whether it's a variable or function declaration, or a block identifier
+                        // if block identifier, return to parent tokenizer
                     }
                     ParsingFunctionCall => todo!("ParsingFunctionCall"),
                     ParsingOperator => todo!("ParsingOperator"),
@@ -129,49 +128,6 @@ impl ExpressionTokenizer {
                 } else if !char.is_whitespace() {
                     return self.err_unexpected();
                 }
-
-
-                // match self.prev_state().expect("Should have prev state.") {
-                //     ParsingString => {
-                //         let token = TokenType::ExprToken(Expr::String(
-                //             self.buf.clone(),
-                //         ));
-                //         self.push_token_pop_state(token);
-                //         self.pop_state();
-                //     }
-                //     ParsingNumber => {
-                //         // self.push_token_pop_state(TokenType::ExprNumber(self.buf.clone()));
-                //         self.pop_state();
-                //         self.pop_state();
-                //     }
-                //     ParsingIdentifier => {
-                //         todo!("ParsingIdentifier");
-                //         // decide whether it's a variable or function declaration
-                //     }
-                //     ParsingFunctionCall => todo!("ParsingFunctionCall"),
-                //     ParsingOperator => todo!("ParsingOperator"),
-                //     ParsingParenthesesOpen => todo!("ParsingParenthesesOpen"),
-                //     ParsingParenthesesClosed => todo!("ParsingParenthesesClosed"),
-                //     _ => unimplemented!(),
-                // }
-                //
-                // if !self.buf.is_empty() {
-                //     if self.buf.len() > 1 {
-                //         panic!("Buffer should not be greater than 1 at this point.")
-                //     }
-                //
-                //     let last = self.buf.chars().last().unwrap();
-                // } else if char.is_ascii_digit() {
-                //     self.push_state(ParsingNumber, Some(char));
-                // } else if char.is_ascii_alphabetic() {
-                //     return self.err_expected_expr_start();
-                // } else if Operator::is_operator_char(char) {
-                //     self.push_state(ParsingOperator, Some(char));
-                // } else if char == ',' || char == '}' {
-                //     return self.get_tokens_and_reset();
-                // } else if !char.is_whitespace() {
-                //     return self.err_expected_expr_start();
-                // }
             }
             ParsingString => {
                 if char == '\\' {
@@ -205,7 +161,24 @@ impl ExpressionTokenizer {
             }
             ParsedNumber => todo!("ParsedNumber"),
             ParsingIdentifier => {
+                dbg!(char);
+                if char.is_ascii_alphanumeric() {
+                    self.buf.push(char);
+                } else if char == ':' {
+                    self.push_state_keep_buf(ParsedOperand, None)
+                } else if char == '{' {
+                    //
+                } else {
+                    self.push_state_keep_buf(ResolvingIdentifierType, None);
+                }
                 todo!("ParsingIdentifier")
+            }
+            ResolvingIdentifierType => {
+                if char == '{' {
+                    let result = ExprResult::ParsedBlockIdentifier(self.buf.clone());
+                    self.reset_buffer();
+                    return result
+                }
             },
             ParsingFunctionCall => todo!("ParsingFunctionCall"),
             ParsedFunctionCall => todo!("ParsedFunctionCall"),
@@ -332,6 +305,7 @@ pub(super) enum ExprState {
     ParsingNumber,
     ParsedNumber,
     ParsingIdentifier,
+    ResolvingIdentifierType,
     ParsingFunctionCall,
     ParsedFunctionCall,
     ParsingOperator,
@@ -354,6 +328,7 @@ impl Display for ExprState {
             ParsingNumber => write!(f, "ParsingNumber"),
             ParsedNumber => write!(f, "ParsedNumber"),
             ParsingIdentifier => write!(f, "ParsingIdentifier"),
+            ResolvingIdentifierType => write!(f, "ResolvingIdentifierType"),
             ParsingFunctionCall => write!(f, "ParsingFunctionCall"),
             ParsedFunctionCall => write!(f, "ParsedFunctionCall"),
             ParsingOperator => write!(f, "ParsingOperator"),
@@ -370,7 +345,8 @@ impl Display for ExprState {
 pub(super) enum ExprResult {
     StillParsing,
     Parsed(Vec<Token>),
+    ParsedBlockIdentifier(String),
     Err(String),
     ErrExpectedExprStart(String),
-    ErrUnexpected
+    ErrUnexpected,
 }
