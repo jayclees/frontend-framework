@@ -6,12 +6,11 @@ pub struct Token {
     start: usize,
     end: usize,
     r#type: TokenType,
+    resolved: bool,
 }
 
 impl Token {
-    pub fn new(start: usize, r#type: TokenType) -> Token {
-        // match and validate start/end with token len
-
+    pub fn resolved(start: usize, r#type: TokenType) -> Token {
         if r#type.len() == 0 {
             panic!("Token should not be 0 length. TokenType: {}, cursor: {}", r#type, start)
         }
@@ -20,6 +19,19 @@ impl Token {
             start,
             end: start + r#type.len(),
             r#type,
+            resolved: true
+        }
+    }
+    pub fn unresolved(start: usize, r#type: TokenType) -> Token {
+        if r#type.len() == 0 {
+            panic!("Token should not be 0 length. TokenType: {}, cursor: {}", r#type, start)
+        }
+
+        Token {
+            start,
+            end: start + r#type.len(),
+            r#type,
+            resolved: false
         }
     }
 
@@ -34,11 +46,20 @@ impl Token {
     pub fn r#type(&self) -> &TokenType {
         &self.r#type
     }
+    
+    pub fn set_type(&mut self, r#type: TokenType) {
+        self.r#type = r#type;
+    }
+
+    pub fn is_resolved(&self) -> bool {
+        self.resolved
+    }
 
     #[cfg(test)]
     pub fn test(&self, source: &str) -> bool {
         let source_str = &source[self.start..self.end];
         match &self.r#type {
+            UnresolvedIdentifier(str) |
             BlockIdentifier(str) |
             LineComment(str) |
             BlockComment(str) |
@@ -51,7 +72,7 @@ impl Token {
             BlockOpen => source_str == "{",
             BlockClose => source_str == "}",
             AttrColon => source_str == ":",
-            AttrSeparator => source_str == ",",
+            BlockOrAttrSeparator => source_str == ",",
             DirectiveOpen => source_str == "[",
             DirectiveClose => source_str == "]",
             DirectiveColon => source_str == ":",
@@ -81,6 +102,7 @@ impl Token {
 #[derive(Debug, PartialEq)]
 pub enum TokenType {
     // Keyword(KeywordEnum),
+    UnresolvedIdentifier(String), // This can be block id, attr id
     BlockIdentifier(String),
     LineComment(String),
     BlockComment(String),
@@ -88,7 +110,7 @@ pub enum TokenType {
     BlockClose,
     AttrIdentifier(String),
     AttrColon,
-    AttrSeparator,
+    BlockOrAttrSeparator,
     ExprToken(ExprToken),
     DirectiveOpen,
     DirectiveClose,
@@ -105,6 +127,7 @@ pub enum TokenType {
 impl TokenType {
     pub fn len(&self) -> usize {
         match self {
+            UnresolvedIdentifier(str) |
             BlockIdentifier(str) |
             LineComment(str) |
             BlockComment(str) |
@@ -117,7 +140,7 @@ impl TokenType {
             BlockOpen |
             BlockClose |
             AttrColon |
-            AttrSeparator |
+            BlockOrAttrSeparator |
             DirectiveOpen |
             DirectiveClose |
             EventListenerClose |
@@ -134,6 +157,7 @@ impl TokenType {
 impl Display for TokenType {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match &self {
+            UnresolvedIdentifier(str) => write!(f, "UnresolvedIdentifier({str})"),
             BlockIdentifier(str) => write!(f, "BlockIdentifier({str})"),
             LineComment(str) => write!(f, "LineComment({str})"),
             BlockComment(str) => write!(f, "BlockComment({str})"),
@@ -141,7 +165,7 @@ impl Display for TokenType {
             BlockClose => write!(f, "BlockClose"),
             AttrIdentifier(str) => write!(f, "AttrIdentifier({str})"),
             AttrColon => write!(f, "AttrColon"),
-            AttrSeparator => write!(f, "AttrSeparator"),
+            BlockOrAttrSeparator => write!(f, "BlockOrAttrSeparator"),
             ExprToken(expr) => write!(f, "ExpressionToken({expr})"),
             DirectiveOpen => write!(f, "DirectiveOpen"),
             DirectiveClose => write!(f, "DirectiveClose"),

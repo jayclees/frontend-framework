@@ -5,17 +5,16 @@ mod state;
 mod test;
 pub(crate) mod token;
 
-use expression::{ExprResult, ExpressionTokenizer};
 use helper::{
-    current, pop_state, pop_state_type, prev, push_state, push_state_keep_buf, push_token,
-    reset_buffer, TokenizerContract,
+    TokenizerContract, current, pop_state, pop_state_type, prev, push_state, push_state_keep_buf,
+    push_token, reset_buffer,
 };
 use state::State;
 use state::State::*;
 use std::cell::RefCell;
-use std::fs::{read_to_string, OpenOptions};
+use std::fs::{OpenOptions, read_to_string};
 use std::io::Write;
-use token::{Token, TokenType, TokenType::*};
+use token::{Token, TokenType};
 
 #[derive(Debug)]
 pub struct Tokenizer {
@@ -155,333 +154,97 @@ impl Tokenizer {
         }
     }
 
-    pub fn tokenize(&mut self, string: String) -> &Vec<Token> {
-        let mut skip: usize = 0;
-        let mut expr_tokenizer = ExpressionTokenizer::new();
+    pub fn push_parse(&mut self, char: char, cursor: usize) -> TokenizerResult {
+        self.cursor = cursor;
 
-        // todo:
-        // Create method to attempt to recover from unexpected token and keep going? Recovery
-        // method will depend on what state it is currently in and the state history.
-        let mut peekable = string.chars().enumerate().peekable();
-        for (cursor, char) in string.chars().enumerate() {
-            self.cursor = cursor;
+        if char == '\n' {
+            self.line += 1;
+            self.column = 0;
+        } else {
+            self.column += 1;
+        }
 
-            if let Some((pos, _)) = peekable.peek()
-                && pos <= &cursor
-            {
-                peekable.next();
+        match self.state() {
+            Start => {
+                if char.is_ascii_alphabetic() {
+                    self.push_state(ParsingIdentifier, Some(char));
+                    return TokenizerResult::Parsing;
+                }
+
+                match char {
+                    '{' => return TokenizerResult::Tokenized(vec![Token::resolved(cursor, TokenType::BlockOpen)]),
+                    '}' => return TokenizerResult::Tokenized(vec![Token::resolved(cursor, TokenType::BlockClose)]),
+                    _ => todo!(r#"handle "{}" char case"#, char)
+                }
             }
-
-            if char == '\n' {
-                self.line += 1;
-                self.column = 0;
-            } else {
-                self.column += 1;
+            InLineComment => {}
+            InBlockComment => {}
+            ParsingIdentifier => {
+                if char.is_ascii_alphabetic() {
+                    self.buf.push(char);
+                } else if char == ':' {
+                    todo!()
+                    // is attr identifier
+                } else if char == '{' {
+                    let token = Token::resolved(
+                        self.buf_start.unwrap(),
+                        TokenType::BlockIdentifier(self.buf.clone()),
+                    );
+                    let token2 = Token::resolved(self.cursor, TokenType::BlockOpen);
+                    self.reset_buffer();
+                    return TokenizerResult::Tokenized(vec![token, token2])
+                } else if char == '(' {
+                    // is fn identifier
+                } else if char.is_whitespace() {
+                    let token = Token::unresolved(self.buf_start.unwrap(), TokenType::UnresolvedIdentifier(self.buf.clone()));
+                    self.pop_state();
+                    self.reset_buffer();
+                    return TokenizerResult::Tokenized(vec![token]);
+                }
             }
-
-            if skip > 0 {
-                skip -= 1;
-                continue;
-            }
-
-            match self.state() {
-                Start => {
-                    // can_have_comments!()
-                    // can_have_line_comment!()
-                    // can_have_block_comment!()
-                    if char.is_ascii_alphabetic() {
-                        self.push_state(ParsingIdentifier, Some(char));
-                    }
-                }
-                InLineComment => todo!("InLineComment"),
-                InBlockComment => todo!("InBlockComment"),
-                ParsingIdentifier => {
-                    if char.is_ascii_alphabetic() {
-                        self.buf.push(char)
-                    } else if char == ':' {
-                        if self.prev_state().expect("Should have state") != &ParsingBlock {
-                            eprintln!("Cannot have attribute identifier outside of block.");
-                            self.err_unexpected(char);
-                        }
-                        self.push_token_pop_state(AttrIdentifier(self.buf.clone()));
-                        self.buf.push(char);
-                        self.push_token(AttrColon);
-                        self.push_state(GatheringExpressionTokens, None);
-                    } else if char.is_whitespace() {
-                        self.push_state_keep_buf(ResolvingIdentifier, None);
-                    } else {
-                        self.err_unexpected(char);
-                    }
-                }
-                ResolvingIdentifier => {
-                    if char == '[' || char == '@' || char == '{' {
-                        // Resolved to block identifier
-                        self.push_token_pop_state(BlockIdentifier(self.buf.clone()));
-                        self.pop_state_type(ParsingIdentifier);
-                        self.push_state(ParsedBlockIdentifier, Some(char));
-                    } else if char == ':' || char == ',' {
-                        // Resolved to attr identifier
-                        self.push_token_pop_state(AttrIdentifier(self.buf.clone()));
-                        self.pop_state_type(ParsingIdentifier);
-                        if char == ':' {
-                            self.reset_buffer();
-                            self.push_token(AttrColon);
-                            self.push_state(GatheringExpressionTokens, None);
-                        } else if char == ',' {
-                            self.reset_buffer();
-                            self.push_token(AttrSeparator);
-                            self.push_state(GatheringExpressionTokens, None);
-                        }
-                    } else if !char.is_whitespace() {
-                        self.err_unexpected(char);
-                    }
-                }
-                ParsedBlockIdentifier => {
-                    if self.buf.is_empty() {
-                        if matches!(char, '[' | '@' | '{') {
-                            self.reset_buffer();
-                            self.buf.push(char);
-                        } else if !char.is_whitespace() {
-                            self.err_unexpected(char);
-                        }
-                    } else {
-                        if self.buf.as_str() == "[" {
-                            self.push_token(DirectiveOpen);
-                            if char.is_whitespace() {
-                                self.push_state(ParsedDirectiveOpen, None);
-                            } else {
-                                self.push_state(ParsingDirectiveIdentifier, Some(char));
-                            }
-                        } else if self.buf.as_str() == "@" {
-                            if char == '[' {
-                                self.buf.push(char);
-                                self.push_token(EventListenerOpen);
-                                self.push_state(ParsingEventListenerIdentifier, None);
-                            } else {
-                                self.err_unexpected(char);
-                            }
-                        } else if self.buf.as_str() == "{" {
-                            self.push_token(BlockOpen);
-                            self.pop_state_type(ParsedBlockIdentifier);
-                            self.push_state(ParsingBlock, None);
-                            if char.is_ascii_alphabetic() {
-                                self.push_state(ParsingIdentifier, Some(char));
-                            } else if char == '}' {
-                                self.buf.push(char);
-                                self.push_token(BlockClose);
-                                self.pop_state_type(ParsingBlock);
-                            }
-                        }
-                    }
-                }
-                ParsedAttrIdentifier => todo!("ParsedAttrIdentifier"),
-                ParsingBlockOpen => todo!("ParsingBlockOpen"),
-                ParsingBlock => {
-                    if char.is_ascii_alphabetic() {
-                        self.push_state(ParsingIdentifier, Some(char));
-                    } else if char == '}' {
-                        self.reset_buffer();
-                        self.buf.push(char);
-                        self.push_token_pop_state(BlockClose);
-                    } else if !char.is_whitespace() {
-                        self.err_unexpected(char);
-                    }
-                }
-                ParsingBlockClose => todo!("ParsingBlockClose"),
-                ParsingAttributeColon => todo!("ParsingAttributeColon"),
-                ParsedAttrColon => todo!("ParsedAttrColon"),
-                ParsingAttrSeparator => todo!("ParsingAttrSeparator"),
-                ParsedAttrSeparator => todo!("ParsedAttrSeparator"),
-                GatheringExpressionTokens => {
-                    match expr_tokenizer.push_parse(cursor, char) {
-                        ExprResult::StillParsing => {
-                            // continue
-                        }
-                        ExprResult::Parsed(mut tokens) => {
-                            self.tokens.append(&mut tokens);
-                            self.pop_state();
-                            if char == '}' {
-                                self.reset_buffer();
-                                self.push_token(BlockClose);
-                                self.pop_state_type(ParsingBlock);
-                            } else if char == ',' {
-                                self.reset_buffer();
-                                self.push_token(AttrSeparator);
-                            } else {
-                                self.push_state(ParsedExpressionTokens, Some(char));
-                            }
-                        }
-                        ExprResult::Err(msg) => {
-                            self.err_msg(msg);
-                        }
-                        ExprResult::ErrExpectedExprStart(msg) => {
-                            eprintln!("{msg}");
-                            self.err_unexpected(char);
-                        }
-                        ExprResult::ErrUnexpected => {
-                            self.err_unexpected(char);
-                        }
-                        ExprResult::ParsedBlockIdentifier(_) => {}
-                    }
-                }
-                ParsedExpressionTokens => todo!("ParsedExpressionTokens"),
-                ParsingDirective => todo!("ParsingDirective"),
-                ParsingDirectiveOpen => todo!("ParsingDirectiveOpen"),
-                ParsedDirectiveOpen => {
-                    if char.is_ascii_alphabetic() {
-                        self.pop_state();
-                        self.push_state(ParsingDirectiveIdentifier, Some(char));
-                    } else if !char.is_whitespace() {
-                        self.err_unexpected(char);
-                    }
-                }
-                ParsingDirectiveIdentifier => {
-                    let buf_empty = self.buf.is_empty();
-                    if buf_empty {
-                        self.reset_buffer();
-                    }
-                    if buf_empty && char.is_ascii_alphabetic() {
-                        self.buf.push(char);
-                    } else if !buf_empty
-                        && (char.is_ascii_alphabetic() || ['-', '_'].contains(&char))
-                    {
-                        self.buf.push(char)
-                    } else if char == ':' {
-                        self.push_token_pop_state(DirectiveIdentifier(self.buf.clone()));
-                        self.buf.push(char);
-                        self.push_token(DirectiveColon);
-                        self.push_state(ParsingDirectiveValue, None);
-                    } else if char == ']' {
-                        self.push_token(DirectiveIdentifier(self.buf.clone()));
-                        self.buf.push(char);
-                        self.push_token(DirectiveClose);
-                        self.pop_state();
-                    } else if char.is_whitespace() {
-                        self.push_token_pop_state(DirectiveIdentifier(self.buf.clone()));
-                        self.push_state(ParsedDirectiveIdentifier, None);
-                    } else {
-                        self.err_unexpected(char);
-                    }
-                }
-                ParsedDirectiveIdentifier => {
-                    if char == ':' {
-                        self.reset_buffer();
-                        self.buf.push(char);
-                        self.push_token_pop_state(DirectiveColon);
-                        self.push_state(ParsingDirectiveValue, None);
-                    } else if char == ']' {
-                        self.reset_buffer();
-                        self.buf.push(char);
-                        self.push_token_pop_state(DirectiveClose);
-                    } else if !char.is_whitespace() {
-                        self.err_unexpected(char);
-                    }
-                }
-                ParsedDirectiveColon => todo!("ParsedDirectiveColon"),
-                EmptyDirectiveParsed => todo!("EmptyDirectiveParsed"),
-                ParsingDirectiveColon => {
-                    if self.buf.is_empty() {
-                        self.reset_buffer();
-                    }
-                    if self.buf.as_str() == ":" {
-                        self.push_token_pop_state(DirectiveColon);
-                        self.push_state(ParsingDirectiveValue, None);
-                    } else if char == ':' {
-                        self.buf.push(char);
-                    } else {
-                        self.err_unexpected(char);
-                    }
-                }
-                ParsingDirectiveValue => {
-                    if self.buf.is_empty() {
-                        self.reset_buffer();
-                    }
-
-                    if char == ']' {
-                        self.push_token_pop_state(DirectiveValue(self.buf.clone()));
-                        self.buf.push(char);
-                        self.push_token(DirectiveClose);
-                        self.push_state(ParsedDirectiveOrEventClose, None);
-                    } else {
-                        self.buf.push(char);
-                    }
-                }
-                ParsingDirectiveClose => todo!("ParsingDirectiveClose"),
-                ParsedDirective => todo!("ParsedDirective"),
-                ParsingEventListenerOpen => todo!("ParsingEventListenerOpen"),
-                ParsedEventListenerOpen => todo!("ParsedEventListenerOpen"),
-                ParsingEventListenerIdentifier => match self.buf.is_empty() {
-                    true => {
-                        self.reset_buffer();
-                        if char.is_ascii_alphabetic() {
-                            self.buf.push(char);
-                        } else if !char.is_whitespace() {
-                            self.err_unexpected(char);
-                        }
-                    }
-                    false => {
-                        if char.is_ascii_alphanumeric() {
-                            self.buf.push(char);
-                        } else if char == ':' {
-                            self.push_token_pop_state(EventListenerIdentifier(self.buf.clone()));
-                            self.buf.push(char);
-                            self.push_token(EventListenerColon);
-                            self.push_state(ParsingEventListenerHandler, None);
-                        } else if char.is_whitespace() {
-                            self.push_token_pop_state(EventListenerIdentifier(self.buf.clone()));
-                            self.push_state(ParsingEventListenerColon, None);
-                        } else {
-                            self.err_unexpected(char);
-                        }
-                    }
-                },
-                ParsingEventListenerColon => {
-                    if char == ':' {
-                        self.reset_buffer();
-                        self.buf.push(char);
-                        self.push_token_pop_state(EventListenerColon);
-                        self.push_state(ParsingEventListenerHandler, None);
-                    } else if !char.is_whitespace() {
-                        self.err_unexpected(char);
-                    }
-                }
-                ParsedEventListenerColon => todo!("ParsedEventListenerColon"),
-                ParsingEventListenerHandler => {
-                    if self.buf.is_empty() {
-                        self.reset_buffer();
-                    }
-                    // push everything to buf and end on close bracket for now
-                    if char == ']' {
-                        self.push_token_pop_state(EventListenerHandler(self.buf.clone()));
-                        self.buf.push(char);
-                        self.push_token(EventListenerClose);
-                        self.push_state(ParsedDirectiveOrEventClose, None);
-                    } else {
-                        self.buf.push(char);
-                    }
-                }
-                ParsedEventListener => todo!("ParsedEventListener"),
-                ParsedDirectiveOrEventClose => {
-                    // just make sure the first char is whitespace
-                    if char.is_whitespace() {
-                        self.pop_state();
-                    } else {
-                        self.err_unexpected(char);
-                    }
-                }
-                InDblQuoteUnescaped => todo!("InDblQuoteUnescaped"),
-                InDblQuoteEscaped => todo!("InDblQuoteEscaped"),
-            }
+            ResolvingIdentifier => {}
+            ParsedBlockIdentifier => {}
+            ParsedAttrIdentifier => {}
+            ParsingBlockOpen => {}
+            ParsingBlock => {}
+            ParsingBlockClose => {}
+            ParsingAttributeColon => {}
+            ParsedAttrColon => {}
+            ParsingAttrSeparator => {}
+            ParsedAttrSeparator => {}
+            GatheringExpressionTokens => {}
+            ParsedExpressionTokens => {}
+            ParsingDirective => {}
+            ParsingDirectiveOpen => {}
+            ParsedDirectiveOpen => {}
+            ParsingDirectiveIdentifier => {}
+            ParsedDirectiveIdentifier => {}
+            ParsedDirectiveColon => {}
+            EmptyDirectiveParsed => {}
+            ParsingDirectiveColon => {}
+            ParsingDirectiveValue => {}
+            ParsingDirectiveClose => {}
+            ParsedDirective => {}
+            ParsingEventListenerOpen => {}
+            ParsedEventListenerOpen => {}
+            ParsingEventListenerIdentifier => {}
+            ParsingEventListenerColon => {}
+            ParsedEventListenerColon => {}
+            ParsingEventListenerHandler => {}
+            ParsedEventListener => {}
+            ParsedDirectiveOrEventClose => {}
+            InDblQuoteUnescaped => {}
+            InDblQuoteEscaped => {}
         }
 
         // All states should have been popped, and we should be back to start
-        if self.state_history.len() != 1 && self.state() != &Start {
-            self.err_eof();
-        }
+        // if self.state_history.len() != 1 && self.state() != &Start {
+        //     self.err_eof();
+        // }
 
         // self.match_with_source();
 
-        &self.tokens
+        TokenizerResult::Parsing
     }
 }
 
@@ -537,4 +300,10 @@ impl TokenizerContract for Tokenizer {
     fn reset_buffer(&mut self) {
         reset_buffer(&mut self.buf, &mut self.buf_start, self.cursor);
     }
+}
+
+pub enum TokenizerResult {
+    Parsing,
+    Tokenized(Vec<Token>),
+    Err(String),
 }

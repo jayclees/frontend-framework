@@ -82,7 +82,7 @@ fn test_token_len_static() {
     assert_eq!(1, TokenType::BlockOpen.len());
     assert_eq!(1, TokenType::BlockClose.len());
     assert_eq!(1, TokenType::AttrColon.len());
-    assert_eq!(1, TokenType::AttrSeparator.len());
+    assert_eq!(1, TokenType::BlockOrAttrSeparator.len());
     assert_eq!(1, TokenType::DirectiveOpen.len());
     assert_eq!(1, TokenType::DirectiveClose.len());
     assert_eq!(1, TokenType::DirectiveColon.len());

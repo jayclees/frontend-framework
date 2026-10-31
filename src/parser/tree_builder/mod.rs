@@ -83,7 +83,7 @@ impl TreeBuilder {
                         TokenType::ExprToken(tok) => {
                             expression.push(tok);
                         }
-                        TokenType::AttrSeparator | TokenType::BlockClose => {
+                        TokenType::BlockOrAttrSeparator | TokenType::BlockClose => {
                             if expression.is_empty() {
                                 // dbg!(tokens, token);
                                 panic!("Expected expression.");
@@ -113,7 +113,7 @@ impl TreeBuilder {
                         builder.add_expr_token(&expr);
                     } else if matches!(
                         token.r#type(),
-                        TokenType::AttrSeparator | TokenType::BlockClose
+                        TokenType::BlockOrAttrSeparator | TokenType::BlockClose
                     ) {
                         let block_builder = active_block(&mut block_builders);
                         block_builder.add_attr(builder.build());

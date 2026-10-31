@@ -74,7 +74,7 @@ pub(super) fn push_token(
     start: usize,
     r#type: TokenType,
 ) {
-    tokens.push(Token::new(start, r#type));
+    tokens.push(Token::resolved(start, r#type));
 }
 
 pub(super) fn reset_buffer(buf: &mut String, buf_start: &mut Option<usize>, cursor: usize) {
