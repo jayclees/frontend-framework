@@ -156,32 +156,19 @@ impl Tokenizer {
     }
 
     pub fn tokenize(&mut self, string: String) -> &Vec<Token> {
-        let mut skip: usize = 0;
         let mut expr_tokenizer = ExpressionTokenizer::new();
 
         // todo:
         // Create method to attempt to recover from unexpected token and keep going? Recovery
         // method will depend on what state it is currently in and the state history.
-        let mut peekable = string.chars().enumerate().peekable();
         for (cursor, char) in string.chars().enumerate() {
             self.cursor = cursor;
-
-            if let Some((pos, _)) = peekable.peek()
-                && pos <= &cursor
-            {
-                peekable.next();
-            }
 
             if char == '\n' {
                 self.line += 1;
                 self.column = 0;
             } else {
                 self.column += 1;
-            }
-
-            if skip > 0 {
-                skip -= 1;
-                continue;
             }
 
             match self.state() {
