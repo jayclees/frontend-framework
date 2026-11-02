@@ -84,7 +84,7 @@ fn attribute_0011_fail() {
         let string = file("attribute/attribute_0011_fail").unwrap();
         let mut tokenizer = Tokenizer::new();
         tokenizer.tokenize(string.clone());
-    }, r#"test"#);
+    }, r#"Expected operator or expression end. At line: 3, column: 5. State: "GatheringExpressionTokens""#);
 }
 
 #[test]

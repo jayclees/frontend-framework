@@ -36,6 +36,7 @@ fn assert_fails<R, F: FnOnce() -> R + UnwindSafe>(f: F, expected_msg: &'static s
 
 /// Loop through tokens and check with source string if token matches original source.
 fn match_tokens_to_source(source: String, tokens: &Vec<Token>) {
+    // todo ensure there are no overlapping/duplicate tokens
     let mut start = 0;
     // dbg!(&tokens);
     for token in tokens {

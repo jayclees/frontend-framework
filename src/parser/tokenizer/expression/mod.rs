@@ -63,6 +63,12 @@ impl ExpressionTokenizer {
                 if char == '"' {
                     self.push_state(ParsingString, Some(char));
                 } else if char.is_ascii_alphabetic() {
+                    if let Some(prev_token) = self.tokens.last()
+                        && let TokenType::ExprToken(prev_type) = prev_token.r#type()
+                        && !matches!(prev_type, ExprToken::Operator(_))
+                    {
+                        return self.err("Expected operator or expression end.".to_owned());
+                    }
                     self.push_state(ParsingIdentifier, Some(char));
                 } else if char.is_ascii_digit() {
                     self.push_state(ParsingNumber, Some(char));
@@ -177,9 +183,9 @@ impl ExpressionTokenizer {
                 if char == '{' {
                     let result = ExprResult::ParsedBlockIdentifier(self.buf.clone());
                     self.reset_buffer();
-                    return result
+                    return result;
                 }
-            },
+            }
             ParsingFunctionCall => todo!("ParsingFunctionCall"),
             ParsedFunctionCall => todo!("ParsedFunctionCall"),
             ParsingOperator => {
