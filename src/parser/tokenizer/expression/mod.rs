@@ -51,8 +51,8 @@ impl ExpressionTokenizer {
         ))
     }
 
-    fn is_operator(&self, char: char) -> bool {
-        false
+    fn is_expr_end(&self, char: char) -> bool {
+        char == ',' || char == '}'
     }
 
     pub(super) fn push_parse(&mut self, cursor: usize, char: char) -> ExprResult {
@@ -76,7 +76,7 @@ impl ExpressionTokenizer {
                     self.reset_buffer();
                     self.buf.push(char);
                     self.push_token(TokenType::ExprToken(ExprToken::Operator(Operator::Minus)));
-                } else if char == ',' || char == '}' {
+                } else if self.is_expr_end(char) {
                     if self.tokens.is_empty() {
                         return self.err("Expected expression.".to_owned());
                     }
@@ -92,24 +92,17 @@ impl ExpressionTokenizer {
                     return self.err_expected_expr_start();
                 }
             }
-            ExpectOperatorOrEnd => {
-                //
+            ExpectOperatorStartOrExprEnd => {
+                todo!("ExpectOperatorStartOrExprEnd")
             }
             ParsedOperand => {
                 // First handle whatever type of token was just parsed
-                match self.prev_state().expect("Should have prev state.") {
+                let token = match self.prev_state().expect("Should have prev state.") {
                     ParsingString => {
-                        let token = TokenType::ExprToken(ExprToken::String(self.buf.clone()));
-                        self.push_token_pop_state(token);
-                        self.pop_state();
-
-                        // todo move this outside of match statement
-                        // self.push_state(ExpectOperatorOrEnd, Some(char));
+                        TokenType::ExprToken(ExprToken::String(self.buf.clone()))
                     }
                     ParsingNumber => {
-                        // self.push_token_pop_state(TokenType::ExprNumber(self.buf.clone()));
-                        self.pop_state();
-                        self.pop_state();
+                        TokenType::ExprToken(ExprToken::Number(self.buf.clone()))
                     }
                     ParsingIdentifier => {
                         todo!("ParsingIdentifier");
@@ -117,21 +110,21 @@ impl ExpressionTokenizer {
                         // if block identifier, return to parent tokenizer
                     }
                     ParsingFunctionCall => todo!("ParsingFunctionCall"),
-                    ParsingOperator => todo!("ParsingOperator"),
                     ParsingParenthesesOpen => todo!("ParsingParenthesesOpen"),
                     ParsingParenthesesClosed => todo!("ParsingParenthesesClosed"),
                     _ => unimplemented!(),
-                }
+                };
+                self.push_token_pop_state(token);
+                self.pop_state();
 
-                // now we should expect an operator or comma
-                if char == ',' || char == '}' {
+                // Now we should expect an operator or comma
+                if self.is_expr_end(char) {
                     return self.get_tokens_and_reset();
-                } else if self.is_operator(char) {
-                    // todo push state ParsingOperator
-                    self.pop_state();
+                } else if Operator::is_operator_char(char) {
                     self.push_state(ParsingOperator, Some(char));
-                    todo!();
-                } else if !char.is_whitespace() {
+                } else if char.is_whitespace() {
+                    self.push_state(ExpectOperatorStartOrExprEnd, None);
+                } else {
                     return self.err_unexpected();
                 }
             }
@@ -152,7 +145,6 @@ impl ExpressionTokenizer {
                 if char.is_ascii_digit() {
                     self.buf.push(char)
                 } else if char == '.' {
-                    // period
                     if self.buf.contains('.') {
                         return self.err("Number can only have one dot.".to_owned());
                     }
@@ -161,8 +153,8 @@ impl ExpressionTokenizer {
                     self.push_token(TokenType::ExprToken(ExprToken::Number(self.buf.clone())));
                     return self.get_tokens_and_reset();
                 } else if char.is_whitespace() || char == ',' || char == '}' {
-                    self.push_token(TokenType::ExprToken(ExprToken::Number(self.buf.clone())));
-                    self.push_state(ParsedOperand, Some(char));
+                    // self.push_token(TokenType::ExprToken(ExprToken::Number(self.buf.clone())));
+                    self.push_state_keep_buf(ParsedOperand, None);
                 }
             }
             ParsedNumber => todo!("ParsedNumber"),
@@ -195,12 +187,7 @@ impl ExpressionTokenizer {
                     match Operator::get_match(&self.buf) {
                         OperatorMatchResult::Matched(operator) => {
                             self.push_token(TokenType::ExprToken(ExprToken::Operator(operator)));
-                            // expect next token to be string, number, variable, function call
-                            if !char.is_whitespace() {
-                                self.push_state(ParsedOperand, Some(char));
-                            } else {
-                                self.push_state(ParsedOperand, None);
-                            }
+                            self.pop_state();
                         }
                         OperatorMatchResult::Failed => {
                             return self.err(format!(r#"Failed operator match "{}""#, self.buf));
@@ -304,7 +291,7 @@ impl TokenizerContract for ExpressionTokenizer {
 #[derive(Debug, PartialEq)]
 pub(super) enum ExprState {
     ExpectOperandStart,
-    ExpectOperatorOrEnd,
+    ExpectOperatorStartOrExprEnd,
     ParsedOperand,
     ParsingString,
     ParsingStringEscaped,
@@ -327,8 +314,8 @@ impl Display for ExprState {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             ExpectOperandStart => write!(f, "ExpectOperandStart"),
-            ExpectOperatorOrEnd => write!(f, "ExpectOperatorOrEnd"),
-            ParsedOperand => write!(f, "ParsedExprToken"),
+            ExpectOperatorStartOrExprEnd => write!(f, "ExpectOperatorStartOrExprEnd"),
+            ParsedOperand => write!(f, "ParsedOperand"),
             ParsingString => write!(f, "ParsingString"),
             ParsingStringEscaped => write!(f, "ParsingStringEscaped"),
             ParsingNumber => write!(f, "ParsingNumber"),
