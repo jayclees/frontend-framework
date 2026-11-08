@@ -1,11 +1,11 @@
 pub mod block;
 mod expression;
-mod expr_parser;
 mod html;
 
 use super::tokenizer::token::{ExprToken, Token, TokenType};
 use super::tree_builder::block::{AttrBuilder, BlockContent};
 use block::{Block, BlockBuilder};
+use crate::parser::tree_builder::expression::BinaryOperation;
 
 pub struct TreeBuilder {
     state_history: Vec<State>,
@@ -47,9 +47,7 @@ impl TreeBuilder {
         let mut blocks = vec![];
         let mut block_builders: Vec<BlockBuilder> = vec![];
         let mut attr_builder: Option<AttrBuilder> = None;
-        let mut expression: Vec<&ExprToken> = vec![];
-
-        // dbg!(&tokens);
+        let mut expression: BinaryOperation = BinaryOperation::empty();
 
         for token in tokens {
             match self.state() {
@@ -81,7 +79,7 @@ impl TreeBuilder {
                 State::BuildingTextNode => {
                     match token.r#type() {
                         TokenType::ExprToken(tok) => {
-                            expression.push(tok);
+                            expression.process_token(tok);
                         }
                         TokenType::AttrSeparator | TokenType::BlockClose => {
                             if expression.is_empty() {
@@ -89,8 +87,8 @@ impl TreeBuilder {
                                 panic!("Expected expression.");
                             } else {
                                 let block_builder = active_block(&mut block_builders);
-                                // block_builder.add_content(expression.resolve());
-                                block_builder.add_content(BlockContent::Text("foobar".to_owned()));
+                                block_builder.add_content(expression.resolve());
+                                // block_builder.add_content(BlockContent::Text("foobar".to_owned()));
                                 blocks.push(build_active_block(&mut block_builders));
                                 self.pop_state(None);
                             }
@@ -110,7 +108,7 @@ impl TreeBuilder {
                 State::BuildingAttr => {
                     let builder = attr_builder.as_mut().unwrap();
                     if let TokenType::ExprToken(expr) = token.r#type() {
-                        builder.add_expr_token(&expr);
+                        // builder.add_expr_token(&expr);
                     } else if matches!(
                         token.r#type(),
                         TokenType::AttrSeparator | TokenType::BlockClose

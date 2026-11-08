@@ -1,5 +1,4 @@
 use crate::parser::tokenizer::token::ExprToken;
-use crate::parser::tree_builder::expr_parser::ExprParser;
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct Block {
@@ -117,22 +116,20 @@ pub struct Attr {
     value: String,
 }
 
-pub struct AttrBuilder<'a> {
+pub struct AttrBuilder {
     handle: Option<String>,
-    expr_parser: ExprParser<'a>,
 }
 
-impl<'a> AttrBuilder<'a> {
-    pub fn new(handle: String) -> AttrBuilder<'a> {
+impl AttrBuilder {
+    pub fn new(handle: String) -> AttrBuilder {
         AttrBuilder {
             handle: Some(handle),
-            expr_parser: ExprParser::new(),
         }
     }
 
-    pub fn add_expr_token(&mut self, tok: &'a ExprToken) {
-        self.expr_parser.add(tok);
-    }
+    // pub fn add_expr_token(&mut self, tok: &'a ExprToken) {
+    //     self.expr_parser.push(tok);
+    // }
 
     pub fn build(&mut self) -> Attr {
         // let mut expression = vec![];
