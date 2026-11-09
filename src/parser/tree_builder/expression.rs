@@ -34,8 +34,6 @@ impl<'a, 'b> BinaryOperation<'a, 'b> {
             ExprToken::VarBracketAccessorClose => todo!("VarBracketAccessorClose"),
             ExprToken::FunctionArgsOpen => todo!("FunctionArgsOpen"),
             ExprToken::FunctionArgsClose => todo!("FunctionArgsClose"),
-            ExprToken::ParenthesesOpen => todo!("ParenthesesOpen"),
-            ExprToken::ParenthesesClose => todo!("ParenthesesClose"),
             ExprToken::ArrayOpen => todo!("ArrayOpen"),
             ExprToken::ArrayClose => todo!("ArrayClose"),
         };
@@ -116,6 +114,8 @@ impl<'a, 'b> BinaryOperation<'a, 'b> {
                 Operator::GreaterThanOrEqualTo => 0,
                 Operator::LessThan => 0,
                 Operator::LessThanOrEqualTo => 0,
+                Operator::ParenthesesOpen => 0,
+                Operator::ParenthesesClose => 0,
                 Operator::And => 0,
                 Operator::Or => 0,
                 Operator::Not => 0,

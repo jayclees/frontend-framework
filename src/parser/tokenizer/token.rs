@@ -69,8 +69,6 @@ impl Token {
                 ExprToken::VarBracketAccessorClose => source_str == "]",
                 ExprToken::FunctionArgsOpen => source_str == "(",
                 ExprToken::FunctionArgsClose => source_str == ")",
-                ExprToken::ParenthesesOpen => source_str == "(",
-                ExprToken::ParenthesesClose => source_str == ")",
                 ExprToken::ArrayOpen => source_str == "[",
                 ExprToken::ArrayClose => source_str == "]",
             },
@@ -170,8 +168,6 @@ pub enum ExprToken {
     VarBracketAccessorClose,
     FunctionArgsOpen,
     FunctionArgsClose,
-    ParenthesesOpen,
-    ParenthesesClose,
     ArrayOpen,
     ArrayClose,
 }
@@ -188,8 +184,6 @@ impl ExprToken {
             ExprToken::VarBracketAccessorClose => 1,
             ExprToken::FunctionArgsOpen => 1,
             ExprToken::FunctionArgsClose => 1,
-            ExprToken::ParenthesesOpen => 1,
-            ExprToken::ParenthesesClose => 1,
             ExprToken::ArrayOpen => 1,
             ExprToken::ArrayClose => 1,
         }
@@ -208,8 +202,6 @@ impl Display for ExprToken {
             ExprToken::VarBracketAccessorClose => write!(f, "VarBracketAccessorClose"),
             ExprToken::FunctionArgsOpen => write!(f, "FunctionArgsOpen"),
             ExprToken::FunctionArgsClose => write!(f, "FunctionArgsClose"),
-            ExprToken::ParenthesesOpen => write!(f, "ParenthesesOpen"),
-            ExprToken::ParenthesesClose => write!(f, "ParenthesesClose"),
             ExprToken::ArrayOpen => write!(f, "ArrayOpen"),
             ExprToken::ArrayClose => write!(f, "ArrayClose"),
         }
@@ -243,6 +235,10 @@ pub enum Operator {
     LessThan,
     LessThanOrEqualTo,
 
+    // Parentheses
+    ParenthesesOpen,
+    ParenthesesClose,
+
     // Logical
     And,
     Or,
@@ -275,6 +271,8 @@ impl Operator {
             Operator::GreaterThanOrEqualTo,
             Operator::LessThan,
             Operator::LessThanOrEqualTo,
+            Operator::ParenthesesOpen,
+            Operator::ParenthesesClose,
             Operator::And,
             Operator::Or,
             Operator::Not,
@@ -310,9 +308,40 @@ impl Operator {
             Operator::GreaterThanOrEqualTo => ">=",
             Operator::LessThan => "<",
             Operator::LessThanOrEqualTo => "<=",
+            Operator::ParenthesesOpen => "(",
+            Operator::ParenthesesClose => ")",
             Operator::And => "&&",
             Operator::Or => "||",
             Operator::Not => "!",
+        }
+    }
+
+    pub fn precedence(&self) -> u8 {
+        match self {
+            Operator::ParenthesesOpen => 1,
+            Operator::Plus => 2,
+            Operator::Minus => 2,
+            Operator::Multiply => 3,
+            Operator::Divide => 3,
+            Operator::ParenthesesClose => unimplemented!(),
+            Operator::Power => unimplemented!(),
+            Operator::Modulus => unimplemented!(),
+            Operator::Assign => unimplemented!(),
+            Operator::Increment => unimplemented!(),
+            Operator::Decrement => unimplemented!(),
+            Operator::IncrementBy => unimplemented!(),
+            Operator::DecrementBy => unimplemented!(),
+            Operator::MultiplyBy => unimplemented!(),
+            Operator::DivideBy => unimplemented!(),
+            Operator::EqualTo => unimplemented!(),
+            Operator::NotEqualTo => unimplemented!(),
+            Operator::GreaterThan => unimplemented!(),
+            Operator::GreaterThanOrEqualTo => unimplemented!(),
+            Operator::LessThan => unimplemented!(),
+            Operator::LessThanOrEqualTo => unimplemented!(),
+            Operator::And => unimplemented!(),
+            Operator::Or => unimplemented!(),
+            Operator::Not => unimplemented!(),
         }
     }
 }
@@ -339,6 +368,8 @@ impl Display for Operator {
             Operator::GreaterThanOrEqualTo => write!(f, "GreaterThanOrEqualTo"),
             Operator::LessThan => write!(f, "LessThan"),
             Operator::LessThanOrEqualTo => write!(f, "LessThanOrEqualTo"),
+            Operator::ParenthesesOpen => write!(f, "ParenthesesOpen"),
+            Operator::ParenthesesClose => write!(f, "ParenthesesClose"),
             Operator::And => write!(f, "And"),
             Operator::Or => write!(f, "Or"),
             Operator::Not => write!(f, "Not"),

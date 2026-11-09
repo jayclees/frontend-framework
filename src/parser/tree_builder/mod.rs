@@ -1,10 +1,12 @@
 pub mod block;
 mod expression;
 mod html;
+mod expr_processor;
 
 use super::tokenizer::token::{ExprToken, Token, TokenType};
 use super::tree_builder::block::{AttrBuilder, BlockContent};
 use block::{Block, BlockBuilder};
+use crate::parser::tree_builder::expr_processor::ExprProcessor;
 use crate::parser::tree_builder::expression::BinaryOperation;
 
 pub struct TreeBuilder {
@@ -47,7 +49,7 @@ impl TreeBuilder {
         let mut blocks = vec![];
         let mut block_builders: Vec<BlockBuilder> = vec![];
         let mut attr_builder: Option<AttrBuilder> = None;
-        let mut expression: BinaryOperation = BinaryOperation::empty();
+        let mut expr_processor: ExprProcessor = ExprProcessor::new();
 
         for token in tokens {
             match self.state() {
@@ -79,15 +81,15 @@ impl TreeBuilder {
                 State::BuildingTextNode => {
                     match token.r#type() {
                         TokenType::ExprToken(tok) => {
-                            expression.process_token(tok);
+                            expr_processor.process(tok);
                         }
                         TokenType::AttrSeparator | TokenType::BlockClose => {
-                            if expression.is_empty() {
+                            if expr_processor.is_empty() {
                                 // dbg!(tokens, token);
                                 panic!("Expected expression.");
                             } else {
                                 let block_builder = active_block(&mut block_builders);
-                                block_builder.add_content(expression.resolve());
+                                block_builder.add_content(expr_processor.resolve());
                                 // block_builder.add_content(BlockContent::Text("foobar".to_owned()));
                                 blocks.push(build_active_block(&mut block_builders));
                                 self.pop_state(None);
