@@ -214,8 +214,8 @@ pub enum Operator {
     Plus,
     Minus,
     Multiply,
-    Power, // ^x
     Divide,
+    Power, // ^x
     Modulus,
 
     // Assignment operators
@@ -255,8 +255,8 @@ impl Operator {
             Operator::Plus,
             Operator::Minus,
             Operator::Multiply,
-            Operator::Power,
             Operator::Divide,
+            Operator::Power,
             Operator::Modulus,
             Operator::Assign,
             Operator::Increment,
@@ -292,8 +292,8 @@ impl Operator {
             Operator::Plus => "+",
             Operator::Minus => "-",
             Operator::Multiply => "*",
-            Operator::Power => "^",
             Operator::Divide => "/",
+            Operator::Power => "^",
             Operator::Modulus => "%",
             Operator::Assign => "=",
             Operator::Increment => "++",
@@ -352,8 +352,8 @@ impl Display for Operator {
             Operator::Plus => write!(f, "Add"),
             Operator::Minus => write!(f, "Sub"),
             Operator::Multiply => write!(f, "Multiply"),
-            Operator::Power => write!(f, "Power"),
             Operator::Divide => write!(f, "Divide"),
+            Operator::Power => write!(f, "Power"),
             Operator::Modulus => write!(f, "Modulus"),
             Operator::Assign => write!(f, "Assign"),
             Operator::Increment => write!(f, "Increment"),

@@ -1,75 +1,81 @@
 use crate::parser::tokenizer::token::{ExprToken, Operator};
 use crate::parser::tree_builder::block::BlockContent;
 
+/// Based on: https://runestone.academy/ns/books/published/pythonds/BasicDS/InfixPrefixandPostfixExpressions.html
 #[derive(Debug)]
 pub struct ExprProcessor<'a> {
     op_stack: Vec<&'a ExprToken>,
-    postfix_output: Vec<Part<'a>>,
+    output: Vec<Part<'a>>,
+    step: usize,
 }
 
 impl<'a> ExprProcessor<'a> {
     pub fn new() -> ExprProcessor<'a> {
         ExprProcessor {
             op_stack: vec![],
-            postfix_output: vec![],
+            output: vec![],
+            step: 0,
         }
     }
 
     pub fn process(&mut self, token: &'a ExprToken) {
+        // (1 + 2 * 5 - 6) * 3 + 4
+        // 1 2 5 * + 6 - 3 * 4 +
+        // stack:
+        // output: 125*+6-3*4+
         match token {
-            ExprToken::Operator(operator) => {
-                match operator {
-                    Operator::Plus | Operator::Minus | Operator::Multiply | Operator::Divide => {
-                        for (i, token) in self.op_stack.clone().iter().enumerate().rev() {
-                            if let ExprToken::Operator(op) = token
-                                && op.precedence() >= operator.precedence()
-                            {
-                                self.postfix_output
-                                    .push(Part::Operator(self.op_stack.pop().expect("err")));
-                                self.op_stack.push(token);
-                            }
+            ExprToken::Number(_) => self.output.push(Part::Operand(token)),
+            ExprToken::Operator(op) => match op {
+                Operator::Plus | Operator::Minus | Operator::Multiply | Operator::Divide => {
+                    // Pop each operator on the stack that has higher
+                    // or equal precedence and append to output.
+                    for i in (0..self.op_stack.len()).rev() {
+                        let to_pop_token = self.op_stack.get(i);
+                        if let Some(ExprToken::Operator(to_pop_op)) = to_pop_token
+                            && to_pop_op.precedence() >= op.precedence()
+                        {
+                            let popped = self.op_stack.remove(i);
+                            self.output.push(Part::Operator(popped));
                         }
                     }
-                    Operator::ParenthesesOpen => {
-                        self.op_stack.push(token);
-                    }
-                    Operator::ParenthesesClose => {
-                        for operator in self.op_stack.clone().iter().rev() {
-                            match operator {
-                                ExprToken::Operator(operator) => {
-                                    if let Operator::ParenthesesOpen = operator {
-                                        self.op_stack.pop();
-                                        break;
-                                    } else {
-                                        let op_tok = self.op_stack.pop().expect("err");
-                                        self.postfix_output.push(Part::Operator(op_tok));
-                                    }
-                                }
-
-                                ExprToken::String(_) => unimplemented!(),
-                                ExprToken::Number(_) => unimplemented!(),
-                                ExprToken::Var(_) => unimplemented!(),
-                                ExprToken::VarDotAccessor => unimplemented!(),
-                                ExprToken::VarBracketAccessorOpen => unimplemented!(),
-                                ExprToken::VarBracketAccessorClose => unimplemented!(),
-                                ExprToken::FunctionArgsOpen => unimplemented!(),
-                                ExprToken::FunctionArgsClose => unimplemented!(),
-                                ExprToken::ArrayOpen => unimplemented!(),
-                                ExprToken::ArrayClose => unimplemented!(),
-                            }
+                    self.op_stack.push(token);
+                }
+                Operator::ParenthesesOpen => {
+                    self.op_stack.push(token);
+                }
+                Operator::ParenthesesClose => {
+                    // Pop all operators and append to output until a left parenthesis is found.
+                    for i in (0..self.op_stack.len()).rev() {
+                        let to_pop_token = self.op_stack.get(i);
+                        if let Some(ExprToken::Operator(Operator::ParenthesesOpen)) = to_pop_token {
+                            self.op_stack.remove(i);
+                            break;
+                        } else {
+                            let to_add_op = self.op_stack.remove(i);
+                            self.output.push(Part::Operator(to_add_op))
                         }
-                    }
-                    t => {
-                        crate::dd!(t);
                     }
                 }
-                self.op_stack.push(token);
-            }
-
+                Operator::Power => {}
+                Operator::Modulus => {}
+                Operator::Assign => {}
+                Operator::Increment => {}
+                Operator::Decrement => {}
+                Operator::IncrementBy => {}
+                Operator::DecrementBy => {}
+                Operator::MultiplyBy => {}
+                Operator::DivideBy => {}
+                Operator::EqualTo => {}
+                Operator::NotEqualTo => {}
+                Operator::GreaterThan => {}
+                Operator::GreaterThanOrEqualTo => {}
+                Operator::LessThan => {}
+                Operator::LessThanOrEqualTo => {}
+                Operator::And => {}
+                Operator::Or => {}
+                Operator::Not => {}
+            },
             ExprToken::String(_) => {}
-            ExprToken::Number(_) => {
-                self.postfix_output.push(Part::Operand(token));
-            }
             ExprToken::Var(_) => {}
             ExprToken::VarDotAccessor => {}
             ExprToken::VarBracketAccessorOpen => {}
@@ -79,6 +85,9 @@ impl<'a> ExprProcessor<'a> {
             ExprToken::ArrayOpen => {}
             ExprToken::ArrayClose => {}
         }
+        self.step += 1;
+        // (1 + 2) * 3
+        // crate::ddif!(self.step == 8, &self.output, &self.op_stack, &token);
     }
 
     pub fn build(&self) {
@@ -86,17 +95,23 @@ impl<'a> ExprProcessor<'a> {
     }
 
     pub fn resolve(&mut self) -> BlockContent {
-        // add remaining operaters to list
+        // add remaining operators to list
         for operator in self.op_stack.iter().rev() {
-            self.postfix_output.push(Part::Operator(operator));
+            self.output.push(Part::Operator(operator));
         }
 
-        dbg!(&self.postfix_output);
+        dbg!(&self.output);
+        self.reset();
         BlockContent::Text("hello".to_owned())
     }
 
     pub fn is_empty(&self) -> bool {
-        self.postfix_output.is_empty()
+        self.output.is_empty()
+    }
+
+    pub fn reset(&mut self) {
+        self.output = vec![];
+        self.op_stack = vec![];
     }
 }
 
