@@ -1,12 +1,12 @@
 pub mod block;
 mod expression;
 mod html;
-mod expr_processor;
+mod postfix_processor;
 
 use super::tokenizer::token::{ExprToken, Token, TokenType};
 use super::tree_builder::block::{AttrBuilder, BlockContent};
 use block::{Block, BlockBuilder};
-use crate::parser::tree_builder::expr_processor::ExprProcessor;
+use crate::parser::tree_builder::postfix_processor::PostfixProcessor;
 use crate::parser::tree_builder::expression::BinaryOperation;
 
 pub struct TreeBuilder {
@@ -49,7 +49,7 @@ impl TreeBuilder {
         let mut blocks = vec![];
         let mut block_builders: Vec<BlockBuilder> = vec![];
         let mut attr_builder: Option<AttrBuilder> = None;
-        let mut expr_processor: ExprProcessor = ExprProcessor::new();
+        let mut expr_processor: PostfixProcessor = PostfixProcessor::new();
 
         for token in tokens {
             match self.state() {

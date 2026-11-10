@@ -11,7 +11,6 @@ pub(super) struct ExpressionTokenizer {
     state_history: Vec<ExprState>,
     tokens: Vec<Token>,
     cursor: usize, // This is a reference to the position of the cursor for the source string/file
-    sub_cursor: usize,
     buf: String,
     buf_start: Option<usize>,
 }
@@ -22,7 +21,6 @@ impl ExpressionTokenizer {
             state_history: vec![ExpectOperandStart],
             tokens: vec![],
             cursor: 0,
-            sub_cursor: 0,
             buf: String::new(),
             buf_start: None,
         }
@@ -136,8 +134,11 @@ impl ExpressionTokenizer {
                             self.push_token(TokenType::ExprToken(ExprToken::Operator(op)));
                             self.pop_state();
                         }
-                        OperatorMatchResult::None => {}
-                        OperatorMatchResult::Err => {}
+                        OperatorMatchResult::Matches(_) => {
+                            self.pop_state();
+                            self.push_state_keep_buf(ParsingOperator, Some(char));
+                        }
+                        OperatorMatchResult::None => panic!(""),
                     }
                 } else if self.is_expr_end(char) {
                     return self.get_tokens_and_reset();
@@ -244,20 +245,30 @@ impl ExpressionTokenizer {
             ParsingOperator => {
                 if Operator::is_operator_char(char) {
                     self.buf.push(char);
-                } else {
+                } else if char.is_whitespace() {
                     match Operator::get_match(&self.buf) {
                         OperatorMatchResult::Matched(operator) => {
                             self.push_token(TokenType::ExprToken(ExprToken::Operator(operator)));
                             self.pop_state();
                         }
+                        OperatorMatchResult::Matches(ops) => {
+                            if let OperatorMatchResult::Matched(op) = Operator::get_exact(&self.buf)
+                            {
+                                self.push_token(TokenType::ExprToken(ExprToken::Operator(op)));
+                                self.pop_state();
+                            } else {
+                                return self.err(format!(
+                                    r#""{}" has not matching operator or is not implemented."#,
+                                    self.buf
+                                ));
+                            }
+                        }
                         OperatorMatchResult::None => {
                             return self.err(format!(r#"No operator match "{}""#, self.buf));
                         }
-                        OperatorMatchResult::Err => {
-                            return self.err(format!(r#"Error matching operator. "{}""#, self.buf));
-                        }
                     }
-                    // todo handle current char
+                } else {
+                    return self.err_unexpected();
                 }
             }
             ParsedOperator => todo!("ParsedOperator"),

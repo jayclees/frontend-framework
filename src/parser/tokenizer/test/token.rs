@@ -103,7 +103,7 @@ fn test_symbol_len() {
     assert_eq!(1, TokenType::ExprToken(ExprToken::Operator(Operator::Plus)).len());
     assert_eq!(1, TokenType::ExprToken(ExprToken::Operator(Operator::Minus)).len());
     assert_eq!(1, TokenType::ExprToken(ExprToken::Operator(Operator::Multiply)).len());
-    assert_eq!(1, TokenType::ExprToken(ExprToken::Operator(Operator::Power)).len());
+    assert_eq!(2, TokenType::ExprToken(ExprToken::Operator(Operator::Power)).len());
     assert_eq!(1, TokenType::ExprToken(ExprToken::Operator(Operator::Divide)).len());
     assert_eq!(1, TokenType::ExprToken(ExprToken::Operator(Operator::Modulus)).len());
     assert_eq!(1, TokenType::ExprToken(ExprToken::Operator(Operator::Assign)).len());

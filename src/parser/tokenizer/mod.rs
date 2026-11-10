@@ -7,13 +7,13 @@ pub(crate) mod token;
 
 use expression::{ExprResult, ExpressionTokenizer};
 use helper::{
-    current, pop_state, pop_state_type, prev, push_state, push_state_keep_buf, push_token,
-    reset_buffer, TokenizerContract,
+    TokenizerContract, current, pop_state, pop_state_type, prev, push_state, push_state_keep_buf,
+    push_token, reset_buffer,
 };
 use state::State;
 use state::State::*;
 use std::cell::RefCell;
-use std::fs::{read_to_string, OpenOptions};
+use std::fs::{OpenOptions, read_to_string};
 use std::io::Write;
 use token::{Token, TokenType, TokenType::*};
 
@@ -54,16 +54,22 @@ impl Tokenizer {
         );
     }
 
-    fn err_unexpected(&self, char: char) {
+    fn err_unexpected(&self, char: char, msg: Option<String>) {
         // todo provide expected tokens based on current tokenizer state
         // dbg!(&self.tokens);
         // dbg!(&self.state_history);
         panic!(
-            r#"Unexpected token "{}" at line: {}, column: {}. State: "{}""#,
+            r#"Unexpected token "{}" at line: {}, column: {}. State: "{}"{}"#,
             char,
             self.line,
             self.column,
-            self.state()
+            self.state(),
+            match msg {
+                Some(msg) => {
+                    format!(". {msg}")
+                }
+                None => "".to_owned(),
+            }
         );
     }
 
@@ -188,7 +194,7 @@ impl Tokenizer {
                     } else if char == ':' {
                         if self.prev_state().expect("Should have state") != &ParsingBlock {
                             eprintln!("Cannot have attribute identifier outside of block.");
-                            self.err_unexpected(char);
+                            self.err_unexpected(char, None);
                         }
                         self.push_token_pop_state(AttrIdentifier(self.buf.clone()));
                         self.buf.push(char);
@@ -197,7 +203,7 @@ impl Tokenizer {
                     } else if char.is_whitespace() {
                         self.push_state_keep_buf(ResolvingIdentifier, None);
                     } else {
-                        self.err_unexpected(char);
+                        self.err_unexpected(char, None);
                     }
                 }
                 ResolvingIdentifier => {
@@ -220,7 +226,7 @@ impl Tokenizer {
                             self.push_state(GatheringExpressionTokens, None);
                         }
                     } else if !char.is_whitespace() {
-                        self.err_unexpected(char);
+                        self.err_unexpected(char, None);
                     }
                 }
                 ParsedBlockIdentifier => {
@@ -229,7 +235,7 @@ impl Tokenizer {
                             self.reset_buffer();
                             self.buf.push(char);
                         } else if !char.is_whitespace() {
-                            self.err_unexpected(char);
+                            self.err_unexpected(char, None);
                         }
                     } else {
                         if self.buf.as_str() == "[" {
@@ -245,7 +251,7 @@ impl Tokenizer {
                                 self.push_token(EventListenerOpen);
                                 self.push_state(ParsingEventListenerIdentifier, None);
                             } else {
-                                self.err_unexpected(char);
+                                self.err_unexpected(char, None);
                             }
                         } else if self.buf.as_str() == "{" {
                             self.push_token(BlockOpen);
@@ -271,7 +277,7 @@ impl Tokenizer {
                         self.buf.push(char);
                         self.push_token_pop_state(BlockClose);
                     } else if !char.is_whitespace() {
-                        self.err_unexpected(char);
+                        self.err_unexpected(char, None);
                     }
                 }
                 ParsingBlockClose => todo!("ParsingBlockClose"),
@@ -302,12 +308,13 @@ impl Tokenizer {
                             self.err_msg(msg);
                         }
                         ExprResult::ErrExpectedExprStart(msg) => {
-                            eprintln!("{msg}");
-                            self.err_unexpected(char);
+                            self.err_unexpected(char, Some(msg));
                         }
                         ExprResult::ErrUnexpected(expr_state) => {
-                            eprintln!("Expr tokenizer state: {expr_state}");
-                            self.err_unexpected(char);
+                            self.err_unexpected(
+                                char,
+                                Some(format!("Expr tokenizer state: {expr_state}")),
+                            );
                         }
                         ExprResult::ParsedBlockIdentifier(_) => {}
                     }
@@ -320,7 +327,7 @@ impl Tokenizer {
                         self.pop_state();
                         self.push_state(ParsingDirectiveIdentifier, Some(char));
                     } else if !char.is_whitespace() {
-                        self.err_unexpected(char);
+                        self.err_unexpected(char, None);
                     }
                 }
                 ParsingDirectiveIdentifier => {
@@ -348,7 +355,7 @@ impl Tokenizer {
                         self.push_token_pop_state(DirectiveIdentifier(self.buf.clone()));
                         self.push_state(ParsedDirectiveIdentifier, None);
                     } else {
-                        self.err_unexpected(char);
+                        self.err_unexpected(char, None);
                     }
                 }
                 ParsedDirectiveIdentifier => {
@@ -362,7 +369,7 @@ impl Tokenizer {
                         self.buf.push(char);
                         self.push_token_pop_state(DirectiveClose);
                     } else if !char.is_whitespace() {
-                        self.err_unexpected(char);
+                        self.err_unexpected(char, None);
                     }
                 }
                 ParsedDirectiveColon => todo!("ParsedDirectiveColon"),
@@ -377,7 +384,7 @@ impl Tokenizer {
                     } else if char == ':' {
                         self.buf.push(char);
                     } else {
-                        self.err_unexpected(char);
+                        self.err_unexpected(char, None);
                     }
                 }
                 ParsingDirectiveValue => {
@@ -404,7 +411,7 @@ impl Tokenizer {
                         if char.is_ascii_alphabetic() {
                             self.buf.push(char);
                         } else if !char.is_whitespace() {
-                            self.err_unexpected(char);
+                            self.err_unexpected(char, None);
                         }
                     }
                     false => {
@@ -419,7 +426,7 @@ impl Tokenizer {
                             self.push_token_pop_state(EventListenerIdentifier(self.buf.clone()));
                             self.push_state(ParsingEventListenerColon, None);
                         } else {
-                            self.err_unexpected(char);
+                            self.err_unexpected(char, None);
                         }
                     }
                 },
@@ -430,7 +437,7 @@ impl Tokenizer {
                         self.push_token_pop_state(EventListenerColon);
                         self.push_state(ParsingEventListenerHandler, None);
                     } else if !char.is_whitespace() {
-                        self.err_unexpected(char);
+                        self.err_unexpected(char, None);
                     }
                 }
                 ParsedEventListenerColon => todo!("ParsedEventListenerColon"),
@@ -454,7 +461,7 @@ impl Tokenizer {
                     if char.is_whitespace() {
                         self.pop_state();
                     } else {
-                        self.err_unexpected(char);
+                        self.err_unexpected(char, None);
                     }
                 }
                 InDblQuoteUnescaped => todo!("InDblQuoteUnescaped"),

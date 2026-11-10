@@ -1,17 +1,19 @@
 use crate::parser::tokenizer::token::{ExprToken, Operator};
 use crate::parser::tree_builder::block::BlockContent;
 
-/// Based on: https://runestone.academy/ns/books/published/pythonds/BasicDS/InfixPrefixandPostfixExpressions.html
+/// Read:
+/// - https://runestone.academy/ns/books/published/pythonds/BasicDS/InfixPrefixandPostfixExpressions.html
+/// - https://www.geeksforgeeks.org/dsa/convert-infix-expression-to-postfix-expression/
 #[derive(Debug)]
-pub struct ExprProcessor<'a> {
+pub struct PostfixProcessor<'a> {
     op_stack: Vec<&'a ExprToken>,
     output: Vec<Part<'a>>,
     step: usize,
 }
 
-impl<'a> ExprProcessor<'a> {
-    pub fn new() -> ExprProcessor<'a> {
-        ExprProcessor {
+impl<'a> PostfixProcessor<'a> {
+    pub fn new() -> PostfixProcessor<'a> {
+        PostfixProcessor {
             op_stack: vec![],
             output: vec![],
             step: 0,
@@ -19,14 +21,10 @@ impl<'a> ExprProcessor<'a> {
     }
 
     pub fn process(&mut self, token: &'a ExprToken) {
-        // (1 + 2 * 5 - 6) * 3 + 4
-        // 1 2 5 * + 6 - 3 * 4 +
-        // stack:
-        // output: 125*+6-3*4+
         match token {
             ExprToken::Number(_) => self.output.push(Part::Operand(token)),
             ExprToken::Operator(op) => match op {
-                Operator::Plus | Operator::Minus | Operator::Multiply | Operator::Divide => {
+                Operator::Plus | Operator::Minus | Operator::Multiply | Operator::Divide | Operator::Power => {
                     // Pop each operator on the stack that has higher
                     // or equal precedence and append to output.
                     for i in (0..self.op_stack.len()).rev() {
@@ -56,7 +54,6 @@ impl<'a> ExprProcessor<'a> {
                         }
                     }
                 }
-                Operator::Power => {}
                 Operator::Modulus => {}
                 Operator::Assign => {}
                 Operator::Increment => {}
@@ -86,16 +83,10 @@ impl<'a> ExprProcessor<'a> {
             ExprToken::ArrayClose => {}
         }
         self.step += 1;
-        // (1 + 2) * 3
-        // crate::ddif!(self.step == 8, &self.output, &self.op_stack, &token);
-    }
-
-    pub fn build(&self) {
-        //
     }
 
     pub fn resolve(&mut self) -> BlockContent {
-        // add remaining operators to list
+        // Add remaining operators to list
         for operator in self.op_stack.iter().rev() {
             self.output.push(Part::Operator(operator));
         }

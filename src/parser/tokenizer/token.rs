@@ -13,7 +13,10 @@ impl Token {
         // match and validate start/end with token len
 
         if r#type.len() == 0 {
-            panic!("Token should not be 0 length. TokenType: {}, cursor: {}", r#type, start)
+            panic!(
+                "Token should not be 0 length. TokenType: {}, cursor: {}",
+                r#type, start
+            )
         }
 
         Token {
@@ -39,14 +42,14 @@ impl Token {
     pub fn test(&self, source: &str) -> bool {
         let source_str = &source[self.start..self.end];
         match &self.r#type {
-            BlockIdentifier(str) |
-            LineComment(str) |
-            BlockComment(str) |
-            AttrIdentifier(str) |
-            DirectiveIdentifier(str) |
-            EventListenerIdentifier(str) |
-            EventListenerHandler(str) |
-            DirectiveValue(str) => source_str == str,
+            BlockIdentifier(str)
+            | LineComment(str)
+            | BlockComment(str)
+            | AttrIdentifier(str)
+            | DirectiveIdentifier(str)
+            | EventListenerIdentifier(str)
+            | EventListenerHandler(str)
+            | DirectiveValue(str) => source_str == str,
 
             BlockOpen => source_str == "{",
             BlockClose => source_str == "}",
@@ -103,24 +106,17 @@ pub enum TokenType {
 impl TokenType {
     pub fn len(&self) -> usize {
         match self {
-            BlockIdentifier(str) |
-            LineComment(str) |
-            BlockComment(str) |
-            AttrIdentifier(str) |
-            DirectiveIdentifier(str) |
-            DirectiveValue(str) |
-            EventListenerHandler(str) |
-            EventListenerIdentifier(str) => str.len(),
+            BlockIdentifier(str)
+            | LineComment(str)
+            | BlockComment(str)
+            | AttrIdentifier(str)
+            | DirectiveIdentifier(str)
+            | DirectiveValue(str)
+            | EventListenerHandler(str)
+            | EventListenerIdentifier(str) => str.len(),
 
-            BlockOpen |
-            BlockClose |
-            AttrColon |
-            AttrSeparator |
-            DirectiveOpen |
-            DirectiveClose |
-            EventListenerClose |
-            EventListenerColon |
-            DirectiveColon => 1,
+            BlockOpen | BlockClose | AttrColon | AttrSeparator | DirectiveOpen | DirectiveClose
+            | EventListenerClose | EventListenerColon | DirectiveColon => 1,
 
             EventListenerOpen => 2,
 
@@ -151,7 +147,6 @@ impl Display for TokenType {
             EventListenerIdentifier(str) => write!(f, "EventListenerIdentifier({str})"),
             EventListenerColon => write!(f, "EventListenerColon"),
             EventListenerHandler(str) => write!(f, "EventListenerHandler({str})"),
-
             // Expression token
         }
     }
@@ -247,44 +242,33 @@ pub enum Operator {
 
 impl Operator {
     pub(super) fn is_operator_char(char: char) -> bool {
-        ['+', '-', '*', '^', '/', '%', '=', '<', '>', '!', '&', '|'].contains(&char)
+        ['+', '-', '*', '/', '%', '=', '<', '>', '!', '&', '|'].contains(&char)
     }
 
     pub(super) fn get_match(buf: &str) -> OperatorMatchResult {
-        let variants = [
-            Operator::Plus,
-            Operator::Minus,
-            Operator::Multiply,
-            Operator::Divide,
-            Operator::Power,
-            Operator::Modulus,
-            Operator::Assign,
-            Operator::Increment,
-            Operator::Decrement,
-            Operator::IncrementBy,
-            Operator::DecrementBy,
-            Operator::MultiplyBy,
-            Operator::DivideBy,
-            Operator::EqualTo,
-            Operator::NotEqualTo,
-            Operator::GreaterThan,
-            Operator::GreaterThanOrEqualTo,
-            Operator::LessThan,
-            Operator::LessThanOrEqualTo,
-            Operator::ParenthesesOpen,
-            Operator::ParenthesesClose,
-            Operator::And,
-            Operator::Or,
-            Operator::Not,
-        ];
-
-        for variant in variants.iter() {
-            if variant.symbol() == buf {
-                return OperatorMatchResult::Matched(variant.clone());
-            }
+        match buf {
+            "+" => OperatorMatchResult::Matched(Operator::Plus),
+            "-" => OperatorMatchResult::Matched(Operator::Minus),
+            "*" => OperatorMatchResult::Matches(vec![Operator::Multiply, Operator::Power]),
+            "**" => OperatorMatchResult::Matched(Operator::Power),
+            "/" => OperatorMatchResult::Matched(Operator::Divide),
+            "(" => OperatorMatchResult::Matched(Operator::ParenthesesOpen),
+            ")" => OperatorMatchResult::Matched(Operator::ParenthesesClose),
+            _ => OperatorMatchResult::None,
         }
+    }
 
-        OperatorMatchResult::None
+    pub(super) fn get_exact(buf: &str) -> OperatorMatchResult {
+        match buf {
+            "+" => OperatorMatchResult::Matched(Operator::Plus),
+            "-" => OperatorMatchResult::Matched(Operator::Minus),
+            "*" => OperatorMatchResult::Matched(Operator::Multiply),
+            "**" => OperatorMatchResult::Matched(Operator::Power),
+            "/" => OperatorMatchResult::Matched(Operator::Divide),
+            "(" => OperatorMatchResult::Matched(Operator::ParenthesesOpen),
+            ")" => OperatorMatchResult::Matched(Operator::ParenthesesClose),
+            _ => OperatorMatchResult::None,
+        }
     }
 
     pub(super) fn symbol(&self) -> &'static str {
@@ -293,7 +277,7 @@ impl Operator {
             Operator::Minus => "-",
             Operator::Multiply => "*",
             Operator::Divide => "/",
-            Operator::Power => "^",
+            Operator::Power => "**",
             Operator::Modulus => "%",
             Operator::Assign => "=",
             Operator::Increment => "++",
@@ -323,9 +307,9 @@ impl Operator {
             Operator::Minus => 2,
             Operator::Multiply => 3,
             Operator::Divide => 3,
+            Operator::Modulus => 3,
+            Operator::Power => 4,
             Operator::ParenthesesClose => unimplemented!(),
-            Operator::Power => unimplemented!(),
-            Operator::Modulus => unimplemented!(),
             Operator::Assign => unimplemented!(),
             Operator::Increment => unimplemented!(),
             Operator::Decrement => unimplemented!(),
@@ -379,6 +363,6 @@ impl Display for Operator {
 
 pub(super) enum OperatorMatchResult {
     Matched(Operator),
+    Matches(Vec<Operator>),
     None,
-    Err,
 }
