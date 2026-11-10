@@ -119,8 +119,8 @@ fn test_symbol_len() {
     assert_eq!(2, TokenType::ExprToken(ExprToken::Operator(Operator::GreaterThanOrEqualTo)).len());
     assert_eq!(1, TokenType::ExprToken(ExprToken::Operator(Operator::LessThan)).len());
     assert_eq!(2, TokenType::ExprToken(ExprToken::Operator(Operator::LessThanOrEqualTo)).len());
-    assert_eq!(2, TokenType::ExprToken(ExprToken::Operator(Operator::ParenthesesOpen)).len());
-    assert_eq!(2, TokenType::ExprToken(ExprToken::Operator(Operator::ParenthesesClose)).len());
+    assert_eq!(1, TokenType::ExprToken(ExprToken::Operator(Operator::ParenthesesOpen)).len());
+    assert_eq!(1, TokenType::ExprToken(ExprToken::Operator(Operator::ParenthesesClose)).len());
     assert_eq!(2, TokenType::ExprToken(ExprToken::Operator(Operator::And)).len());
     assert_eq!(2, TokenType::ExprToken(ExprToken::Operator(Operator::Or)).len());
     assert_eq!(1, TokenType::ExprToken(ExprToken::Operator(Operator::Not)).len());

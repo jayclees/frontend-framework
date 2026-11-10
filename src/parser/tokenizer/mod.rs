@@ -305,7 +305,8 @@ impl Tokenizer {
                             eprintln!("{msg}");
                             self.err_unexpected(char);
                         }
-                        ExprResult::ErrUnexpected => {
+                        ExprResult::ErrUnexpected(expr_state) => {
+                            eprintln!("Expr tokenizer state: {expr_state}");
                             self.err_unexpected(char);
                         }
                         ExprResult::ParsedBlockIdentifier(_) => {}

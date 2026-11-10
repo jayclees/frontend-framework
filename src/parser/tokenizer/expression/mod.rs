@@ -41,7 +41,7 @@ impl ExpressionTokenizer {
     }
 
     fn err_unexpected(&self) -> ExprResult {
-        ExprResult::ErrUnexpected
+        ExprResult::ErrUnexpected(self.state_history.last().expect("Should be set"))
     }
 
     fn err_expected_expr_start(&self) -> ExprResult {
@@ -139,6 +139,8 @@ impl ExpressionTokenizer {
                         OperatorMatchResult::None => {}
                         OperatorMatchResult::Err => {}
                     }
+                } else if self.is_expr_end(char) {
+                    return self.get_tokens_and_reset();
                 } else if !char.is_whitespace() {
                     return self.err_unexpected();
                 }
@@ -414,11 +416,11 @@ impl Display for ExprState {
     }
 }
 
-pub(super) enum ExprResult {
+pub(super) enum ExprResult<'a> {
     StillParsing,
     Parsed(Vec<Token>),
     ParsedBlockIdentifier(String),
     Err(String),
     ErrExpectedExprStart(String),
-    ErrUnexpected,
+    ErrUnexpected(&'a ExprState),
 }
