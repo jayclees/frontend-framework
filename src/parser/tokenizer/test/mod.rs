@@ -52,7 +52,7 @@ fn match_tokens_to_source(source: String, tokens: &Vec<Token>) {
             );
         }
 
-        dbg!(&source[token.start()..token.end()]);
+        // dbg!(&source[token.start()..token.end()]);
         assert!(token.test(source.as_ref()));
 
         start = token.end();

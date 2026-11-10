@@ -23,7 +23,7 @@ fn event_0003() {
     let mut tokenizer = Tokenizer::new();
     let tokens = tokenizer.tokenize(string.clone());
     for token in tokens {
-        dbg!(token);
+        // dbg!(token);
         assert!(token.test(string.as_ref()))
     }
 }

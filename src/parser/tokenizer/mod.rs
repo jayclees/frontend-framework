@@ -56,7 +56,7 @@ impl Tokenizer {
 
     fn err_unexpected(&self, char: char) {
         // todo provide expected tokens based on current tokenizer state
-        dbg!(&self.tokens);
+        // dbg!(&self.tokens);
         // dbg!(&self.state_history);
         panic!(
             r#"Unexpected token "{}" at line: {}, column: {}. State: "{}""#,

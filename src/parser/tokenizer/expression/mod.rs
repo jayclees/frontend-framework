@@ -146,23 +146,6 @@ impl ExpressionTokenizer {
                 }
             }
             ParsedOperand => {
-                // First handle whatever type of token was just parsed
-                // let token = match self.prev_state().expect("Should have prev state.") {
-                //     ParsingString => TokenType::ExprToken(ExprToken::String(self.buf.clone())),
-                //     ParsingNumber => TokenType::ExprToken(ExprToken::Number(self.buf.clone())),
-                //     ParsingIdentifier => {
-                //         todo!("ParsingIdentifier");
-                //         // decide whether it's a variable or function declaration, or a block identifier
-                //         // if block identifier, return to parent tokenizer
-                //     }
-                //     ParsingFunctionCall => todo!("ParsingFunctionCall"),
-                //     ParsingParenthesesOpen => todo!("ParsingParenthesesOpen"),
-                //     ParsingParenthesesClosed => todo!("ParsingParenthesesClosed"),
-                //     _ => unimplemented!(),
-                // };
-                // self.push_token_pop_state(token);
-                // self.pop_state();
-
                 if self.buf == ")" {
                     self.push_token(TokenType::ExprToken(ExprToken::Operator(
                         Operator::ParenthesesClose,
