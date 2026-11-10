@@ -143,7 +143,7 @@ impl TreeBuilder {
         //     builders.last_mut()
         // }
 
-        dbg!(&blocks);
+        // dbg!(&blocks);
 
         blocks
     }

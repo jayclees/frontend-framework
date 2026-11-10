@@ -284,7 +284,7 @@ impl Operator {
             }
         }
 
-        OperatorMatchResult::Failed
+        OperatorMatchResult::None
     }
 
     pub(super) fn symbol(&self) -> &'static str {
@@ -379,5 +379,6 @@ impl Display for Operator {
 
 pub(super) enum OperatorMatchResult {
     Matched(Operator),
-    Failed,
+    None,
+    Err,
 }
