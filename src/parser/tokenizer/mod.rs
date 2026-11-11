@@ -161,6 +161,91 @@ impl Tokenizer {
         }
     }
 
+    fn expect_identifier_start(&mut self, char: char) -> TokenizerResult {
+        if char.is_ascii_alphabetic() {
+            self.reset_buffer();
+            self.buf.push(char);
+            self.push_state_keep_buf(ParsingIdentifier, None);
+            return TokenizerResult::Handled;
+        }
+
+        TokenizerResult::NextPipe
+    }
+
+    fn parse_identifier_char(&mut self, char: char) -> TokenizerResult {
+        if char.is_ascii_alphabetic() {
+            self.buf.push(char);
+            TokenizerResult::Handled
+        } else if char == ':' {
+            if self.prev_state().expect("Should have state") != &ParsingBlock {
+                eprintln!("Cannot have attribute identifier outside of block.");
+                self.err_unexpected(char, None);
+            }
+            self.push_token_pop_state(AttrIdentifier(self.buf.clone()));
+            self.buf.push(char);
+            self.push_token(AttrColon);
+            TokenizerResult::PushState(GatheringExpressionTokens)
+        } else if char.is_whitespace() {
+            TokenizerResult::PushStateKeepBuf(ResolvingIdentifier, None)
+        } else {
+            TokenizerResult::ErrUnexpected
+        }
+    }
+
+    fn resolve_identifier_type(&mut self, char: char) -> TokenizerResult {
+        if char == '[' || char == '@' || char == '{' {
+            // Resolved to block identifier
+            self.push_token_pop_state(BlockIdentifier(self.buf.clone()));
+            self.pop_state_type(ParsingIdentifier);
+            return TokenizerResult::PushStateKeepBuf(ParsedBlockIdentifier, Some(char));
+        } else if char == ':' || char == ',' {
+            // Resolved to attr identifier
+            self.push_token_pop_state(AttrIdentifier(self.buf.clone()));
+            self.pop_state_type(ParsingIdentifier);
+            if char == ':' {
+                self.reset_buffer();
+                self.push_token(AttrColon);
+                return TokenizerResult::PushState(GatheringExpressionTokens);
+            } else if char == ',' {
+                self.reset_buffer();
+                self.push_token(AttrSeparator);
+                return TokenizerResult::PushState(GatheringExpressionTokens);
+            }
+        } else if !char.is_whitespace() {
+            return TokenizerResult::ErrUnexpected;
+        }
+
+        TokenizerResult::Handled
+    }
+
+    fn pipeline(&mut self, char: char, pipes: Vec<Pipe>) {
+        for pipe in pipes {
+            let result = match pipe {
+                Pipe::ExpectIdentifierStart => self.expect_identifier_start(char),
+                Pipe::ParseIdentifierChar => self.parse_identifier_char(char),
+                Pipe::ResolveIdentifierType => self.resolve_identifier_type(char),
+                // Pipe::ExpectCommentStart => self.expect_comment_start(char),
+            };
+            match result {
+                TokenizerResult::Handled => return,
+                TokenizerResult::NextPipe | TokenizerResult::Void => { /* Do nothing */ }
+                TokenizerResult::ReplaceState(next) => {
+                    self.pop_state();
+                    self.push_state(next, None);
+                    return;
+                }
+                TokenizerResult::PushState(next) => return self.push_state(next, None),
+                TokenizerResult::PushStateKeepBuf(next, char) => {
+                    return self.push_state_keep_buf(next, char);
+                }
+                TokenizerResult::PopState => {}
+                TokenizerResult::PopStateType(_) => {}
+                TokenizerResult::Err => {}
+                TokenizerResult::ErrUnexpected => self.err_unexpected(char, None),
+            };
+        }
+    }
+
     pub fn tokenize(&mut self, string: String) -> &Vec<Token> {
         let mut expr_tokenizer = ExpressionTokenizer::new();
 
@@ -178,57 +263,17 @@ impl Tokenizer {
             }
 
             match self.state() {
-                Start => {
-                    // can_have_comments!()
-                    // can_have_line_comment!()
-                    // can_have_block_comment!()
-                    if char.is_ascii_alphabetic() {
-                        self.push_state(ParsingIdentifier, Some(char));
-                    }
-                }
+                Start => self.pipeline(
+                    char,
+                    vec![
+                        Pipe::ExpectIdentifierStart,
+                        // Pipe::ExpectCommentStart
+                    ],
+                ),
                 InLineComment => todo!("InLineComment"),
                 InBlockComment => todo!("InBlockComment"),
-                ParsingIdentifier => {
-                    if char.is_ascii_alphabetic() {
-                        self.buf.push(char)
-                    } else if char == ':' {
-                        if self.prev_state().expect("Should have state") != &ParsingBlock {
-                            eprintln!("Cannot have attribute identifier outside of block.");
-                            self.err_unexpected(char, None);
-                        }
-                        self.push_token_pop_state(AttrIdentifier(self.buf.clone()));
-                        self.buf.push(char);
-                        self.push_token(AttrColon);
-                        self.push_state(GatheringExpressionTokens, None);
-                    } else if char.is_whitespace() {
-                        self.push_state_keep_buf(ResolvingIdentifier, None);
-                    } else {
-                        self.err_unexpected(char, None);
-                    }
-                }
-                ResolvingIdentifier => {
-                    if char == '[' || char == '@' || char == '{' {
-                        // Resolved to block identifier
-                        self.push_token_pop_state(BlockIdentifier(self.buf.clone()));
-                        self.pop_state_type(ParsingIdentifier);
-                        self.push_state(ParsedBlockIdentifier, Some(char));
-                    } else if char == ':' || char == ',' {
-                        // Resolved to attr identifier
-                        self.push_token_pop_state(AttrIdentifier(self.buf.clone()));
-                        self.pop_state_type(ParsingIdentifier);
-                        if char == ':' {
-                            self.reset_buffer();
-                            self.push_token(AttrColon);
-                            self.push_state(GatheringExpressionTokens, None);
-                        } else if char == ',' {
-                            self.reset_buffer();
-                            self.push_token(AttrSeparator);
-                            self.push_state(GatheringExpressionTokens, None);
-                        }
-                    } else if !char.is_whitespace() {
-                        self.err_unexpected(char, None);
-                    }
-                }
+                ParsingIdentifier => self.pipeline(char, vec![Pipe::ParseIdentifierChar]),
+                ResolvingIdentifier => self.pipeline(char, vec![Pipe::ResolveIdentifierType]),
                 ParsedBlockIdentifier => {
                     if self.buf.is_empty() {
                         if matches!(char, '[' | '@' | '{') {
@@ -532,4 +577,23 @@ impl TokenizerContract for Tokenizer {
     fn reset_buffer(&mut self) {
         reset_buffer(&mut self.buf, &mut self.buf_start, self.cursor);
     }
+}
+
+enum TokenizerResult {
+    Handled,
+    NextPipe,
+    ReplaceState(State),
+    PushState(State),
+    PushStateKeepBuf(State, Option<char>),
+    PopState,
+    PopStateType(State),
+    Err,
+    ErrUnexpected,
+    Void,
+}
+
+enum Pipe {
+    ExpectIdentifierStart,
+    ParseIdentifierChar, // ExpectCommentStart,
+    ResolveIdentifierType,
 }
