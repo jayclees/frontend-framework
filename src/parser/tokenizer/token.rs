@@ -183,6 +183,120 @@ impl ExprToken {
             ExprToken::ArrayClose => 1,
         }
     }
+
+    pub(crate) fn add(&self, right: ExprToken) -> String {
+        if let ExprToken::Number(right) = right {
+            match self {
+                ExprToken::Number(left) => {
+                    if left.contains(".") || right.contains(".") {
+                        (left.parse::<f64>().unwrap() + right.parse::<f64>().unwrap()).to_string()
+                    } else {
+                        (left.parse::<usize>().unwrap() + right.parse::<usize>().unwrap()).to_string()
+                    }
+                }
+                token => {
+                    panic!(r#""{token}" is not a number."#)
+                }
+            }
+        } else {
+            panic!("Right hand operand is not a number.")
+        }
+    }
+
+    pub(crate) fn subtract(&self, right: ExprToken) -> String {
+        if let ExprToken::Number(right) = right {
+            match self {
+                ExprToken::Number(left) => {
+                    if left.contains(".") || right.contains(".") {
+                        (left.parse::<f64>().unwrap() - right.parse::<f64>().unwrap()).to_string()
+                    } else {
+                        (left.parse::<isize>().unwrap() - right.parse::<isize>().unwrap()).to_string()
+                    }
+                }
+                token => {
+                    panic!(r#""{token}" is not a number."#)
+                }
+            }
+        } else {
+            panic!("Right hand operand is not a number.")
+        }
+    }
+
+    pub(crate) fn multiply(&self, right: ExprToken) -> String {
+        if let ExprToken::Number(right) = right {
+            match self {
+                ExprToken::Number(left) => {
+                    if left.contains(".") || right.contains(".") {
+                        (left.parse::<f64>().unwrap() * right.parse::<f64>().unwrap()).to_string()
+                    } else {
+                        (left.parse::<usize>().unwrap() * right.parse::<usize>().unwrap()).to_string()
+                    }
+                }
+                token => {
+                    panic!(r#""{token}" is not a number."#)
+                }
+            }
+        } else {
+            panic!("Right hand operand is not a number.")
+        }
+    }
+
+    pub(crate) fn divide(&self, right: ExprToken) -> String {
+        if let ExprToken::Number(right) = right {
+            match self {
+                ExprToken::Number(left) => {
+                    (left.parse::<f64>().unwrap() / right.parse::<f64>().unwrap()).to_string()
+                }
+                token => {
+                    panic!(r#""{token}" is not a number."#)
+                }
+            }
+        } else {
+            panic!("Right hand operand is not a number.")
+        }
+    }
+
+    pub(crate) fn power(&self, right: ExprToken) -> String {
+        if let ExprToken::Number(right) = right {
+            match self {
+                ExprToken::Number(left) => {
+                    if left.contains(".") || right.contains(".") {
+                        left.parse::<f64>().unwrap().powf(right.parse::<f64>().unwrap()).to_string()
+                    } else {
+                        match left.parse::<usize>().unwrap().checked_pow(right.parse::<u32>().unwrap()) {
+                            Some(result) => result.to_string(),
+                            None => panic!("Failed raising {left} to the power of {right}.")
+                        }
+
+                    }
+                }
+                token => {
+                    panic!(r#""{token}" is not a number."#)
+                }
+            }
+        } else {
+            panic!("Right hand operand is not a number.")
+        }
+    }
+
+    pub(crate) fn modulus(&self, right: ExprToken) -> String {
+        if let ExprToken::Number(right) = right {
+            match self {
+                ExprToken::Number(left) => {
+                    if left.contains(".") || right.contains(".") {
+                        (left.parse::<f64>().unwrap() % right.parse::<f64>().unwrap()).to_string()
+                    } else {
+                        (left.parse::<usize>().unwrap() % right.parse::<usize>().unwrap()).to_string()
+                    }
+                }
+                token => {
+                    panic!(r#""{token}" is not a number."#)
+                }
+            }
+        } else {
+            panic!("Right hand operand is not a number.")
+        }
+    }
 }
 
 impl Display for ExprToken {
@@ -258,16 +372,16 @@ impl Operator {
         }
     }
 
-    pub(super) fn get_exact(buf: &str) -> OperatorMatchResult {
+    pub(super) fn get_exact(buf: &str) -> Option<Operator> {
         match buf {
-            "+" => OperatorMatchResult::Matched(Operator::Plus),
-            "-" => OperatorMatchResult::Matched(Operator::Minus),
-            "*" => OperatorMatchResult::Matched(Operator::Multiply),
-            "**" => OperatorMatchResult::Matched(Operator::Power),
-            "/" => OperatorMatchResult::Matched(Operator::Divide),
-            "(" => OperatorMatchResult::Matched(Operator::ParenthesesOpen),
-            ")" => OperatorMatchResult::Matched(Operator::ParenthesesClose),
-            _ => OperatorMatchResult::None,
+            "+" => Some(Operator::Plus),
+            "-" => Some(Operator::Minus),
+            "*" => Some(Operator::Multiply),
+            "**" => Some(Operator::Power),
+            "/" => Some(Operator::Divide),
+            "(" => Some(Operator::ParenthesesOpen),
+            ")" => Some(Operator::ParenthesesClose),
+            _ => None,
         }
     }
 
@@ -333,8 +447,8 @@ impl Operator {
 impl Display for Operator {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            Operator::Plus => write!(f, "Add"),
-            Operator::Minus => write!(f, "Sub"),
+            Operator::Plus => write!(f, "Plus"),
+            Operator::Minus => write!(f, "Minus"),
             Operator::Multiply => write!(f, "Multiply"),
             Operator::Divide => write!(f, "Divide"),
             Operator::Power => write!(f, "Power"),

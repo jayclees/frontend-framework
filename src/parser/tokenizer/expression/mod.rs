@@ -126,7 +126,6 @@ impl ExpressionTokenizer {
                 }
             }
             ExpectOperatorStartOrExprEnd => {
-                // crate::dd!(&self.tokens, &self.buf, char);
                 if Operator::is_operator_char(char) {
                     self.buf.push(char);
                     match Operator::get_match(self.buf.as_ref()) {
@@ -136,7 +135,7 @@ impl ExpressionTokenizer {
                         }
                         OperatorMatchResult::Matches(_) => {
                             self.pop_state();
-                            self.push_state_keep_buf(ParsingOperator, Some(char));
+                            self.push_state_keep_buf(ParsingOperator, None);
                         }
                         OperatorMatchResult::None => panic!(""),
                     }
@@ -243,33 +242,70 @@ impl ExpressionTokenizer {
             ParsingFunctionCall => todo!("ParsingFunctionCall"),
             ParsedFunctionCall => todo!("ParsedFunctionCall"),
             ParsingOperator => {
-                if Operator::is_operator_char(char) {
-                    self.buf.push(char);
-                } else if char.is_whitespace() {
-                    match Operator::get_match(&self.buf) {
-                        OperatorMatchResult::Matched(operator) => {
-                            self.push_token(TokenType::ExprToken(ExprToken::Operator(operator)));
+                match Operator::get_match(&self.buf) {
+                    OperatorMatchResult::Matched(operator) => {
+                        self.push_token(TokenType::ExprToken(ExprToken::Operator(operator)));
+                        self.pop_state();
+                    }
+                    OperatorMatchResult::Matches(operators) => {
+                        if Operator::is_operator_char(char) {
+                            self.buf.push(char);
+                        } else if char.is_whitespace() {
+                            self.push_token(TokenType::ExprToken(ExprToken::Operator(
+                                operators
+                                    .iter()
+                                    .find(|op| op.symbol() == self.buf)
+                                    .expect("Should be in list.")
+                                    .clone(),
+                            )));
                             self.pop_state();
-                        }
-                        OperatorMatchResult::Matches(ops) => {
-                            if let OperatorMatchResult::Matched(op) = Operator::get_exact(&self.buf)
-                            {
-                                self.push_token(TokenType::ExprToken(ExprToken::Operator(op)));
-                                self.pop_state();
-                            } else {
-                                return self.err(format!(
-                                    r#""{}" has not matching operator or is not implemented."#,
-                                    self.buf
-                                ));
-                            }
-                        }
-                        OperatorMatchResult::None => {
-                            return self.err(format!(r#"No operator match "{}""#, self.buf));
+                        } else {
+                            unimplemented!();
+                            // this should contain the exact same code as ExprState::ExpectOperandStart
+                            self.pop_state();
+                            // potential solution: have an "inner" `parse` method that we can run twice run from this method `push_parse()` if
+                            // the first attempt to parse it resulted in a hanging char that requires parsing in a different state
+                            // different tokens with no space in between should require running the parser twice on a char
+                            // or potentially recursively call it once.
+                            dbg!(&self.state_history);
+                            return self.push_parse(cursor, char);
                         }
                     }
-                } else {
-                    return self.err_unexpected();
+                    OperatorMatchResult::None => {
+                        return self.err(format!(
+                            r#""{}" has no matching operator or is not implemented."#,
+                            self.buf
+                        ));
+                    }
                 }
+
+                // if Operator::is_operator_char(char) {
+                //     self.buf.push(char);
+                // } else if char.is_whitespace() {
+                //     match Operator::get_match(&self.buf) {
+                //         OperatorMatchResult::Matched(operator) => {
+                //             self.push_token(TokenType::ExprToken(ExprToken::Operator(operator)));
+                //             self.pop_state();
+                //         }
+                //         OperatorMatchResult::Matches(_) => {
+                //             if let OperatorMatchResult::Matched(op) = Operator::get_exact(&self.buf)
+                //             {
+                //                 self.push_token(TokenType::ExprToken(ExprToken::Operator(op)));
+                //                 self.pop_state();
+                //             } else {
+                //                 return self.err(format!(
+                //                     r#""{}" has no matching operator or is not implemented."#,
+                //                     self.buf
+                //                 ));
+                //             }
+                //         }
+                //         OperatorMatchResult::None => {
+                //             return self.err(format!(r#"No operator match "{}""#, self.buf));
+                //         }
+                //     }
+                // } else {
+                //     return self.err_unexpected();
+                // }
             }
             ParsedOperator => todo!("ParsedOperator"),
             ParsingParenthesesOpen => todo!("ParsingParenthesesOpen"),
