@@ -20,6 +20,7 @@ use token::{Token, TokenType, TokenType::*};
 #[derive(Debug)]
 pub struct Tokenizer {
     state_history: Vec<State>,
+    char: char,
     cursor: usize,
     line: usize,
     column: usize,
@@ -32,6 +33,7 @@ impl Tokenizer {
     pub fn new() -> Tokenizer {
         Tokenizer {
             state_history: vec![Start],
+            char: 'a', // dummy char
             cursor: 0,
             line: 1,
             column: 0,
@@ -54,13 +56,13 @@ impl Tokenizer {
         );
     }
 
-    fn err_unexpected(&self, char: char, msg: Option<String>) {
+    fn err_unexpected(&self, msg: Option<String>) {
         // todo provide expected tokens based on current tokenizer state
         // dbg!(&self.tokens);
         // dbg!(&self.state_history);
         panic!(
             r#"Unexpected token "{}" at line: {}, column: {}. State: "{}"{}"#,
-            char,
+            self.char,
             self.line,
             self.column,
             self.state(),
@@ -161,7 +163,8 @@ impl Tokenizer {
         }
     }
 
-    fn expect_identifier_start(&mut self, char: char) -> TokenizerResult {
+    fn expect_identifier_start(&mut self) -> TokenizerResult {
+        let char = self.char;
         if char.is_ascii_alphabetic() {
             self.reset_buffer();
             self.buf.push(char);
@@ -172,14 +175,15 @@ impl Tokenizer {
         TokenizerResult::NextPipe
     }
 
-    fn parse_identifier_char(&mut self, char: char) -> TokenizerResult {
+    fn parse_identifier_char(&mut self) -> TokenizerResult {
+        let char = self.char;
         if char.is_ascii_alphabetic() {
             self.buf.push(char);
             TokenizerResult::Handled
         } else if char == ':' {
             if self.prev_state().expect("Should have state") != &ParsingBlock {
                 eprintln!("Cannot have attribute identifier outside of block.");
-                self.err_unexpected(char, None);
+                self.err_unexpected(None);
             }
             self.push_token_pop_state(AttrIdentifier(self.buf.clone()));
             self.buf.push(char);
@@ -192,7 +196,8 @@ impl Tokenizer {
         }
     }
 
-    fn resolve_identifier_type(&mut self, char: char) -> TokenizerResult {
+    fn resolve_identifier_type(&mut self) -> TokenizerResult {
+        let char = self.char;
         if char == '[' || char == '@' || char == '{' {
             // Resolved to block identifier
             self.push_token_pop_state(BlockIdentifier(self.buf.clone()));
@@ -218,13 +223,13 @@ impl Tokenizer {
         TokenizerResult::Handled
     }
 
-    fn pipeline(&mut self, char: char, pipes: Vec<Pipe>) {
+    fn pipeline(&mut self, pipes: Vec<Pipe>) {
         for pipe in pipes {
             let result = match pipe {
-                Pipe::ExpectIdentifierStart => self.expect_identifier_start(char),
-                Pipe::ParseIdentifierChar => self.parse_identifier_char(char),
-                Pipe::ResolveIdentifierType => self.resolve_identifier_type(char),
-                // Pipe::ExpectCommentStart => self.expect_comment_start(char),
+                Pipe::ExpectIdentifierStart => self.expect_identifier_start(),
+                Pipe::ParseIdentifierChar => self.parse_identifier_char(),
+                Pipe::ResolveIdentifierType => self.resolve_identifier_type(),
+                // Pipe::ExpectCommentStart => self.expect_comment_start(),
             };
             match result {
                 TokenizerResult::Handled => return,
@@ -241,7 +246,7 @@ impl Tokenizer {
                 TokenizerResult::PopState => {}
                 TokenizerResult::PopStateType(_) => {}
                 TokenizerResult::Err => {}
-                TokenizerResult::ErrUnexpected => self.err_unexpected(char, None),
+                TokenizerResult::ErrUnexpected => self.err_unexpected(None),
             };
         }
     }
@@ -253,6 +258,7 @@ impl Tokenizer {
         // Create method to attempt to recover from unexpected token and keep going? Recovery
         // method will depend on what state it is currently in and the state history.
         for (cursor, char) in string.chars().enumerate() {
+            self.char = char;
             self.cursor = cursor;
 
             if char == '\n' {
@@ -264,7 +270,6 @@ impl Tokenizer {
 
             match self.state() {
                 Start => self.pipeline(
-                    char,
                     vec![
                         Pipe::ExpectIdentifierStart,
                         // Pipe::ExpectCommentStart
@@ -272,15 +277,15 @@ impl Tokenizer {
                 ),
                 InLineComment => todo!("InLineComment"),
                 InBlockComment => todo!("InBlockComment"),
-                ParsingIdentifier => self.pipeline(char, vec![Pipe::ParseIdentifierChar]),
-                ResolvingIdentifier => self.pipeline(char, vec![Pipe::ResolveIdentifierType]),
+                ParsingIdentifier => self.pipeline(vec![Pipe::ParseIdentifierChar]),
+                ResolvingIdentifier => self.pipeline(vec![Pipe::ResolveIdentifierType]),
                 ParsedBlockIdentifier => {
                     if self.buf.is_empty() {
                         if matches!(char, '[' | '@' | '{') {
                             self.reset_buffer();
                             self.buf.push(char);
                         } else if !char.is_whitespace() {
-                            self.err_unexpected(char, None);
+                            self.err_unexpected(None);
                         }
                     } else {
                         if self.buf.as_str() == "[" {
@@ -296,7 +301,7 @@ impl Tokenizer {
                                 self.push_token(EventListenerOpen);
                                 self.push_state(ParsingEventListenerIdentifier, None);
                             } else {
-                                self.err_unexpected(char, None);
+                                self.err_unexpected(None);
                             }
                         } else if self.buf.as_str() == "{" {
                             self.push_token(BlockOpen);
@@ -322,7 +327,7 @@ impl Tokenizer {
                         self.buf.push(char);
                         self.push_token_pop_state(BlockClose);
                     } else if !char.is_whitespace() {
-                        self.err_unexpected(char, None);
+                        self.err_unexpected(None);
                     }
                 }
                 ParsingBlockClose => todo!("ParsingBlockClose"),
@@ -353,11 +358,10 @@ impl Tokenizer {
                             self.err_msg(msg);
                         }
                         ExprResult::ErrExpectedExprStart(msg) => {
-                            self.err_unexpected(char, Some(msg));
+                            self.err_unexpected(Some(msg));
                         }
                         ExprResult::ErrUnexpected(expr_state) => {
                             self.err_unexpected(
-                                char,
                                 Some(format!("Expr tokenizer state: {expr_state}")),
                             );
                         }
@@ -372,7 +376,7 @@ impl Tokenizer {
                         self.pop_state();
                         self.push_state(ParsingDirectiveIdentifier, Some(char));
                     } else if !char.is_whitespace() {
-                        self.err_unexpected(char, None);
+                        self.err_unexpected(None);
                     }
                 }
                 ParsingDirectiveIdentifier => {
@@ -400,7 +404,7 @@ impl Tokenizer {
                         self.push_token_pop_state(DirectiveIdentifier(self.buf.clone()));
                         self.push_state(ParsedDirectiveIdentifier, None);
                     } else {
-                        self.err_unexpected(char, None);
+                        self.err_unexpected(None);
                     }
                 }
                 ParsedDirectiveIdentifier => {
@@ -414,7 +418,7 @@ impl Tokenizer {
                         self.buf.push(char);
                         self.push_token_pop_state(DirectiveClose);
                     } else if !char.is_whitespace() {
-                        self.err_unexpected(char, None);
+                        self.err_unexpected(None);
                     }
                 }
                 ParsedDirectiveColon => todo!("ParsedDirectiveColon"),
@@ -429,7 +433,7 @@ impl Tokenizer {
                     } else if char == ':' {
                         self.buf.push(char);
                     } else {
-                        self.err_unexpected(char, None);
+                        self.err_unexpected(None);
                     }
                 }
                 ParsingDirectiveValue => {
@@ -456,7 +460,7 @@ impl Tokenizer {
                         if char.is_ascii_alphabetic() {
                             self.buf.push(char);
                         } else if !char.is_whitespace() {
-                            self.err_unexpected(char, None);
+                            self.err_unexpected(None);
                         }
                     }
                     false => {
@@ -471,7 +475,7 @@ impl Tokenizer {
                             self.push_token_pop_state(EventListenerIdentifier(self.buf.clone()));
                             self.push_state(ParsingEventListenerColon, None);
                         } else {
-                            self.err_unexpected(char, None);
+                            self.err_unexpected(None);
                         }
                     }
                 },
@@ -482,7 +486,7 @@ impl Tokenizer {
                         self.push_token_pop_state(EventListenerColon);
                         self.push_state(ParsingEventListenerHandler, None);
                     } else if !char.is_whitespace() {
-                        self.err_unexpected(char, None);
+                        self.err_unexpected(None);
                     }
                 }
                 ParsedEventListenerColon => todo!("ParsedEventListenerColon"),
@@ -506,7 +510,7 @@ impl Tokenizer {
                     if char.is_whitespace() {
                         self.pop_state();
                     } else {
-                        self.err_unexpected(char, None);
+                        self.err_unexpected(None);
                     }
                 }
                 InDblQuoteUnescaped => todo!("InDblQuoteUnescaped"),
@@ -592,6 +596,7 @@ enum TokenizerResult {
     Void,
 }
 
+/** {@see Tokenizer@pipeline} */
 enum Pipe {
     ExpectIdentifierStart,
     ParseIdentifierChar, // ExpectCommentStart,
