@@ -28,12 +28,9 @@ pub(super) fn push_state<T>(
     state_history: &mut Vec<T>,
     state: T,
     buf: &mut String,
-    buf_start: &mut Option<usize>,
     starting_char: Option<char>,
-    cursor: usize,
 ) {
     state_history.push(state);
-    reset_buffer(buf, buf_start, cursor);
 
     if let Some(char) = starting_char
         && !char.is_whitespace()

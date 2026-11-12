@@ -4,50 +4,51 @@ use std::fmt::{Display, Formatter};
 #[derive(Debug, PartialEq)]
 pub enum State {
     Start,
-    InLineComment,
-    InBlockComment,
+    ResolvingCommentType,
+    ParsingLineComment,
+    ParsingBlockComment,
 
     ParsingIdentifier,
     ResolvingIdentifier,
     ParsedBlockIdentifier,
     ParsedAttrIdentifier,
 
-    ParsingBlockOpen,
+    // ParsingBlockOpen,
     ParsingBlock,
-    ParsingBlockClose,
+    // ParsingBlockClose,
 
-    ParsingAttributeColon,
+    // ParsingAttributeColon,
     ParsedAttrColon,
-    ParsingAttrSeparator,
-    ParsedAttrSeparator,
+    // ParsingAttrSeparator,
+    // ParsedAttrSeparator,
 
     GatheringExpressionTokens,
     ParsedExpressionTokens,
 
     ParsingDirective,
-    ParsingDirectiveOpen,
-    ParsedDirectiveOpen,
+    // ParsingDirectiveOpen,
+    // ParsedDirectiveOpen,
     ParsingDirectiveIdentifier,
     ParsedDirectiveIdentifier,
     ParsedDirectiveColon,
-    EmptyDirectiveParsed,
-    ParsingDirectiveColon,
+    // EmptyDirectiveParsed,
+    // ParsingDirectiveColon,
     ParsingDirectiveValue,
-    ParsingDirectiveClose,
-    ParsedDirective,
+    // ParsingDirectiveClose,
+    // ParsedDirective,
 
     ParsingEventListenerOpen,
     ParsedEventListenerOpen,
     ParsingEventListenerIdentifier,
-    ParsingEventListenerColon,
+    // ParsingEventListenerColon,
     ParsedEventListenerColon,
     ParsingEventListenerHandler,
-    ParsedEventListener,
+    // ParsedEventListener,
 
-    ParsedDirectiveOrEventClose,
+    // ParsedDirectiveOrEventClose,
 
-    InDblQuoteUnescaped,
-    InDblQuoteEscaped,
+    // InDblQuoteUnescaped,
+    // InDblQuoteEscaped,
 }
 
 impl Display for State {
@@ -57,50 +58,33 @@ impl Display for State {
             "{}",
             match self {
                 Start => "Start",
-                InLineComment => "InLineComment",
-                InBlockComment => "InBlockComment",
+                ResolvingCommentType => "ResolvingCommentType",
+                ParsingLineComment => "ParsingLineComment",
+                ParsingBlockComment => "ParsingBlockComment",
 
                 ParsingIdentifier => "ParsingIdentifier",
                 ResolvingIdentifier => "ResolvingIdentifier",
                 ParsedBlockIdentifier => "ParsedBlockIdentifier",
                 ParsedAttrIdentifier => "ParsedAttrIdentifier",
 
-                ParsingBlockOpen => "ParsingBlockOpen",
                 ParsingBlock => "ParsingBlock",
-                ParsingBlockClose => "ParsingBlockClose",
 
-                ParsingAttributeColon => "ParsingAttributeColon",
                 ParsedAttrColon => "ParsedAttrColon",
-                ParsingAttrSeparator => "ParsingAttrSeparator",
-                ParsedAttrSeparator => "ParsedAttrSeparator",
 
                 GatheringExpressionTokens => "GatheringExpressionTokens",
                 ParsedExpressionTokens => "ParsedExpressionTokens",
 
                 ParsingDirective => "ParsingDirective",
-                ParsingDirectiveOpen => "ParsingDirectiveOpen",
-                ParsedDirectiveOpen => "ParsedDirectiveOpen",
                 ParsingDirectiveIdentifier => "ParsingDirectiveIdentifier",
                 ParsedDirectiveIdentifier => "ParsedDirectiveIdentifier",
                 ParsedDirectiveColon => "ParsedDirectiveColon",
-                EmptyDirectiveParsed => "EmptyDirectiveParsed",
-                ParsingDirectiveColon => "ParsingDirectiveColon",
                 ParsingDirectiveValue => "ParsingDirectiveValue",
-                ParsingDirectiveClose => "ParsingDirectiveClose",
-                ParsedDirective => "ParsedDirective",
 
                 ParsingEventListenerOpen => "ParsingEventListenerOpen",
                 ParsedEventListenerOpen => "ParsedEventListenerOpen",
                 ParsingEventListenerIdentifier => "ParsingEventListenerIdentifier",
-                ParsingEventListenerColon => "ParsingEventListenerColon",
                 ParsedEventListenerColon => "ParsedEventListenerColon",
                 ParsingEventListenerHandler => "ParsingEventListenerHandler",
-                ParsedEventListener => "ParsedEventListener",
-
-                ParsedDirectiveOrEventClose => "ParsedDirectiveOrEventClose",
-
-                InDblQuoteUnescaped => "InDblQuoteUnescaped",
-                InDblQuoteEscaped => "InDblQuoteEscaped",
             }
         )
     }

@@ -358,9 +358,7 @@ impl TokenizerContract for ExpressionTokenizer {
             &mut self.state_history,
             state,
             &mut self.buf,
-            &mut self.buf_start,
             starting_char,
-            self.cursor,
         );
     }
 

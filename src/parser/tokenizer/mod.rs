@@ -5,17 +5,17 @@ mod state;
 mod test;
 pub(crate) mod token;
 
-use expression::{ExprResult, ExpressionTokenizer};
+use crate::parser::tokenizer::expression::ExprResult;
+use expression::ExpressionTokenizer;
 use helper::{
     TokenizerContract, current, pop_state, pop_state_type, prev, push_state, push_state_keep_buf,
     push_token, reset_buffer,
 };
 use state::State;
-use state::State::*;
 use std::cell::RefCell;
 use std::fs::{OpenOptions, read_to_string};
 use std::io::Write;
-use token::{Token, TokenType, TokenType::*};
+use token::{Token, TokenType};
 
 #[derive(Debug)]
 pub struct Tokenizer {
@@ -32,7 +32,7 @@ pub struct Tokenizer {
 impl Tokenizer {
     pub fn new() -> Tokenizer {
         Tokenizer {
-            state_history: vec![Start],
+            state_history: vec![State::Start],
             char: 'a', // dummy char
             cursor: 0,
             line: 1,
@@ -163,64 +163,245 @@ impl Tokenizer {
         }
     }
 
-    fn expect_identifier_start(&mut self) -> TokenizerResult {
+    fn expect_identifier_start(&mut self) -> PipelineResult {
         let char = self.char;
+
         if char.is_ascii_alphabetic() {
             self.reset_buffer();
             self.buf.push(char);
-            self.push_state_keep_buf(ParsingIdentifier, None);
-            return TokenizerResult::Handled;
+            return PipelineResult::HandledPushState(State::ParsingIdentifier);
         }
 
-        TokenizerResult::NextPipe
+        PipelineResult::Continue
     }
 
-    fn parse_identifier_char(&mut self) -> TokenizerResult {
+    fn parse_identifier_char(&mut self) -> PipelineResult {
         let char = self.char;
-        if char.is_ascii_alphabetic() {
+
+        if char.is_ascii_alphanumeric() {
             self.buf.push(char);
-            TokenizerResult::Handled
-        } else if char == ':' {
-            if self.prev_state().expect("Should have state") != &ParsingBlock {
-                eprintln!("Cannot have attribute identifier outside of block.");
-                self.err_unexpected(None);
-            }
-            self.push_token_pop_state(AttrIdentifier(self.buf.clone()));
+            return PipelineResult::Handled;
+        }
+
+        PipelineResult::Continue
+    }
+
+    fn resolve_identifier_type(&mut self) -> PipelineResult {
+        let char = self.char;
+
+        if matches!(char, '[' | '@' | '{') {
+            self.push_token_pop_state(TokenType::BlockIdentifier(self.buf.clone()));
+        }
+
+        if char == ':' {
+            self.push_token_pop_state(TokenType::AttrIdentifier(self.buf.clone()));
+        }
+
+        PipelineResult::Continue
+    }
+
+    fn expect_comment_start(&mut self) -> PipelineResult {
+        let char = self.char;
+
+        if char == '/' {
+            self.reset_buffer();
+            self.push_state(State::ResolvingCommentType, Some(char));
+            return PipelineResult::Handled;
+        }
+
+        PipelineResult::Continue
+    }
+
+    fn resolve_comment_type(&mut self) -> PipelineResult {
+        let char = self.char;
+
+        if char == '/' {
+            self.pop_state();
+            self.push_state_keep_buf(State::ParsingLineComment, Some(char));
+            return PipelineResult::Handled;
+        }
+
+        if char == '*' {
+            self.pop_state();
+            self.push_state_keep_buf(State::ParsingBlockComment, Some(char));
+            return PipelineResult::Handled;
+        }
+
+        PipelineResult::ErrUnexpected
+    }
+
+    fn parse_line_comment(&mut self) -> PipelineResult {
+        let char = self.char;
+
+        if char == '\n' {
             self.buf.push(char);
-            self.push_token(AttrColon);
-            TokenizerResult::PushState(GatheringExpressionTokens)
-        } else if char.is_whitespace() {
-            TokenizerResult::PushStateKeepBuf(ResolvingIdentifier, None)
+            self.push_token_pop_state(TokenType::LineComment(self.buf.clone()));
         } else {
-            TokenizerResult::ErrUnexpected
+            self.buf.push(char);
+        }
+
+        PipelineResult::Handled
+    }
+
+    fn parse_block_comment(&mut self) -> PipelineResult {
+        let char = self.char;
+
+        if let Some(last) = self.buf.chars().last()
+            && last == '*'
+            && char == '/'
+        {
+            self.buf.push(char);
+            self.push_token(TokenType::BlockComment(self.buf.clone()));
+            self.pop_state_type(State::ParsingBlockComment);
+        } else {
+            self.buf.push(char);
+        }
+
+        PipelineResult::Handled
+    }
+
+    fn expect_block_open(&mut self) -> PipelineResult {
+        let char = self.char;
+
+        if char == '{' {
+            self.reset_buffer();
+            self.push_token(TokenType::BlockOpen);
+            self.push_state(State::ParsingBlock, None);
+            return PipelineResult::Handled;
+        }
+
+        PipelineResult::Continue
+    }
+
+    fn expect_block_close(&mut self) -> PipelineResult {
+        let char = self.char;
+
+        if char == '}' {
+            self.reset_buffer();
+            self.push_token(TokenType::BlockClose);
+            self.pop_state_type(State::ParsingBlock);
+            return PipelineResult::Handled;
+        }
+
+        PipelineResult::Continue
+    }
+
+    fn expect_directive_open(&mut self) -> PipelineResult {
+        let char = self.char;
+
+        if char == '[' {
+            self.reset_buffer();
+            self.push_token(TokenType::DirectiveOpen);
+            self.push_state(State::ParsingDirective, None);
+            return PipelineResult::Handled;
+        }
+
+        PipelineResult::Continue
+    }
+
+    fn expect_directive_identifier_start(&mut self) -> PipelineResult {
+        let char = self.char;
+
+        if char.is_ascii_alphabetic() {
+            self.reset_buffer();
+            self.push_state();
         }
     }
 
-    fn resolve_identifier_type(&mut self) -> TokenizerResult {
+    fn parse_directive_identifier(&mut self) -> PipelineResult {
         let char = self.char;
-        if char == '[' || char == '@' || char == '{' {
-            // Resolved to block identifier
-            self.push_token_pop_state(BlockIdentifier(self.buf.clone()));
-            self.pop_state_type(ParsingIdentifier);
-            return TokenizerResult::PushStateKeepBuf(ParsedBlockIdentifier, Some(char));
-        } else if char == ':' || char == ',' {
-            // Resolved to attr identifier
-            self.push_token_pop_state(AttrIdentifier(self.buf.clone()));
-            self.pop_state_type(ParsingIdentifier);
-            if char == ':' {
-                self.reset_buffer();
-                self.push_token(AttrColon);
-                return TokenizerResult::PushState(GatheringExpressionTokens);
-            } else if char == ',' {
-                self.reset_buffer();
-                self.push_token(AttrSeparator);
-                return TokenizerResult::PushState(GatheringExpressionTokens);
-            }
-        } else if !char.is_whitespace() {
-            return TokenizerResult::ErrUnexpected;
-        }
 
-        TokenizerResult::Handled
+        //
+    }
+
+    fn expect_directive_colon(&mut self) -> PipelineResult {
+        let char = self.char;
+
+        //
+    }
+
+    fn expect_directive_value(&mut self) -> PipelineResult {
+        let char = self.char;
+
+        //
+    }
+
+    fn parse_directive_value(&mut self) -> PipelineResult {
+        let char = self.char;
+
+        //
+    }
+
+    fn expect_directive_close(&mut self) -> PipelineResult {
+        let char = self.char;
+
+        //
+    }
+
+    fn expect_event_listener_open_start(&mut self) -> PipelineResult {
+        let char = self.char;
+
+        //
+    }
+
+    fn parse_event_listener_open(&mut self) -> PipelineResult {
+        let char = self.char;
+
+        //
+    }
+
+    fn expect_event_listener_identifier_start(&mut self) -> PipelineResult {
+        let char = self.char;
+
+        //
+    }
+
+    fn expect_event_listener_identifier_colon(&mut self) -> PipelineResult {
+        let char = self.char;
+
+        //
+    }
+
+    fn parse_event_listener_identifier(&mut self) -> PipelineResult {
+        let char = self.char;
+
+        //
+    }
+
+    fn expect_event_listener_handler_start(&mut self) -> PipelineResult {
+        let char = self.char;
+
+        //
+    }
+
+    fn parse_event_listener_handler(&mut self) -> PipelineResult {
+        let char = self.char;
+
+        //
+    }
+
+    fn expect_event_listener_close(&mut self) -> PipelineResult {
+        let char = self.char;
+
+        //
+    }
+
+    fn expect_attr_colon(&mut self) -> PipelineResult {
+        let char = self.char;
+
+        //
+    }
+
+    fn expect_expression_start(&mut self) -> PipelineResult {
+        let char = self.char;
+
+        //
+    }
+
+    fn expect_attr_separator(&mut self) -> PipelineResult {
+        let char = self.char;
+
+        //
     }
 
     fn pipeline(&mut self, pipes: Vec<Pipe>) {
@@ -229,24 +410,51 @@ impl Tokenizer {
                 Pipe::ExpectIdentifierStart => self.expect_identifier_start(),
                 Pipe::ParseIdentifierChar => self.parse_identifier_char(),
                 Pipe::ResolveIdentifierType => self.resolve_identifier_type(),
-                // Pipe::ExpectCommentStart => self.expect_comment_start(),
+                Pipe::ExpectCommentStart => self.expect_comment_start(),
+                Pipe::ResolveCommentType => self.resolve_comment_type(),
+                Pipe::ParseLineComment => self.parse_line_comment(),
+                Pipe::ParseBlockComment => self.parse_block_comment(),
+                Pipe::ExpectBlockOpen => self.expect_block_open(),
+                Pipe::ExpectBlockClose => self.expect_block_close(),
+                Pipe::ExpectDirectiveOpen => self.expect_directive_open(),
+                Pipe::ExpectDirectiveIdentifierStart => self.expect_directive_identifier_start(),
+                Pipe::ParseDirectiveIdentifier => self.parse_directive_identifier(),
+                Pipe::ExpectDirectiveColon => self.expect_directive_colon(),
+                Pipe::ExpectDirectiveValue => self.expect_directive_value(),
+                Pipe::ParseDirectiveValue => self.parse_directive_value(),
+                Pipe::ExpectDirectiveClose => self.expect_directive_close(),
+                Pipe::ExpectEventListenerOpenStart => self.expect_event_listener_open_start(),
+                Pipe::ParseEventListenerOpen => self.parse_event_listener_open(),
+                Pipe::ExpectEventListenerIdentifierStart => {
+                    self.expect_event_listener_identifier_start()
+                }
+                Pipe::ExpectEventListenerIdentifierColon => {
+                    self.expect_event_listener_identifier_colon()
+                }
+                Pipe::ParseEventListenerIdentifier => self.parse_event_listener_identifier(),
+                Pipe::ExpectEventListenerHandlerStart => self.expect_event_listener_handler_start(),
+                Pipe::ParseEventListenerHandler => self.parse_event_listener_handler(),
+                Pipe::ExpectEventListenerClose => self.expect_event_listener_close(),
+                Pipe::ExpectAttrColon => self.expect_attr_colon(),
+                Pipe::ExpectExpressionStart => self.expect_expression_start(),
+                Pipe::ExpectAttrSeparator => self.expect_attr_separator(),
             };
             match result {
-                TokenizerResult::Handled => return,
-                TokenizerResult::NextPipe | TokenizerResult::Void => { /* Do nothing */ }
-                TokenizerResult::ReplaceState(next) => {
+                PipelineResult::Handled => return,
+                PipelineResult::Continue | PipelineResult::Void => { /* Do nothing */ }
+                PipelineResult::ReplaceState(next) => {
                     self.pop_state();
                     self.push_state(next, None);
                     return;
                 }
-                TokenizerResult::PushState(next) => return self.push_state(next, None),
-                TokenizerResult::PushStateKeepBuf(next, char) => {
+                PipelineResult::HandledPushState(next) => return self.push_state(next, None),
+                PipelineResult::PushStateKeepBuf(next, char) => {
                     return self.push_state_keep_buf(next, char);
                 }
-                TokenizerResult::PopState => {}
-                TokenizerResult::PopStateType(_) => {}
-                TokenizerResult::Err => {}
-                TokenizerResult::ErrUnexpected => self.err_unexpected(None),
+                PipelineResult::PopState => {}
+                PipelineResult::PopStateType(_) => {}
+                PipelineResult::Err => {}
+                PipelineResult::ErrUnexpected => self.err_unexpected(None),
             };
         }
     }
@@ -269,73 +477,45 @@ impl Tokenizer {
             }
 
             match self.state() {
-                Start => self.pipeline(
-                    vec![
-                        Pipe::ExpectIdentifierStart,
-                        // Pipe::ExpectCommentStart
-                    ],
-                ),
-                InLineComment => todo!("InLineComment"),
-                InBlockComment => todo!("InBlockComment"),
-                ParsingIdentifier => self.pipeline(vec![Pipe::ParseIdentifierChar]),
-                ResolvingIdentifier => self.pipeline(vec![Pipe::ResolveIdentifierType]),
-                ParsedBlockIdentifier => {
-                    if self.buf.is_empty() {
-                        if matches!(char, '[' | '@' | '{') {
-                            self.reset_buffer();
-                            self.buf.push(char);
-                        } else if !char.is_whitespace() {
-                            self.err_unexpected(None);
-                        }
-                    } else {
-                        if self.buf.as_str() == "[" {
-                            self.push_token(DirectiveOpen);
-                            if char.is_whitespace() {
-                                self.push_state(ParsedDirectiveOpen, None);
-                            } else {
-                                self.push_state(ParsingDirectiveIdentifier, Some(char));
-                            }
-                        } else if self.buf.as_str() == "@" {
-                            if char == '[' {
-                                self.buf.push(char);
-                                self.push_token(EventListenerOpen);
-                                self.push_state(ParsingEventListenerIdentifier, None);
-                            } else {
-                                self.err_unexpected(None);
-                            }
-                        } else if self.buf.as_str() == "{" {
-                            self.push_token(BlockOpen);
-                            self.pop_state_type(ParsedBlockIdentifier);
-                            self.push_state(ParsingBlock, None);
-                            if char.is_ascii_alphabetic() {
-                                self.push_state(ParsingIdentifier, Some(char));
-                            } else if char == '}' {
-                                self.buf.push(char);
-                                self.push_token(BlockClose);
-                                self.pop_state_type(ParsingBlock);
-                            }
-                        }
-                    }
+                State::Start => {
+                    self.pipeline(vec![Pipe::ExpectIdentifierStart, Pipe::ExpectCommentStart])
                 }
-                ParsedAttrIdentifier => todo!("ParsedAttrIdentifier"),
-                ParsingBlockOpen => todo!("ParsingBlockOpen"),
-                ParsingBlock => {
-                    if char.is_ascii_alphabetic() {
-                        self.push_state(ParsingIdentifier, Some(char));
-                    } else if char == '}' {
-                        self.reset_buffer();
-                        self.buf.push(char);
-                        self.push_token_pop_state(BlockClose);
-                    } else if !char.is_whitespace() {
-                        self.err_unexpected(None);
-                    }
+                State::ResolvingCommentType => self.pipeline(vec![Pipe::ResolveCommentType]),
+                State::ParsingLineComment => self.pipeline(vec![Pipe::ParseLineComment]),
+                State::ParsingBlockComment => self.pipeline(vec![Pipe::ParseBlockComment]),
+                State::ParsingIdentifier => self.pipeline(vec![
+                    Pipe::ParseIdentifierChar,
+                    Pipe::ResolveIdentifierType,
+                    Pipe::ExpectBlockOpen,
+                    Pipe::ExpectDirectiveOpen,
+                    Pipe::ExpectEventListenerOpenStart,
+                    Pipe::ExpectCommentStart,
+                ]),
+                State::ResolvingIdentifier => self.pipeline(vec![
+                    Pipe::ResolveIdentifierType,
+                    Pipe::ExpectBlockOpen,
+                    Pipe::ExpectDirectiveOpen,
+                    Pipe::ExpectEventListenerOpenStart,
+                    Pipe::ExpectCommentStart,
+                ]),
+                State::ParsedBlockIdentifier => self.pipeline(vec![
+                    Pipe::ExpectBlockOpen,
+                    Pipe::ExpectDirectiveOpen,
+                    Pipe::ExpectEventListenerOpenStart,
+                    Pipe::ExpectCommentStart,
+                ]),
+                State::ParsedAttrIdentifier => {
+                    self.pipeline(vec![Pipe::ExpectAttrColon, Pipe::ExpectCommentStart])
                 }
-                ParsingBlockClose => todo!("ParsingBlockClose"),
-                ParsingAttributeColon => todo!("ParsingAttributeColon"),
-                ParsedAttrColon => todo!("ParsedAttrColon"),
-                ParsingAttrSeparator => todo!("ParsingAttrSeparator"),
-                ParsedAttrSeparator => todo!("ParsedAttrSeparator"),
-                GatheringExpressionTokens => {
+                State::ParsingBlock => self.pipeline(vec![
+                    Pipe::ExpectCommentStart,
+                    Pipe::ExpectIdentifierStart,
+                    Pipe::ExpectBlockClose,
+                ]),
+                State::ParsedAttrColon => {
+                    self.pipeline(vec![Pipe::ExpectCommentStart, Pipe::ExpectExpressionStart])
+                }
+                State::GatheringExpressionTokens => {
                     match expr_tokenizer.push_parse(cursor, char) {
                         ExprResult::StillParsing => {
                             // continue
@@ -345,13 +525,13 @@ impl Tokenizer {
                             self.pop_state();
                             if char == '}' {
                                 self.reset_buffer();
-                                self.push_token(BlockClose);
-                                self.pop_state_type(ParsingBlock);
+                                self.push_token(TokenType::BlockClose);
+                                self.pop_state_type(State::ParsingBlock);
                             } else if char == ',' {
                                 self.reset_buffer();
-                                self.push_token(AttrSeparator);
+                                self.push_token(TokenType::AttrSeparator);
                             } else {
-                                self.push_state(ParsedExpressionTokens, Some(char));
+                                self.push_state(State::ParsedExpressionTokens, Some(char));
                             }
                         }
                         ExprResult::Err(msg) => {
@@ -361,165 +541,61 @@ impl Tokenizer {
                             self.err_unexpected(Some(msg));
                         }
                         ExprResult::ErrUnexpected(expr_state) => {
-                            self.err_unexpected(
-                                Some(format!("Expr tokenizer state: {expr_state}")),
-                            );
+                            self.err_unexpected(Some(format!(
+                                "Expr tokenizer state: {expr_state}"
+                            )));
                         }
                         ExprResult::ParsedBlockIdentifier(_) => {}
                     }
                 }
-                ParsedExpressionTokens => todo!("ParsedExpressionTokens"),
-                ParsingDirective => todo!("ParsingDirective"),
-                ParsingDirectiveOpen => todo!("ParsingDirectiveOpen"),
-                ParsedDirectiveOpen => {
-                    if char.is_ascii_alphabetic() {
-                        self.pop_state();
-                        self.push_state(ParsingDirectiveIdentifier, Some(char));
-                    } else if !char.is_whitespace() {
-                        self.err_unexpected(None);
-                    }
+                State::ParsedExpressionTokens => self.pipeline(vec![
+                    Pipe::ExpectCommentStart,
+                    Pipe::ExpectAttrSeparator,
+                    Pipe::ExpectBlockClose,
+                ]),
+                State::ParsingDirective => self.pipeline(vec![
+                    Pipe::ExpectCommentStart,
+                    Pipe::ExpectDirectiveIdentifierStart,
+                ]),
+                State::ParsingDirectiveIdentifier => self.pipeline(vec![
+                    Pipe::ExpectCommentStart,
+                    Pipe::ParseDirectiveIdentifier,
+                    Pipe::ExpectDirectiveColon,
+                    Pipe::ExpectDirectiveClose,
+                ]),
+                State::ParsedDirectiveIdentifier => {
+                    self.pipeline(vec![Pipe::ExpectCommentStart, Pipe::ExpectDirectiveColon])
                 }
-                ParsingDirectiveIdentifier => {
-                    let buf_empty = self.buf.is_empty();
-                    if buf_empty {
-                        self.reset_buffer();
-                    }
-                    if buf_empty && char.is_ascii_alphabetic() {
-                        self.buf.push(char);
-                    } else if !buf_empty
-                        && (char.is_ascii_alphabetic() || ['-', '_'].contains(&char))
-                    {
-                        self.buf.push(char)
-                    } else if char == ':' {
-                        self.push_token_pop_state(DirectiveIdentifier(self.buf.clone()));
-                        self.buf.push(char);
-                        self.push_token(DirectiveColon);
-                        self.push_state(ParsingDirectiveValue, None);
-                    } else if char == ']' {
-                        self.push_token(DirectiveIdentifier(self.buf.clone()));
-                        self.buf.push(char);
-                        self.push_token(DirectiveClose);
-                        self.pop_state();
-                    } else if char.is_whitespace() {
-                        self.push_token_pop_state(DirectiveIdentifier(self.buf.clone()));
-                        self.push_state(ParsedDirectiveIdentifier, None);
-                    } else {
-                        self.err_unexpected(None);
-                    }
+                State::ParsedDirectiveColon => {
+                    self.pipeline(vec![Pipe::ExpectCommentStart, Pipe::ExpectDirectiveValue])
                 }
-                ParsedDirectiveIdentifier => {
-                    if char == ':' {
-                        self.reset_buffer();
-                        self.buf.push(char);
-                        self.push_token_pop_state(DirectiveColon);
-                        self.push_state(ParsingDirectiveValue, None);
-                    } else if char == ']' {
-                        self.reset_buffer();
-                        self.buf.push(char);
-                        self.push_token_pop_state(DirectiveClose);
-                    } else if !char.is_whitespace() {
-                        self.err_unexpected(None);
-                    }
+                State::ParsingDirectiveValue => self.pipeline(vec![Pipe::ParseDirectiveValue]),
+                State::ParsingEventListenerOpen => {
+                    self.pipeline(vec![Pipe::ParseEventListenerOpen])
                 }
-                ParsedDirectiveColon => todo!("ParsedDirectiveColon"),
-                EmptyDirectiveParsed => todo!("EmptyDirectiveParsed"),
-                ParsingDirectiveColon => {
-                    if self.buf.is_empty() {
-                        self.reset_buffer();
-                    }
-                    if self.buf.as_str() == ":" {
-                        self.push_token_pop_state(DirectiveColon);
-                        self.push_state(ParsingDirectiveValue, None);
-                    } else if char == ':' {
-                        self.buf.push(char);
-                    } else {
-                        self.err_unexpected(None);
-                    }
-                }
-                ParsingDirectiveValue => {
-                    if self.buf.is_empty() {
-                        self.reset_buffer();
-                    }
-
-                    if char == ']' {
-                        self.push_token_pop_state(DirectiveValue(self.buf.clone()));
-                        self.buf.push(char);
-                        self.push_token(DirectiveClose);
-                        self.push_state(ParsedDirectiveOrEventClose, None);
-                    } else {
-                        self.buf.push(char);
-                    }
-                }
-                ParsingDirectiveClose => todo!("ParsingDirectiveClose"),
-                ParsedDirective => todo!("ParsedDirective"),
-                ParsingEventListenerOpen => todo!("ParsingEventListenerOpen"),
-                ParsedEventListenerOpen => todo!("ParsedEventListenerOpen"),
-                ParsingEventListenerIdentifier => match self.buf.is_empty() {
-                    true => {
-                        self.reset_buffer();
-                        if char.is_ascii_alphabetic() {
-                            self.buf.push(char);
-                        } else if !char.is_whitespace() {
-                            self.err_unexpected(None);
-                        }
-                    }
-                    false => {
-                        if char.is_ascii_alphanumeric() {
-                            self.buf.push(char);
-                        } else if char == ':' {
-                            self.push_token_pop_state(EventListenerIdentifier(self.buf.clone()));
-                            self.buf.push(char);
-                            self.push_token(EventListenerColon);
-                            self.push_state(ParsingEventListenerHandler, None);
-                        } else if char.is_whitespace() {
-                            self.push_token_pop_state(EventListenerIdentifier(self.buf.clone()));
-                            self.push_state(ParsingEventListenerColon, None);
-                        } else {
-                            self.err_unexpected(None);
-                        }
-                    }
-                },
-                ParsingEventListenerColon => {
-                    if char == ':' {
-                        self.reset_buffer();
-                        self.buf.push(char);
-                        self.push_token_pop_state(EventListenerColon);
-                        self.push_state(ParsingEventListenerHandler, None);
-                    } else if !char.is_whitespace() {
-                        self.err_unexpected(None);
-                    }
-                }
-                ParsedEventListenerColon => todo!("ParsedEventListenerColon"),
-                ParsingEventListenerHandler => {
-                    if self.buf.is_empty() {
-                        self.reset_buffer();
-                    }
-                    // push everything to buf and end on close bracket for now
-                    if char == ']' {
-                        self.push_token_pop_state(EventListenerHandler(self.buf.clone()));
-                        self.buf.push(char);
-                        self.push_token(EventListenerClose);
-                        self.push_state(ParsedDirectiveOrEventClose, None);
-                    } else {
-                        self.buf.push(char);
-                    }
-                }
-                ParsedEventListener => todo!("ParsedEventListener"),
-                ParsedDirectiveOrEventClose => {
-                    // just make sure the first char is whitespace
-                    if char.is_whitespace() {
-                        self.pop_state();
-                    } else {
-                        self.err_unexpected(None);
-                    }
-                }
-                InDblQuoteUnescaped => todo!("InDblQuoteUnescaped"),
-                InDblQuoteEscaped => todo!("InDblQuoteEscaped"),
+                State::ParsedEventListenerOpen => self.pipeline(vec![
+                    Pipe::ExpectCommentStart,
+                    Pipe::ExpectEventListenerIdentifierStart,
+                ]),
+                State::ParsingEventListenerIdentifier => self.pipeline(vec![
+                    Pipe::ExpectCommentStart,
+                    Pipe::ParseEventListenerIdentifier,
+                    Pipe::ExpectEventListenerIdentifierColon,
+                ]),
+                State::ParsedEventListenerColon => self.pipeline(vec![
+                    Pipe::ExpectCommentStart,
+                    Pipe::ExpectEventListenerHandlerStart,
+                ]),
+                State::ParsingEventListenerHandler => self.pipeline(vec![
+                    Pipe::ExpectCommentStart,
+                    Pipe::ParseEventListenerHandler,
+                    Pipe::ExpectEventListenerClose,
+                ]),
             }
         }
 
         // All states should have been popped, and we should be back to start
-        if self.state_history.len() != 1 && self.state() != &Start {
+        if self.state_history.len() != 1 && self.state() != &State::Start {
             self.err_eof();
         }
 
@@ -545,9 +621,7 @@ impl TokenizerContract for Tokenizer {
             &mut self.state_history,
             state,
             &mut self.buf,
-            &mut self.buf_start,
             starting_char,
-            self.cursor,
         );
     }
 
@@ -583,11 +657,11 @@ impl TokenizerContract for Tokenizer {
     }
 }
 
-enum TokenizerResult {
+enum PipelineResult {
     Handled,
-    NextPipe,
+    Continue,
     ReplaceState(State),
-    PushState(State),
+    HandledPushState(State),
     PushStateKeepBuf(State, Option<char>),
     PopState,
     PopStateType(State),
@@ -599,6 +673,35 @@ enum TokenizerResult {
 /** {@see Tokenizer@pipeline} */
 enum Pipe {
     ExpectIdentifierStart,
-    ParseIdentifierChar, // ExpectCommentStart,
+    ParseIdentifierChar,
     ResolveIdentifierType,
+
+    ExpectCommentStart,
+    ResolveCommentType,
+    ParseLineComment,
+    ParseBlockComment,
+
+    ExpectBlockOpen,
+    ExpectBlockClose,
+
+    ExpectDirectiveOpen,
+    ExpectDirectiveIdentifierStart,
+    ParseDirectiveIdentifier,
+    ExpectDirectiveColon,
+    ExpectDirectiveValue,
+    ParseDirectiveValue,
+    ExpectDirectiveClose,
+
+    ExpectEventListenerOpenStart,
+    ParseEventListenerOpen,
+    ExpectEventListenerIdentifierStart,
+    ExpectEventListenerIdentifierColon,
+    ParseEventListenerIdentifier,
+    ExpectEventListenerHandlerStart,
+    ParseEventListenerHandler,
+    ExpectEventListenerClose,
+
+    ExpectAttrColon,
+    ExpectExpressionStart,
+    ExpectAttrSeparator,
 }
