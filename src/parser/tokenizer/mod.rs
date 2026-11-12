@@ -194,6 +194,9 @@ impl Tokenizer {
         }
 
         if char == ':' {
+            if self.tokens.is_empty() {
+                return PipelineResult::ErrUnexpected;
+            }
             self.push_token_pop_state(TokenType::AttrIdentifier(self.buf.clone()));
             self.push_state(State::ParsedAttrIdentifier, None);
         }
@@ -712,7 +715,9 @@ impl Tokenizer {
 
         if char == ')' {
             self.reset_buffer();
-            self.push_token(TokenType::ExprToken(ExprToken::Operator(Operator::ParenthesesClose)));
+            self.push_token(TokenType::ExprToken(ExprToken::Operator(
+                Operator::ParenthesesClose,
+            )));
             return PipelineResult::Handled;
         }
 
@@ -992,6 +997,7 @@ impl TokenizerContract for Tokenizer {
                 Pipe::ExprResolveDot => self.expr_resolve_dot(),
                 Pipe::ExprResolveSlash => self.expr_resolve_slash(),
             };
+
             match result {
                 PipelineResult::Handled => return,
                 PipelineResult::Continue | PipelineResult::Void => { /* Do nothing */ }
@@ -1009,6 +1015,17 @@ impl TokenizerContract for Tokenizer {
                 PipelineResult::Err(msg) => self.err_msg(msg),
                 PipelineResult::ErrUnexpected => self.err_unexpected(None),
             };
+        }
+
+        // todo WARNING: ignoring all whitespace here may cause problems down the line?
+        if !self.char.is_ascii_whitespace() {
+            panic!(
+                r#"Unexpected token "{}" at line: {}, column: {}. State: "{}"."#,
+                self.char,
+                self.line,
+                self.column,
+                self.state(),
+            )
         }
     }
 
