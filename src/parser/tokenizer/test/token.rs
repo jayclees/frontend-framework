@@ -89,9 +89,9 @@ fn test_token_len_static() {
     assert_eq!(2, TokenType::EventListenerOpen.len()); // event listener open
     assert_eq!(1, TokenType::EventListenerClose.len());
     assert_eq!(1, TokenType::EventListenerColon.len());
-    assert_eq!(1, TokenType::ExprToken(ExprToken::VarDotAccessor).len());
-    assert_eq!(1, TokenType::ExprToken(ExprToken::VarBracketAccessorOpen).len());
-    assert_eq!(1, TokenType::ExprToken(ExprToken::VarBracketAccessorClose).len());
+    assert_eq!(1, TokenType::ExprToken(ExprToken::DotAccessor).len());
+    assert_eq!(1, TokenType::ExprToken(ExprToken::BracketAccessorOpen).len());
+    assert_eq!(1, TokenType::ExprToken(ExprToken::BracketAccessorClose).len());
     assert_eq!(1, TokenType::ExprToken(ExprToken::FunctionArgsOpen).len());
     assert_eq!(1, TokenType::ExprToken(ExprToken::FunctionArgsClose).len());
     assert_eq!(1, TokenType::ExprToken(ExprToken::ArrayOpen).len());

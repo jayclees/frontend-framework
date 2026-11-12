@@ -5,9 +5,8 @@ mod state;
 mod test;
 pub(crate) mod token;
 
-use crate::parser::tokenizer::expression::ExprResult;
 use crate::parser::tokenizer::token::TokenType::DirectiveValue;
-use expression::ExpressionTokenizer;
+use crate::parser::tokenizer::token::{ExprToken, Operator, OperatorMatchResult};
 use helper::{
     TokenizerContract, current, pop_state, pop_state_type, prev, push_state, push_state_keep_buf,
     push_token, reset_buffer,
@@ -281,6 +280,25 @@ impl Tokenizer {
         if char == '}' {
             self.reset_buffer();
             self.push_token(TokenType::BlockClose);
+
+            if self.state() == &State::ExprParsedNumber {
+                self.pop_state_type(State::ExprParsedNumber);
+                self.pop_state_type(State::ParsedAttrColon);
+            } else if self.state() == &State::ExprParsedString {
+                self.pop_state_type(State::ExprParsedString);
+                self.pop_state_type(State::ParsedAttrColon);
+            } else if self.state() == &State::ExprParsedVar {
+                self.pop_state_type(State::ExprParsedVar);
+                self.pop_state_type(State::ParsedAttrColon);
+            }
+
+            // if any of these states are the previous ones, the tokenizer is in an invalid state
+            // ExprParsedOperator
+            // ExprParsedBracketOpen
+            // ExprParsedFuncParenthesisOpen
+            // ExprParsedFuncOperand
+            // ExprParsedParenthesisClose
+
             self.pop_state_type(State::ParsingBlock);
             return PipelineResult::Handled;
         }
@@ -483,83 +501,255 @@ impl Tokenizer {
         PipelineResult::Continue
     }
 
-    fn expect_expression_start(&mut self) -> PipelineResult {
-        let char = self.char;
-
-        self.push_state(State::GatheringExpressionTokens, Some(char));
-        PipelineResult::Handled
-    }
-
     fn expect_attr_separator(&mut self) -> PipelineResult {
         let char = self.char;
 
         if char == ',' {
             self.reset_buffer();
             self.push_token(TokenType::AttrSeparator);
-            return PipelineResult::Handled
+
+            if self.state() == &State::ExprParsedString {
+                self.pop_state_type(State::ExprParsedString);
+            }
+
+            self.pop_state_type(State::ParsedAttrColon);
+
+            return PipelineResult::Handled;
         }
 
         PipelineResult::Continue
     }
 
-    fn pipeline(&mut self, pipes: Vec<Pipe>) {
-        for pipe in pipes {
-            let result = match pipe {
-                Pipe::ExpectIdentifierStart => self.expect_identifier_start(),
-                Pipe::ParseIdentifierChar => self.parse_identifier_char(),
-                Pipe::ResolveIdentifierType => self.resolve_identifier_type(),
-                Pipe::ExpectCommentStart => self.expect_comment_start(),
-                Pipe::ResolveCommentType => self.resolve_comment_type(),
-                Pipe::ParseLineComment => self.parse_line_comment(),
-                Pipe::ParseBlockComment => self.parse_block_comment(),
-                Pipe::ExpectBlockOpen => self.expect_block_open(),
-                Pipe::ExpectBlockClose => self.expect_block_close(),
-                Pipe::ExpectDirectiveOpen => self.expect_directive_open(),
-                Pipe::ExpectDirectiveIdentifierStart => self.expect_directive_identifier_start(),
-                Pipe::ParseDirectiveIdentifier => self.parse_directive_identifier(),
-                Pipe::ExpectDirectiveColon => self.expect_directive_colon(),
-                Pipe::ExpectDirectiveValueStart => self.expect_directive_value_start(),
-                Pipe::ParseDirectiveValue => self.parse_directive_value(),
-                Pipe::ExpectDirectiveClose => self.expect_directive_close(),
-                Pipe::ExpectEventListenerOpenStart => self.expect_event_listener_open_start(),
-                Pipe::ParseEventListenerOpen => self.parse_event_listener_open(),
-                Pipe::ExpectEventListenerIdentifierStart => {
-                    self.expect_event_listener_identifier_start()
+    // Expressions
+
+    fn expr_expect_operand_start(&mut self) -> PipelineResult {
+        let char = self.char;
+
+        if char.is_ascii_digit() {
+            self.reset_buffer();
+            self.push_state(State::ExprParsingNumber, Some(char));
+            return PipelineResult::Handled;
+        } else if char.is_ascii_alphabetic() {
+            self.reset_buffer();
+            self.push_state(State::ExprParsingVar, Some(char));
+            return PipelineResult::Handled;
+        } else if char == '"' {
+            self.reset_buffer();
+            self.push_state(State::ExprParsingString, Some(char));
+            return PipelineResult::Handled;
+        }
+
+        PipelineResult::Continue
+    }
+
+    fn expr_expect_parenthesis_open(&mut self) -> PipelineResult {
+        let char = self.char;
+
+        if char == '(' {
+            self.reset_buffer();
+            self.push_token(TokenType::ExprToken(ExprToken::Operator(
+                Operator::ParenthesesOpen,
+            )));
+            return PipelineResult::Handled;
+        }
+
+        PipelineResult::Continue
+    }
+
+    fn expr_parse_string(&mut self) -> PipelineResult {
+        let char = self.char;
+
+        // todo support single quotes
+        self.buf.push(char);
+
+        if char == '"' {
+            let trailing = self.buf.rsplit_once('\\');
+            let trailing_backslash_count = trailing.iter().len();
+
+            if trailing_backslash_count % 2 == 0 {
+                self.push_token(TokenType::ExprToken(ExprToken::String(self.buf.clone())));
+                self.pop_state_type(State::ExprParsingString);
+                self.push_state(State::ExprParsedString, None);
+            }
+        }
+
+        PipelineResult::Handled
+    }
+
+    fn expr_parse_number(&mut self) -> PipelineResult {
+        let char = self.char;
+
+        if self.char.is_ascii_digit() {
+            self.buf.push(char);
+            return PipelineResult::Handled;
+        }
+
+        self.push_token(TokenType::ExprToken(ExprToken::Number(self.buf.clone())));
+        self.pop_state_type(State::ExprParsingNumber);
+        self.push_state(State::ExprParsedNumber, None);
+
+        PipelineResult::Continue
+    }
+
+    fn expr_parse_var(&mut self) -> PipelineResult {
+        let char = self.char;
+
+        if char.is_ascii_alphanumeric() {
+            self.buf.push(char);
+            return PipelineResult::Handled;
+        }
+
+        self.push_token(TokenType::ExprToken(ExprToken::Var(self.buf.clone())));
+        self.pop_state_type(State::ExprParsingVar);
+        self.push_state(State::ExprParsedVar, None);
+
+        PipelineResult::Continue
+    }
+
+    fn expr_expect_bracket_accessor_open(&mut self) -> PipelineResult {
+        let char = self.char;
+
+        if char == '[' {
+            // todo check previous token to see what type of bracket this is.
+            // todo array declaration? array access?
+            self.reset_buffer();
+            self.push_token(TokenType::ExprToken(ExprToken::BracketAccessorOpen));
+            self.push_state(State::ExprParsedBracketOpen, None);
+            return PipelineResult::Handled;
+        }
+
+        PipelineResult::Continue
+    }
+
+    fn expr_expect_bracket_accessor_close(&mut self) -> PipelineResult {
+        let char = self.char;
+
+        if char == ']' {
+            // todo check most recent bracket type to see what type of bracket this is.
+            self.reset_buffer();
+            self.push_token(TokenType::ExprToken(ExprToken::BracketAccessorClose));
+            self.pop_state_type(State::ExprParsedBracketOpen);
+            return PipelineResult::Handled;
+        }
+
+        PipelineResult::Continue
+    }
+
+    fn expr_expect_negative_operator(&mut self) -> PipelineResult {
+        let char = self.char;
+
+        if char == '-' {
+            self.reset_buffer();
+            self.push_token(TokenType::ExprToken(ExprToken::BracketAccessorClose));
+            return PipelineResult::Handled;
+        }
+
+        PipelineResult::Continue
+    }
+
+    fn expr_expect_operator_start(&mut self) -> PipelineResult {
+        let char = self.char;
+
+        if Operator::is_operator_char(char) {
+            self.buf.push(char);
+
+            return match Operator::get_match(&self.buf) {
+                OperatorMatchResult::Matched(op) => {
+                    self.push_token(TokenType::ExprToken(ExprToken::Operator(op)));
+                    self.push_state(State::ExprParsedOperator, None);
+                    PipelineResult::Handled
                 }
-                Pipe::ParseEventListenerIdentifier => self.parse_event_listener_identifier(),
-                Pipe::ExpectEventListenerIdentifierColon => {
-                    self.expect_event_listener_identifier_colon()
+                OperatorMatchResult::Matches(_) => {
+                    self.push_state(State::ExprParsingOperator, None);
+                    PipelineResult::Handled
                 }
-                Pipe::ExpectEventListenerHandlerStart => self.expect_event_listener_handler_start(),
-                Pipe::ParseEventListenerHandler => self.parse_event_listener_handler(),
-                Pipe::ExpectEventListenerClose => self.expect_event_listener_close(),
-                Pipe::ExpectAttrColon => self.expect_attr_colon(),
-                Pipe::ExpectExpressionStart => self.expect_expression_start(),
-                Pipe::ExpectAttrSeparator => self.expect_attr_separator(),
+                OperatorMatchResult::None => PipelineResult::Err(format!(
+                    r#""{}" does not match any operators or is not implemented"#,
+                    &self.buf
+                )),
             };
-            match result {
-                PipelineResult::Handled => return,
-                PipelineResult::Continue | PipelineResult::Void => { /* Do nothing */ }
-                PipelineResult::ReplaceState(next) => {
-                    self.pop_state();
-                    self.push_state(next, None);
-                    return;
-                }
-                PipelineResult::HandledPushState(next) => return self.push_state(next, None),
-                PipelineResult::PushStateKeepBuf(next, char) => {
-                    return self.push_state_keep_buf(next, char);
-                }
-                PipelineResult::PopState => {}
-                PipelineResult::PopStateType(_) => {}
-                PipelineResult::Err => {}
-                PipelineResult::ErrUnexpected => self.err_unexpected(None),
-            };
+        }
+
+        match Operator::get_exact(&self.buf) {
+            Some(op) => {
+                self.push_token(TokenType::ExprToken(ExprToken::Operator(op)));
+                self.push_state(State::ExprParsedOperator, None);
+                PipelineResult::Handled
+            }
+            None => PipelineResult::Err(format!(
+                r#""{}" does not match any operators or is not implemented"#,
+                &self.buf
+            )),
         }
     }
 
-    pub fn tokenize(&mut self, string: String) -> &Vec<Token> {
-        let mut expr_tokenizer = ExpressionTokenizer::new();
+    fn expr_parse_operator(&mut self) -> PipelineResult {
+        let char = self.char;
 
+        if Operator::is_operator_char(char) {
+            self.buf.push(char);
+
+            return match Operator::get_match(&self.buf) {
+                OperatorMatchResult::Matched(op) => {
+                    self.push_token(TokenType::ExprToken(ExprToken::Operator(op)));
+                    self.push_state(State::ExprParsedOperator, None);
+                    self.pop_state_type(State::ExprParsingOperator);
+                    PipelineResult::Handled
+                }
+                OperatorMatchResult::Matches(_) => PipelineResult::Handled,
+                OperatorMatchResult::None => PipelineResult::Err(format!(
+                    r#""{}" does not match any operators or is not implemented"#,
+                    &self.buf
+                )),
+            };
+        }
+
+        PipelineResult::ErrUnexpected
+    }
+
+    fn expr_expect_parenthesis_close(&mut self) -> PipelineResult {
+        let char = self.char;
+
+        if char == ')' {
+            self.reset_buffer();
+            self.push_token(TokenType::ExprToken(ExprToken::Operator(Operator::ParenthesesClose)));
+            return PipelineResult::Handled;
+        }
+
+        PipelineResult::Continue
+    }
+
+    fn expr_expect_slash(&mut self) -> PipelineResult {
+        let char = self.char;
+
+        PipelineResult::Continue
+    }
+
+    fn expr_expect_dot(&mut self) -> PipelineResult {
+        let char = self.char;
+
+        PipelineResult::Continue
+    }
+
+    fn expr_expect_bracket_open(&mut self) -> PipelineResult {
+        let char = self.char;
+
+        PipelineResult::Continue
+    }
+
+    fn expr_resolve_dot(&mut self) -> PipelineResult {
+        let char = self.char;
+
+        PipelineResult::Continue
+    }
+
+    fn expr_resolve_slash(&mut self) -> PipelineResult {
+        let char = self.char;
+
+        PipelineResult::Continue
+    }
+
+    pub fn tokenize(&mut self, string: String) -> &Vec<Token> {
         // todo:
         // Create method to attempt to recover from unexpected token and keep going? Recovery
         // method will depend on what state it is currently in and the state history.
@@ -581,7 +771,6 @@ impl Tokenizer {
                 State::ResolvingCommentType => self.pipeline(vec![Pipe::ResolveCommentType]),
                 State::ParsingLineComment => self.pipeline(vec![Pipe::ParseLineComment]),
                 State::ParsingBlockComment => self.pipeline(vec![Pipe::ParseBlockComment]),
-                // asdf
                 State::ParsingIdentifier => self.pipeline(vec![
                     Pipe::ParseIdentifierChar,
                     Pipe::ResolveIdentifierType,
@@ -613,44 +802,9 @@ impl Tokenizer {
                     Pipe::ExpectBlockClose,
                 ]),
                 State::ParsedAttrColon => {
-                    // Order should matter here. ExpectCommentStart
+                    // Order should matter here? ExpectCommentStart
                     // must be before ExpectExpressionStart.
-                    expr_tokenizer.reset_buffer();
-                    self.pipeline(vec![Pipe::ExpectCommentStart, Pipe::ExpectExpressionStart])
-                }
-                State::GatheringExpressionTokens => {
-                    match expr_tokenizer.push_parse(cursor, char) {
-                        ExprResult::StillParsing => {
-                            // continue
-                        }
-                        ExprResult::Parsed(mut tokens) => {
-                            self.tokens.append(&mut tokens);
-                            self.pop_state();
-                            if char == '}' {
-                                self.reset_buffer();
-                                self.push_token(TokenType::BlockClose);
-                                self.pop_state_type(State::ParsedAttrColon);
-                                self.pop_state_type(State::ParsingBlock);
-                            } else if char == ',' {
-                                self.reset_buffer();
-                                self.push_token(TokenType::AttrSeparator);
-                            } else {
-                                self.push_state(State::ParsedExpressionTokens, Some(char));
-                            }
-                        }
-                        ExprResult::Err(msg) => {
-                            self.err_msg(msg);
-                        }
-                        ExprResult::ErrExpectedExprStart(msg) => {
-                            self.err_unexpected(Some(msg));
-                        }
-                        ExprResult::ErrUnexpected(expr_state) => {
-                            self.err_unexpected(Some(format!(
-                                "Expr tokenizer state: {expr_state}"
-                            )));
-                        }
-                        ExprResult::ParsedBlockIdentifier(_) => {}
-                    }
+                    self.pipeline(vec![Pipe::ExprExpectOperandStart])
                 }
                 State::ParsedExpressionTokens => self.pipeline(vec![
                     Pipe::ExpectCommentStart,
@@ -698,6 +852,75 @@ impl Tokenizer {
                     Pipe::ParseEventListenerHandler,
                     Pipe::ExpectEventListenerClose,
                 ]),
+                State::ExprStart => self.pipeline(vec![
+                    Pipe::ExpectCommentStart,
+                    Pipe::ExprExpectNegativeOperator,
+                    Pipe::ExprExpectOperandStart,
+                    Pipe::ExprExpectParenthesisOpen,
+                ]),
+                // todo if current char is not a number in the following state,
+                // todo make sure to pop ExprParsingNumber state in handler
+                State::ExprParsingNumber => self.pipeline(vec![
+                    Pipe::ExprParseNumber,
+                    Pipe::ExprExpectOperatorStart,
+                    Pipe::ExprExpectParenthesisClose,
+                    Pipe::ExprExpectDot,
+                    Pipe::ExprExpectSlash,
+                    Pipe::ExpectAttrSeparator,
+                    Pipe::ExpectBlockClose,
+                ]),
+                State::ExprParsedNumber => self.pipeline(vec![
+                    Pipe::ExprExpectSlash,
+                    Pipe::ExprExpectOperatorStart,
+                    Pipe::ExprExpectParenthesisClose,
+                    Pipe::ExpectAttrSeparator,
+                    Pipe::ExpectBlockClose,
+                ]),
+                State::ExprParsingString => self.pipeline(vec![Pipe::ExprParseString]),
+                State::ExprParsedString => self.pipeline(vec![
+                    Pipe::ExpectCommentStart,
+                    Pipe::ExprExpectDot,
+                    Pipe::ExprExpectParenthesisClose,
+                    Pipe::ExpectAttrSeparator,
+                    Pipe::ExpectBlockClose,
+                ]),
+                State::ExprParsingVar => self.pipeline(vec![
+                    Pipe::ExprParseVar,
+                    Pipe::ExprExpectSlash,
+                    Pipe::ExprExpectDot,
+                    Pipe::ExprExpectBracketOpen,
+                    Pipe::ExprExpectParenthesisClose,
+                    Pipe::ExpectAttrSeparator,
+                    Pipe::ExpectBlockClose,
+                ]),
+                State::ExprParsedVar => self.pipeline(vec![
+                    Pipe::ExprExpectSlash,
+                    Pipe::ExprExpectDot,
+                    Pipe::ExprExpectBracketOpen,
+                    Pipe::ExprExpectParenthesisClose,
+                    Pipe::ExpectAttrSeparator,
+                    Pipe::ExpectBlockClose,
+                ]),
+                State::ExprParsingOperator => self.pipeline(vec![Pipe::ExprParseOperator]),
+                State::ExprParsedOperator => {
+                    self.pipeline(vec![Pipe::ExpectCommentStart, Pipe::ExprExpectOperandStart])
+                }
+                State::ExprParsedBracketOpen => self.pipeline(vec![
+                    Pipe::UNIMPLEMENTED,
+                    Pipe::ExpectCommentStart,
+                    Pipe::ExprExpectOperandStart,
+                ]),
+                State::ExprParsedParenthesisClose => self.pipeline(vec![
+                    Pipe::ExprExpectSlash,
+                    Pipe::ExprExpectOperatorStart,
+                    Pipe::ExprExpectParenthesisClose,
+                    Pipe::ExprExpectDot,
+                    Pipe::ExpectAttrSeparator,
+                    Pipe::ExpectBlockClose,
+                ]),
+                State::ExprResolveSlash => {
+                    self.pipeline(vec![Pipe::ExprResolveSlash, Pipe::ExprExpectOperandStart])
+                }
             }
         }
 
@@ -714,6 +937,80 @@ impl Tokenizer {
 
 impl TokenizerContract for Tokenizer {
     type TokenizerState = State;
+    type PipeType = Pipe;
+
+    fn pipeline(&mut self, pipes: Vec<Pipe>) {
+        for pipe in pipes {
+            let result = match pipe {
+                Pipe::UNIMPLEMENTED => unimplemented!(),
+                Pipe::ExpectIdentifierStart => self.expect_identifier_start(),
+                Pipe::ParseIdentifierChar => self.parse_identifier_char(),
+                Pipe::ResolveIdentifierType => self.resolve_identifier_type(),
+                Pipe::ExpectCommentStart => self.expect_comment_start(),
+                Pipe::ResolveCommentType => self.resolve_comment_type(),
+                Pipe::ParseLineComment => self.parse_line_comment(),
+                Pipe::ParseBlockComment => self.parse_block_comment(),
+                Pipe::ExpectBlockOpen => self.expect_block_open(),
+                Pipe::ExpectBlockClose => self.expect_block_close(),
+                Pipe::ExpectDirectiveOpen => self.expect_directive_open(),
+                Pipe::ExpectDirectiveIdentifierStart => self.expect_directive_identifier_start(),
+                Pipe::ParseDirectiveIdentifier => self.parse_directive_identifier(),
+                Pipe::ExpectDirectiveColon => self.expect_directive_colon(),
+                Pipe::ExpectDirectiveValueStart => self.expect_directive_value_start(),
+                Pipe::ParseDirectiveValue => self.parse_directive_value(),
+                Pipe::ExpectDirectiveClose => self.expect_directive_close(),
+                Pipe::ExpectEventListenerOpenStart => self.expect_event_listener_open_start(),
+                Pipe::ParseEventListenerOpen => self.parse_event_listener_open(),
+                Pipe::ExpectEventListenerIdentifierStart => {
+                    self.expect_event_listener_identifier_start()
+                }
+                Pipe::ParseEventListenerIdentifier => self.parse_event_listener_identifier(),
+                Pipe::ExpectEventListenerIdentifierColon => {
+                    self.expect_event_listener_identifier_colon()
+                }
+                Pipe::ExpectEventListenerHandlerStart => self.expect_event_listener_handler_start(),
+                Pipe::ParseEventListenerHandler => self.parse_event_listener_handler(),
+                Pipe::ExpectEventListenerClose => self.expect_event_listener_close(),
+                Pipe::ExpectAttrColon => self.expect_attr_colon(),
+                Pipe::ExpectAttrSeparator => self.expect_attr_separator(),
+
+                // Expressions
+                Pipe::ExprExpectOperandStart => self.expr_expect_operand_start(),
+                Pipe::ExprExpectParenthesisOpen => self.expr_expect_parenthesis_open(),
+                Pipe::ExprParseString => self.expr_parse_string(),
+                Pipe::ExprParseNumber => self.expr_parse_number(),
+                Pipe::ExprParseVar => self.expr_parse_var(),
+                Pipe::ExprParseOperator => self.expr_parse_operator(),
+                Pipe::ExprExpectBracketAccessorOpen => self.expr_expect_bracket_accessor_open(),
+                Pipe::ExprExpectBracketAccessorClose => self.expr_expect_bracket_accessor_close(),
+                Pipe::ExprExpectNegativeOperator => self.expr_expect_negative_operator(),
+                Pipe::ExprExpectOperatorStart => self.expr_expect_operator_start(),
+                Pipe::ExprExpectParenthesisClose => self.expr_expect_parenthesis_close(),
+                Pipe::ExprExpectSlash => self.expr_expect_slash(),
+                Pipe::ExprExpectDot => self.expr_expect_dot(),
+                Pipe::ExprExpectBracketOpen => self.expr_expect_bracket_open(),
+                Pipe::ExprResolveDot => self.expr_resolve_dot(),
+                Pipe::ExprResolveSlash => self.expr_resolve_slash(),
+            };
+            match result {
+                PipelineResult::Handled => return,
+                PipelineResult::Continue | PipelineResult::Void => { /* Do nothing */ }
+                PipelineResult::ReplaceState(next) => {
+                    self.pop_state();
+                    self.push_state(next, None);
+                    return;
+                }
+                PipelineResult::HandledPushState(next) => return self.push_state(next, None),
+                PipelineResult::PushStateKeepBuf(next, char) => {
+                    return self.push_state_keep_buf(next, char);
+                }
+                PipelineResult::PopState => {}
+                PipelineResult::PopStateType(_) => {}
+                PipelineResult::Err(msg) => self.err_msg(msg),
+                PipelineResult::ErrUnexpected => self.err_unexpected(None),
+            };
+        }
+    }
 
     fn state(&self) -> &State {
         current(&self.state_history)
@@ -768,13 +1065,16 @@ enum PipelineResult {
     PushStateKeepBuf(State, Option<char>),
     PopState,
     PopStateType(State),
-    Err,
+    Err(String),
     ErrUnexpected,
     Void,
 }
 
 /** {@see Tokenizer@pipeline} */
-enum Pipe {
+pub enum Pipe {
+    // Dummy pipe that will trigger "unimplemented" to mark unhandled tokenizer states
+    UNIMPLEMENTED,
+
     ExpectIdentifierStart,
     ParseIdentifierChar,
     ResolveIdentifierType,
@@ -805,6 +1105,25 @@ enum Pipe {
     ExpectEventListenerClose,
 
     ExpectAttrColon,
-    ExpectExpressionStart,
     ExpectAttrSeparator,
+
+    // Expressions
+    ExprExpectOperandStart,
+    ExprExpectParenthesisOpen,
+    ExprParseString,
+    ExprParseNumber,
+    ExprParseVar,
+    ExprParseOperator,
+    ExprExpectBracketAccessorOpen,
+    ExprExpectBracketAccessorClose,
+    // ExprExpectFunctionArgsOpen,
+    // ExprExpectFunctionArgsClose,
+    ExprExpectNegativeOperator,
+    ExprExpectOperatorStart,
+    ExprExpectParenthesisClose,
+    ExprExpectSlash,
+    ExprExpectDot,
+    ExprExpectBracketOpen,
+    ExprResolveDot,
+    ExprResolveSlash,
 }

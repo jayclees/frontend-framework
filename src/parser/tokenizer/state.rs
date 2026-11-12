@@ -13,42 +13,39 @@ pub enum State {
     ParsedBlockIdentifier,
     ParsedAttrIdentifier,
 
-    // ParsingBlockOpen,
     ParsingBlock,
-    // ParsingBlockClose,
-
-    // ParsingAttributeColon,
     ParsedAttrColon,
-    // ParsingAttrSeparator,
-    // ParsedAttrSeparator,
-
-    GatheringExpressionTokens,
-    ParsedExpressionTokens,
 
     ParsingDirective,
-    // ParsingDirectiveOpen,
-    // ParsedDirectiveOpen,
     ParsingDirectiveIdentifier,
     ParsedDirectiveIdentifier,
     ParsedDirectiveColon,
-    // EmptyDirectiveParsed,
-    // ParsingDirectiveColon,
     ParsingDirectiveValue,
-    // ParsingDirectiveClose,
-    // ParsedDirective,
 
     ParsingEventListenerOpen,
     ParsedEventListenerOpen,
     ParsingEventListenerIdentifier,
-    // ParsingEventListenerColon,
     ParsedEventListenerColon,
     ParsingEventListenerHandler,
-    // ParsedEventListener,
 
-    // ParsedDirectiveOrEventClose,
+    // Expressions
+    ExprStart,
+    ExprParsingNumber,
+    ExprParsedNumber,
+    ExprParsingString,
+    ExprParsedString,
+    ExprParsingVar,
+    ExprParsedVar,
+    ExprParsingOperator,
+    ExprParsedOperator,
+    ExprParsedBracketOpen,
+    // ExprParsedFuncParenthesisOpen,
+    // ExprParsedFuncOperand,
+    ExprParsedParenthesisClose,
+    ExprResolveSlash,
 
-    // InDblQuoteUnescaped,
-    // InDblQuoteEscaped,
+    // GatheringExpressionTokens,
+    ParsedExpressionTokens,
 }
 
 impl Display for State {
@@ -71,9 +68,6 @@ impl Display for State {
 
                 ParsedAttrColon => "ParsedAttrColon",
 
-                GatheringExpressionTokens => "GatheringExpressionTokens",
-                ParsedExpressionTokens => "ParsedExpressionTokens",
-
                 ParsingDirective => "ParsingDirective",
                 ParsingDirectiveIdentifier => "ParsingDirectiveIdentifier",
                 ParsedDirectiveIdentifier => "ParsedDirectiveIdentifier",
@@ -85,6 +79,22 @@ impl Display for State {
                 ParsingEventListenerIdentifier => "ParsingEventListenerIdentifier",
                 ParsedEventListenerColon => "ParsedEventListenerColon",
                 ParsingEventListenerHandler => "ParsingEventListenerHandler",
+
+                // Expressions
+                ExprStart => "ExprStart",
+                ExprParsingNumber => "ExprParsingNumber",
+                ExprParsedNumber => "ExprParsedNumber",
+                ExprParsingString => "ExprParsingString",
+                ExprParsedString => "ExprParsedString",
+                ExprParsingVar => "ExprParsingVar",
+                ExprParsingOperator => "ExprParsingOperator",
+                ExprParsedOperator => "ExprParsedOperator",
+                ExprParsedBracketOpen => "ExprParsedBracketOpen",
+                ExprParsedVar => "ExprParsedVar",
+                ExprParsedParenthesisClose => "ExprParsedParenthesisClose",
+                ExprResolveSlash => "ExprResolveSlash",
+
+                ParsedExpressionTokens => "ParsedExpressionTokens",
             }
         )
     }

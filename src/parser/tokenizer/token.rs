@@ -67,9 +67,9 @@ impl Token {
                 ExprToken::Number(str) => source_str == str,
                 ExprToken::Operator(op) => source_str == op.symbol(),
                 ExprToken::Var(str) => source_str == str,
-                ExprToken::VarDotAccessor => source_str == ".",
-                ExprToken::VarBracketAccessorOpen => source_str == "[",
-                ExprToken::VarBracketAccessorClose => source_str == "]",
+                ExprToken::DotAccessor => source_str == ".",
+                ExprToken::BracketAccessorOpen => source_str == "[",
+                ExprToken::BracketAccessorClose => source_str == "]",
                 ExprToken::FunctionArgsOpen => source_str == "(",
                 ExprToken::FunctionArgsClose => source_str == ")",
                 ExprToken::ArrayOpen => source_str == "[",
@@ -158,9 +158,9 @@ pub enum ExprToken {
     Number(String),
     Operator(Operator),
     Var(String),
-    VarDotAccessor,
-    VarBracketAccessorOpen,
-    VarBracketAccessorClose,
+    DotAccessor,
+    BracketAccessorOpen,
+    BracketAccessorClose,
     FunctionArgsOpen,
     FunctionArgsClose,
     ArrayOpen,
@@ -174,9 +174,9 @@ impl ExprToken {
             ExprToken::Number(str) => str.len(),
             ExprToken::Operator(op) => op.symbol().len(),
             ExprToken::Var(str) => str.len(),
-            ExprToken::VarDotAccessor => 1,
-            ExprToken::VarBracketAccessorOpen => 1,
-            ExprToken::VarBracketAccessorClose => 1,
+            ExprToken::DotAccessor => 1,
+            ExprToken::BracketAccessorOpen => 1,
+            ExprToken::BracketAccessorClose => 1,
             ExprToken::FunctionArgsOpen => 1,
             ExprToken::FunctionArgsClose => 1,
             ExprToken::ArrayOpen => 1,
@@ -306,9 +306,9 @@ impl Display for ExprToken {
             ExprToken::Number(str) => write!(f, "Number({str})"),
             ExprToken::Operator(op) => write!(f, "Operator({op})"),
             ExprToken::Var(str) => write!(f, "Variable({str})"),
-            ExprToken::VarDotAccessor => write!(f, "VariableDotAccessor"),
-            ExprToken::VarBracketAccessorOpen => write!(f, "VarBracketAccessorOpen"),
-            ExprToken::VarBracketAccessorClose => write!(f, "VarBracketAccessorClose"),
+            ExprToken::DotAccessor => write!(f, "VariableDotAccessor"),
+            ExprToken::BracketAccessorOpen => write!(f, "BracketAccessorOpen"),
+            ExprToken::BracketAccessorClose => write!(f, "BracketAccessorClose"),
             ExprToken::FunctionArgsOpen => write!(f, "FunctionArgsOpen"),
             ExprToken::FunctionArgsClose => write!(f, "FunctionArgsClose"),
             ExprToken::ArrayOpen => write!(f, "ArrayOpen"),
@@ -319,6 +319,9 @@ impl Display for ExprToken {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Operator {
+    // String
+    Concatenation, // .
+
     // Arithmetic
     Plus,
     Minus,
@@ -411,6 +414,7 @@ impl Operator {
             Operator::And => "&&",
             Operator::Or => "||",
             Operator::Not => "!",
+            Operator::Concatenation => ".",
         }
     }
 
@@ -423,6 +427,7 @@ impl Operator {
             Operator::Divide => 3,
             Operator::Modulus => 3,
             Operator::Power => 4,
+            Operator::Concatenation => 5,
             Operator::ParenthesesClose => unimplemented!(),
             Operator::Assign => unimplemented!(),
             Operator::Increment => unimplemented!(),
@@ -471,6 +476,7 @@ impl Display for Operator {
             Operator::And => write!(f, "And"),
             Operator::Or => write!(f, "Or"),
             Operator::Not => write!(f, "Not"),
+            Operator::Concatenation => write!(f, "Concatenation")
         }
     }
 }
