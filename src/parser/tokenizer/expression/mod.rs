@@ -377,7 +377,10 @@ impl TokenizerContract for ExpressionTokenizer {
     fn push_token(&mut self, r#type: TokenType) {
         push_token(
             &mut self.tokens,
-            self.buf_start.expect("Should be set."),
+            match self.buf_start {
+                Some(s) => s,
+                None => panic!("buf_start not set. {}", r#type)
+            },
             r#type,
         );
         self.reset_buffer();

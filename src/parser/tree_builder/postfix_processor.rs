@@ -147,11 +147,15 @@ impl<'a> PostfixProcessor<'a> {
             }
         }
 
-        dbg!(&buf);
+        // dbg!(&buf);
 
         self.reset();
 
-        BlockContent::Text("hello".to_owned())
+        if let Some(ExprToken::Number(num)) = buf.first() {
+            BlockContent::Text(num.to_owned())
+        } else {
+            panic!("Buf should not be empty.");
+        }
     }
 
     pub fn is_empty(&self) -> bool {
