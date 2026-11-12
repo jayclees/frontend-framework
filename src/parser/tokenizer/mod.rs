@@ -1,11 +1,9 @@
-mod expression;
 mod helper;
 mod state;
 #[cfg(test)]
 mod test;
 pub(crate) mod token;
 
-use crate::parser::tokenizer::token::TokenType::DirectiveValue;
 use crate::parser::tokenizer::token::{ExprToken, Operator, OperatorMatchResult};
 use helper::{
     TokenizerContract, current, pop_state, pop_state_type, prev, push_state, push_state_keep_buf,
@@ -190,7 +188,12 @@ impl Tokenizer {
         let char = self.char;
 
         if matches!(char, '[' | '@' | '{') {
-            self.push_token_pop_state(TokenType::BlockIdentifier(self.buf.clone()));
+            self.push_token(TokenType::BlockIdentifier(self.buf.clone()));
+            self.pop_state_type(State::ParsingIdentifier);
+            if self.state() == &State::ParsingIdentifier {
+                self.pop_state_type(State::ParsingIdentifier);
+            }
+            self.push_state(State::ParsedBlockIdentifier, None);
         }
 
         if char == ':' {
@@ -269,6 +272,9 @@ impl Tokenizer {
 
         if char == '{' {
             self.reset_buffer();
+            if self.state() == &State::ParsedBlockIdentifier {
+                self.pop_state_type(State::ParsedBlockIdentifier);
+            }
             self.push_token(TokenType::BlockOpen);
             self.push_state(State::ParsingBlock, None);
             return PipelineResult::Handled;
@@ -343,6 +349,8 @@ impl Tokenizer {
         }
 
         self.push_token(TokenType::DirectiveIdentifier(self.buf.clone()));
+        self.pop_state_type(State::ParsingDirectiveIdentifier);
+        self.push_state(State::ParsedDirectiveIdentifier, None);
 
         PipelineResult::Continue
     }
@@ -353,6 +361,7 @@ impl Tokenizer {
         if char == ':' {
             self.reset_buffer();
             self.push_token(TokenType::DirectiveColon);
+            self.push_state(State::ParsedDirectiveColon, None);
             return PipelineResult::Handled;
         }
 
@@ -360,33 +369,54 @@ impl Tokenizer {
     }
 
     fn expect_directive_value_start(&mut self) -> PipelineResult {
-        let char = self.char;
-
-        // todo for now we are just looking for a ] and closing it.
-        // todo finish implementation later
-        if char == ']' {
-            self.push_token(DirectiveValue(self.buf.clone()));
-            self.pop_state_type(State::ParsingDirectiveValue);
-            return PipelineResult::Continue;
-        }
-
-        self.buf.push(char);
-
-        PipelineResult::Handled
+        unimplemented!();
+        // let char = self.char;
+        //
+        // // todo for now we are just looking for a ] and closing it.
+        // // todo finish implementation later
+        // if char == ']' {
+        //     self.push_token(TokenType::DirectiveValue(self.buf.clone()));
+        //     self.pop_state_type(State::ParsedDirectiveColon);
+        //     return PipelineResult::Continue;
+        // }
+        //
+        // self.buf.push(char);
+        //
+        // PipelineResult::Handled
     }
 
     fn parse_directive_value(&mut self) -> PipelineResult {
         let char = self.char;
 
-        unimplemented!("parse_directive_value() not implemented")
+        if char == ']' {
+            if self.buf.is_empty() {
+                return PipelineResult::ErrUnexpected;
+            }
+
+            self.push_token(TokenType::DirectiveValue(self.buf.clone()));
+            return PipelineResult::Continue;
+        }
+
+        if self.buf.is_empty() {
+            self.reset_buffer();
+        }
+        self.buf.push(char);
+
+        PipelineResult::Handled
     }
 
     fn expect_directive_close(&mut self) -> PipelineResult {
         let char = self.char;
 
         if char == ']' {
+            // todo ensure at least one character for directive value for testing
+
             self.reset_buffer();
             self.push_token(TokenType::DirectiveClose);
+            if self.state() == &State::ParsedDirectiveColon {
+                self.pop_state_type(State::ParsedDirectiveColon);
+            }
+            self.pop_state_type(State::ParsedDirectiveIdentifier);
             self.pop_state_type(State::ParsingDirective);
             return PipelineResult::Handled;
         }
@@ -398,6 +428,16 @@ impl Tokenizer {
         let char = self.char;
 
         if char == '@' {
+            // must have whitespace between identifier and @ symbol
+            dbg!(self.state(), self.buf_start.unwrap(), self.buf.len(), self.cursor);
+
+            let last_token = self.tokens.last().unwrap();
+            let has_space = last_token.start() + last_token.end() < self.cursor;
+
+            if self.state() == &State::ParsedBlockIdentifier && !has_space {
+                return PipelineResult::Err("Must have space between event listener start and block identifier.".to_owned());
+            }
+
             self.reset_buffer();
             self.push_state(State::ParsingEventListenerOpen, Some(char));
             return PipelineResult::Handled;
@@ -411,6 +451,7 @@ impl Tokenizer {
 
         if char == '[' {
             self.push_token(TokenType::EventListenerOpen);
+            self.pop_state_type(State::ParsingEventListenerOpen);
             self.push_state(State::ParsedEventListenerOpen, None);
             return PipelineResult::Handled;
         }
@@ -439,6 +480,8 @@ impl Tokenizer {
         }
 
         self.push_token(TokenType::EventListenerIdentifier(self.buf.clone()));
+        self.pop_state_type(State::ParsingEventListenerIdentifier);
+        self.push_state(State::ParsedEventListenerIdentifier, None);
 
         PipelineResult::Continue
     }
@@ -449,6 +492,7 @@ impl Tokenizer {
         if char == ':' {
             self.reset_buffer();
             self.push_token(TokenType::EventListenerColon);
+            self.push_state(State::ParsedEventListenerColon, None);
             return PipelineResult::Handled;
         }
 
@@ -458,10 +502,21 @@ impl Tokenizer {
     fn expect_event_listener_handler_start(&mut self) -> PipelineResult {
         let char = self.char;
 
-        // todo for now we are just looking for a ] and closing it.
-        // todo finish implementation later
+        if char.is_ascii_alphabetic() {
+            self.pop_state_type(State::ParsedEventListenerColon);
+            self.reset_buffer();
+            self.push_state(State::ParsingEventListenerHandler, Some(char));
+            return PipelineResult::Handled
+        }
+
+        PipelineResult::Continue
+    }
+
+    fn parse_event_listener_handler(&mut self) -> PipelineResult {
+        let char = self.char;
+
         if char == ']' {
-            self.push_token(DirectiveValue(self.buf.clone()));
+            self.push_token(TokenType::EventListenerHandler(self.buf.clone()));
             self.pop_state_type(State::ParsingEventListenerHandler);
             return PipelineResult::Continue;
         }
@@ -469,12 +524,7 @@ impl Tokenizer {
         self.buf.push(char);
 
         PipelineResult::Handled
-    }
 
-    fn parse_event_listener_handler(&mut self) -> PipelineResult {
-        let char = self.char;
-
-        unimplemented!();
     }
 
     fn expect_event_listener_close(&mut self) -> PipelineResult {
@@ -483,6 +533,7 @@ impl Tokenizer {
         if char == ']' {
             self.reset_buffer();
             self.push_token(TokenType::EventListenerClose);
+            self.pop_state_type(State::ParsedEventListenerIdentifier);
             self.pop_state_type(State::ParsedEventListenerOpen);
             return PipelineResult::Handled;
         }
@@ -826,13 +877,14 @@ impl Tokenizer {
                     Pipe::ExpectDirectiveColon,
                     Pipe::ExpectDirectiveClose,
                 ]),
-                State::ParsedDirectiveIdentifier => {
-                    self.pipeline(vec![Pipe::ExpectCommentStart, Pipe::ExpectDirectiveColon])
-                }
-                State::ParsedDirectiveColon => self.pipeline(vec![
+                State::ParsedDirectiveIdentifier => self.pipeline(vec![
                     Pipe::ExpectCommentStart,
-                    Pipe::ExpectDirectiveValueStart,
+                    Pipe::ExpectDirectiveColon,
+                    Pipe::ExpectDirectiveClose,
                 ]),
+                State::ParsedDirectiveColon => {
+                    self.pipeline(vec![Pipe::ParseDirectiveValue, Pipe::ExpectDirectiveClose])
+                }
                 State::ParsingDirectiveValue => {
                     self.pipeline(vec![Pipe::ParseDirectiveValue, Pipe::ExpectDirectiveClose])
                 }
@@ -848,12 +900,15 @@ impl Tokenizer {
                     Pipe::ParseEventListenerIdentifier,
                     Pipe::ExpectEventListenerIdentifierColon,
                 ]),
+                State::ParsedEventListenerIdentifier => self.pipeline(vec![
+                    Pipe::ExpectCommentStart,
+                    Pipe::ExpectEventListenerIdentifierColon,
+                ]),
                 State::ParsedEventListenerColon => self.pipeline(vec![
                     Pipe::ExpectCommentStart,
                     Pipe::ExpectEventListenerHandlerStart,
                 ]),
                 State::ParsingEventListenerHandler => self.pipeline(vec![
-                    Pipe::ExpectCommentStart,
                     Pipe::ParseEventListenerHandler,
                     Pipe::ExpectEventListenerClose,
                 ]),

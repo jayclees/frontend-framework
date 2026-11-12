@@ -40,6 +40,7 @@ fn match_tokens_to_source(source: String, tokens: &Vec<Token>) {
     let mut start = 0;
     // dbg!(&tokens);
     for token in tokens {
+        dbg!(&token);
         // If there are any non-whitespace characters in the gaps between tokens, that is an error.
         let non_tokenized = &source[start..token.start()];
         for (i, char) in non_tokenized.chars().enumerate() {

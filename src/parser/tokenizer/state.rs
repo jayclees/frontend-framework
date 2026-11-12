@@ -25,6 +25,7 @@ pub enum State {
     ParsingEventListenerOpen,
     ParsedEventListenerOpen,
     ParsingEventListenerIdentifier,
+    ParsedEventListenerIdentifier,
     ParsedEventListenerColon,
     ParsingEventListenerHandler,
 
@@ -77,6 +78,7 @@ impl Display for State {
                 ParsingEventListenerOpen => "ParsingEventListenerOpen",
                 ParsedEventListenerOpen => "ParsedEventListenerOpen",
                 ParsingEventListenerIdentifier => "ParsingEventListenerIdentifier",
+                ParsedEventListenerIdentifier => "ParsedEventListenerIdentifier",
                 ParsedEventListenerColon => "ParsedEventListenerColon",
                 ParsingEventListenerHandler => "ParsingEventListenerHandler",
 
