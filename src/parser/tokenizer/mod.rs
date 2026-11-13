@@ -817,7 +817,7 @@ impl Tokenizer {
     fn expr_resolve_dot(&mut self) -> PipelineResult {
         let char = self.char;
 
-        if char.is_ascii_digit() {
+        if char.is_ascii_digit() || matches!(char, ',' | '}' | ')') {
             assert_matches!(
                 self.tokens.pop().unwrap().r#type(),
                 TokenType::ExprToken(ExprToken::Dot)
@@ -831,8 +831,12 @@ impl Tokenizer {
                     TokenType::ExprToken(ExprToken::Number(num)),
                 ));
                 self.pop_state_type(State::ExprResolvingDot);
-                self.push_state(State::ExprParsingFractionalNumber, Some(char));
-                PipelineResult::Handled
+                if char.is_ascii_digit() {
+                    self.push_state(State::ExprParsingFractionalNumber, Some(char));
+                    PipelineResult::Handled
+                } else {
+                    PipelineResult::Continue
+                }
             } else {
                 // Previous token is not a number.
                 unimplemented!()
@@ -842,10 +846,6 @@ impl Tokenizer {
         if char.is_ascii_alphabetic() {
             // Is a var dot accessor. Potentially for property getter or method call.
             unimplemented!()
-        }
-
-        if matches!(char, ',' | '}' | ')') {
-            todo!("requires code in match statement in line 827")
         }
 
         PipelineResult::Continue
@@ -1078,6 +1078,8 @@ impl Tokenizer {
                     Pipe::ExprResolveDot,
                     Pipe::ExprExpectOperandStart,
                     Pipe::ExprExpectFractionalNumberStart,
+                    Pipe::ExpectAttrSeparator,
+                    Pipe::ExpectBlockClose,
                 ]),
             }
         }
