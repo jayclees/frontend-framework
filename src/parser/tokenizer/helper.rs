@@ -62,9 +62,7 @@ pub(super) fn pop_state_type<T: PartialEq<T> + std::fmt::Display + std::fmt::Deb
     state_history: &mut Vec<T>,
     state: T,
 ) {
-    let last = state_history
-        .last()
-        .expect("Should always have at least 1 state_history (State::Start)");
+    let last = state_history.last().unwrap();
     if last != &state {
         dbg!(&state_history);
         panic!(r#"Expected to pop "{state}", found "{last}" instead."#);

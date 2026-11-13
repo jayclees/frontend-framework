@@ -10,6 +10,7 @@ use helper::{
     push_token, reset_buffer,
 };
 use state::State;
+use std::assert_matches;
 use std::cell::RefCell;
 use std::fs::{OpenOptions, read_to_string};
 use std::io::Write;
@@ -429,13 +430,20 @@ impl Tokenizer {
 
         if char == '@' {
             // must have whitespace between identifier and @ symbol
-            dbg!(self.state(), self.buf_start.unwrap(), self.buf.len(), self.cursor);
+            dbg!(
+                self.state(),
+                self.buf_start.unwrap(),
+                self.buf.len(),
+                self.cursor
+            );
 
             let last_token = self.tokens.last().unwrap();
             let has_space = last_token.start() + last_token.end() < self.cursor;
 
             if self.state() == &State::ParsedBlockIdentifier && !has_space {
-                return PipelineResult::Err("Must have space between event listener start and block identifier.".to_owned());
+                return PipelineResult::Err(
+                    "Must have space between event listener start and block identifier.".to_owned(),
+                );
             }
 
             self.reset_buffer();
@@ -506,7 +514,7 @@ impl Tokenizer {
             self.pop_state_type(State::ParsedEventListenerColon);
             self.reset_buffer();
             self.push_state(State::ParsingEventListenerHandler, Some(char));
-            return PipelineResult::Handled
+            return PipelineResult::Handled;
         }
 
         PipelineResult::Continue
@@ -524,7 +532,6 @@ impl Tokenizer {
         self.buf.push(char);
 
         PipelineResult::Handled
-
     }
 
     fn expect_event_listener_close(&mut self) -> PipelineResult {
@@ -564,6 +571,12 @@ impl Tokenizer {
 
             if self.state() == &State::ExprParsedString {
                 self.pop_state_type(State::ExprParsedString);
+            }
+
+            match self.state() {
+                State::ExprParsedString => self.pop_state_type(State::ExprParsedString),
+                State::ExprParsedNumber => self.pop_state_type(State::ExprParsedNumber),
+                _ => {}
             }
 
             self.pop_state_type(State::ParsedAttrColon);
@@ -724,17 +737,18 @@ impl Tokenizer {
             };
         }
 
-        match Operator::get_exact(&self.buf) {
-            Some(op) => {
-                self.push_token(TokenType::ExprToken(ExprToken::Operator(op)));
-                self.push_state(State::ExprParsedOperator, None);
-                PipelineResult::Handled
-            }
-            None => PipelineResult::Err(format!(
-                r#""{}" does not match any operators or is not implemented"#,
-                &self.buf
-            )),
-        }
+        PipelineResult::Continue
+        // match Operator::get_exact(&self.buf) {
+        //     Some(op) => {
+        //         self.push_token(TokenType::ExprToken(ExprToken::Operator(op)));
+        //         self.push_state(State::ExprParsedOperator, None);
+        //         PipelineResult::Handled
+        //     }
+        //     None => PipelineResult::Err(format!(
+        //         r#""{}" does not match any operators or is not implemented"#,
+        //         &self.buf
+        //     )),
+        // }
     }
 
     fn expr_parse_operator(&mut self) -> PipelineResult {
@@ -784,6 +798,13 @@ impl Tokenizer {
     fn expr_expect_dot(&mut self) -> PipelineResult {
         let char = self.char;
 
+        if char == '.' {
+            self.reset_buffer();
+            self.push_token(TokenType::ExprToken(ExprToken::Dot));
+            self.push_state(State::ExprResolvingDot, None);
+            return PipelineResult::Handled;
+        }
+
         PipelineResult::Continue
     }
 
@@ -796,11 +817,75 @@ impl Tokenizer {
     fn expr_resolve_dot(&mut self) -> PipelineResult {
         let char = self.char;
 
+        if char.is_ascii_digit() {
+            assert_matches!(
+                self.tokens.pop().unwrap().r#type(),
+                TokenType::ExprToken(ExprToken::Dot)
+            );
+            let prev = self.tokens.pop().unwrap();
+            return if let TokenType::ExprToken(ExprToken::Number(num)) = prev.r#type() {
+                let mut num = num.clone();
+                num.push('.');
+                self.tokens.push(Token::new(
+                    prev.start(),
+                    TokenType::ExprToken(ExprToken::Number(num)),
+                ));
+                self.pop_state_type(State::ExprResolvingDot);
+                self.push_state(State::ExprParsingFractionalNumber, Some(char));
+                PipelineResult::Handled
+            } else {
+                // Previous token is not a number.
+                unimplemented!()
+            };
+        }
+
+        if char.is_ascii_alphabetic() {
+            // Is a var dot accessor. Potentially for property getter or method call.
+            unimplemented!()
+        }
+
+        if matches!(char, ',' | '}' | ')') {
+            todo!("requires code in match statement in line 827")
+        }
+
         PipelineResult::Continue
     }
 
     fn expr_resolve_slash(&mut self) -> PipelineResult {
+        todo!();
         let char = self.char;
+
+        PipelineResult::Continue
+    }
+
+    fn expr_expect_fractional_number_start(&mut self) -> PipelineResult {
+        let char = self.char;
+
+        if char.is_ascii_digit() {
+            self.reset_buffer();
+            self.push_state(State::ExprParsingFractionalNumber, Some(char));
+            return PipelineResult::Handled;
+        }
+
+        PipelineResult::Continue
+    }
+
+    fn expr_parse_fractional_number(&mut self) -> PipelineResult {
+        let char = self.char;
+
+        if char.is_ascii_digit() {
+            self.buf.push(char);
+            return PipelineResult::Handled;
+        }
+
+        let num_tok = self.tokens.pop().unwrap();
+        if let TokenType::ExprToken(ExprToken::Number(num)) = num_tok.r#type() {
+            self.tokens.push(Token::new(
+                num_tok.start(),
+                TokenType::ExprToken(ExprToken::Number(format!("{}{}", num, self.buf))),
+            ));
+            self.pop_state_type(State::ExprParsingFractionalNumber);
+        }
 
         PipelineResult::Continue
     }
@@ -922,14 +1007,22 @@ impl Tokenizer {
                 // todo make sure to pop ExprParsingNumber state in handler
                 State::ExprParsingNumber => self.pipeline(vec![
                     Pipe::ExprParseNumber,
+                    Pipe::ExprExpectSlash,
                     Pipe::ExprExpectOperatorStart,
                     Pipe::ExprExpectParenthesisClose,
                     Pipe::ExprExpectDot,
-                    Pipe::ExprExpectSlash,
                     Pipe::ExpectAttrSeparator,
                     Pipe::ExpectBlockClose,
                 ]),
                 State::ExprParsedNumber => self.pipeline(vec![
+                    Pipe::ExprExpectSlash,
+                    Pipe::ExprExpectOperatorStart,
+                    Pipe::ExprExpectParenthesisClose,
+                    Pipe::ExpectAttrSeparator,
+                    Pipe::ExpectBlockClose,
+                ]),
+                State::ExprParsingFractionalNumber => self.pipeline(vec![
+                    Pipe::ExprParseFractionalNumber,
                     Pipe::ExprExpectSlash,
                     Pipe::ExprExpectOperatorStart,
                     Pipe::ExprExpectParenthesisClose,
@@ -978,9 +1071,14 @@ impl Tokenizer {
                     Pipe::ExpectAttrSeparator,
                     Pipe::ExpectBlockClose,
                 ]),
-                State::ExprResolveSlash => {
+                State::ExprResolvingSlash => {
                     self.pipeline(vec![Pipe::ExprResolveSlash, Pipe::ExprExpectOperandStart])
                 }
+                State::ExprResolvingDot => self.pipeline(vec![
+                    Pipe::ExprResolveDot,
+                    Pipe::ExprExpectOperandStart,
+                    Pipe::ExprExpectFractionalNumberStart,
+                ]),
             }
         }
 
@@ -1051,6 +1149,8 @@ impl TokenizerContract for Tokenizer {
                 Pipe::ExprExpectBracketOpen => self.expr_expect_bracket_open(),
                 Pipe::ExprResolveDot => self.expr_resolve_dot(),
                 Pipe::ExprResolveSlash => self.expr_resolve_slash(),
+                Pipe::ExprExpectFractionalNumberStart => self.expr_expect_fractional_number_start(),
+                Pipe::ExprParseFractionalNumber => self.expr_parse_fractional_number(),
             };
 
             match result {
@@ -1074,6 +1174,7 @@ impl TokenizerContract for Tokenizer {
 
         // todo WARNING: ignoring all whitespace here may cause problems down the line?
         if !self.char.is_ascii_whitespace() {
+            dbg!(&self.state_history);
             panic!(
                 r#"Unexpected token "{}" at line: {}, column: {}. State: "{}"."#,
                 self.char,
@@ -1198,4 +1299,6 @@ pub enum Pipe {
     ExprExpectBracketOpen,
     ExprResolveDot,
     ExprResolveSlash,
+    ExprExpectFractionalNumberStart,
+    ExprParseFractionalNumber,
 }

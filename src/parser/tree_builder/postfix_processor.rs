@@ -75,7 +75,7 @@ impl<'a> PostfixProcessor<'a> {
             },
             ExprToken::String(_) => {}
             ExprToken::Var(_) => {}
-            ExprToken::DotAccessor => {}
+            ExprToken::Dot => {}
             ExprToken::BracketAccessorOpen => {}
             ExprToken::BracketAccessorClose => {}
             ExprToken::FunctionArgsOpen => {}

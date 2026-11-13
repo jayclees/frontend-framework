@@ -29,7 +29,7 @@ impl<'a, 'b> BinaryOperation<'a, 'b> {
             }
             ExprToken::Operator(op) => OperandOrOperator::Operator(op),
             ExprToken::Var(var) => todo!("Var"),
-            ExprToken::DotAccessor => todo!("DotAccessor"),
+            ExprToken::Dot => todo!("DotAccessor"),
             ExprToken::BracketAccessorOpen => todo!("BracketAccessorOpen"),
             ExprToken::BracketAccessorClose => todo!("BracketAccessorClose"),
             ExprToken::FunctionArgsOpen => todo!("FunctionArgsOpen"),

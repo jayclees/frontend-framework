@@ -32,6 +32,7 @@ pub enum State {
     // Expressions
     ExprStart,
     ExprParsingNumber,
+    ExprParsingFractionalNumber,
     ExprParsedNumber,
     ExprParsingString,
     ExprParsedString,
@@ -40,12 +41,10 @@ pub enum State {
     ExprParsingOperator,
     ExprParsedOperator,
     ExprParsedBracketOpen,
-    // ExprParsedFuncParenthesisOpen,
-    // ExprParsedFuncOperand,
     ExprParsedParenthesisClose,
-    ExprResolveSlash,
+    ExprResolvingSlash,
+    ExprResolvingDot,
 
-    // GatheringExpressionTokens,
     ParsedExpressionTokens,
 }
 
@@ -85,6 +84,7 @@ impl Display for State {
                 // Expressions
                 ExprStart => "ExprStart",
                 ExprParsingNumber => "ExprParsingNumber",
+                ExprParsingFractionalNumber => "ExprParsingFractionalNumber",
                 ExprParsedNumber => "ExprParsedNumber",
                 ExprParsingString => "ExprParsingString",
                 ExprParsedString => "ExprParsedString",
@@ -94,7 +94,8 @@ impl Display for State {
                 ExprParsedBracketOpen => "ExprParsedBracketOpen",
                 ExprParsedVar => "ExprParsedVar",
                 ExprParsedParenthesisClose => "ExprParsedParenthesisClose",
-                ExprResolveSlash => "ExprResolveSlash",
+                ExprResolvingSlash => "ExprResolvingSlash",
+                ExprResolvingDot => "ExprResolvingDot",
 
                 ParsedExpressionTokens => "ParsedExpressionTokens",
             }
