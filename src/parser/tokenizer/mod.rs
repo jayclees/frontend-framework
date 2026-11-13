@@ -44,6 +44,14 @@ impl Tokenizer {
 }
 
 impl Tokenizer {
+    fn dump_tokens(&self) {
+        let mut output = String::new();
+        for token in &self.tokens {
+            output.push_str(token.r#type().dump().as_ref())
+        }
+        dbg!(output);
+    }
+
     fn err_msg(&self, msg: String) {
         let msg = msg.trim_end_matches(".");
         panic!(
@@ -593,10 +601,16 @@ impl Tokenizer {
         let char = self.char;
 
         if char.is_ascii_digit() {
+            if self.state() == &State::ExprParsedOperator {
+                self.pop_state_type(State::ExprParsedOperator);
+            }
             self.reset_buffer();
             self.push_state(State::ExprParsingNumber, Some(char));
             return PipelineResult::Handled;
         } else if char.is_ascii_alphabetic() {
+            if self.state() == &State::ExprParsedOperator {
+                self.pop_state_type(State::ExprParsedOperator);
+            }
             self.reset_buffer();
             self.push_state(State::ExprParsingVar, Some(char));
             return PipelineResult::Handled;
@@ -613,8 +627,13 @@ impl Tokenizer {
         let char = self.char;
 
         if char.is_ascii_digit() {
+            if self.state() == &State::ExprParsedNegativeOperator {
+                self.pop_state_type(State::ExprParsedNegativeOperator);
+            }
+            if self.state() == &State::ExprParsedOperator {
+                self.pop_state_type(State::ExprParsedOperator);
+            }
             self.reset_buffer();
-            self.pop_state_type(State::ExprParsedNegativeOperator);
             self.push_state(State::ExprParsingNumber, Some(char));
             return PipelineResult::Handled;
         }
@@ -736,33 +755,28 @@ impl Tokenizer {
 
             return match Operator::get_match(&self.buf) {
                 OperatorMatchResult::Matched(op) => {
+                    if self.state() == &State::ExprParsedNumber {
+                        self.pop_state_type(State::ExprParsedNumber);
+                    }
                     self.push_token(TokenType::ExprToken(ExprToken::Operator(op)));
                     self.push_state(State::ExprParsedOperator, None);
                     PipelineResult::Handled
                 }
                 OperatorMatchResult::Matches(_) => {
+                    if self.state() == &State::ExprParsedNumber {
+                        self.pop_state_type(State::ExprParsedNumber);
+                    }
                     self.push_state(State::ExprParsingOperator, None);
                     PipelineResult::Handled
                 }
                 OperatorMatchResult::None => PipelineResult::Err(format!(
                     r#""{}" does not match any operators or is not implemented"#,
-                    &self.buf
+                    self.buf
                 )),
             };
         }
 
         PipelineResult::Continue
-        // match Operator::get_exact(&self.buf) {
-        //     Some(op) => {
-        //         self.push_token(TokenType::ExprToken(ExprToken::Operator(op)));
-        //         self.push_state(State::ExprParsedOperator, None);
-        //         PipelineResult::Handled
-        //     }
-        //     None => PipelineResult::Err(format!(
-        //         r#""{}" does not match any operators or is not implemented"#,
-        //         &self.buf
-        //     )),
-        // }
     }
 
     fn expr_parse_operator(&mut self) -> PipelineResult {
@@ -771,8 +785,11 @@ impl Tokenizer {
         if Operator::is_operator_char(char) {
             self.buf.push(char);
 
-            return match Operator::get_match(&self.buf) {
+            match Operator::get_match(&self.buf) {
                 OperatorMatchResult::Matched(op) => {
+                    if self.state() == &State::ExprParsedNumber {
+                        self.pop_state_type(State::ExprParsedNumber);
+                    }
                     self.push_token(TokenType::ExprToken(ExprToken::Operator(op)));
                     self.push_state(State::ExprParsedOperator, None);
                     self.pop_state_type(State::ExprParsingOperator);
@@ -781,12 +798,23 @@ impl Tokenizer {
                 OperatorMatchResult::Matches(_) => PipelineResult::Handled,
                 OperatorMatchResult::None => PipelineResult::Err(format!(
                     r#""{}" does not match any operators or is not implemented"#,
-                    &self.buf
+                    self.buf
                 )),
-            };
+            }
+        } else {
+            match Operator::get_exact(&self.buf) {
+                Some(op) => {
+                    self.push_token(TokenType::ExprToken(ExprToken::Operator(op)));
+                    self.pop_state_type(State::ExprParsingOperator);
+                    self.push_state(State::ExprParsedOperator, None);
+                    PipelineResult::Continue
+                }
+                None => PipelineResult::Err(format!(
+                    r#""{}" does not match any operators or is not implemented"#,
+                    self.buf
+                )),
+            }
         }
-
-        PipelineResult::ErrUnexpected
     }
 
     fn expr_expect_parenthesis_close(&mut self) -> PipelineResult {
@@ -1069,7 +1097,11 @@ impl Tokenizer {
                     Pipe::ExpectAttrSeparator,
                     Pipe::ExpectBlockClose,
                 ]),
-                State::ExprParsingOperator => self.pipeline(vec![Pipe::ExprParseOperator]),
+                State::ExprParsingOperator => self.pipeline(vec![
+                    Pipe::ExprParseOperator,
+                    Pipe::ExprExpectSlash,
+                    Pipe::ExprExpectOperandStart,
+                ]),
                 State::ExprParsedOperator => {
                     self.pipeline(vec![Pipe::ExpectCommentStart, Pipe::ExprExpectOperandStart])
                 }
@@ -1096,9 +1128,9 @@ impl Tokenizer {
                     Pipe::ExpectAttrSeparator,
                     Pipe::ExpectBlockClose,
                 ]),
-                State::ExprParsedNegativeOperator =>  self.pipeline(vec![
-                    Pipe::ExprExpectNumberStart,
-                ]),
+                State::ExprParsedNegativeOperator => {
+                    self.pipeline(vec![Pipe::ExprExpectNumberStart])
+                }
             }
         }
 
