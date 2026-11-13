@@ -44,6 +44,7 @@ pub enum State {
     ExprParsedParenthesisClose,
     ExprResolvingSlash,
     ExprResolvingDot,
+    ExprParsedNegativeOperator,
 
     ParsedExpressionTokens,
 }
@@ -96,6 +97,7 @@ impl Display for State {
                 ExprParsedParenthesisClose => "ExprParsedParenthesisClose",
                 ExprResolvingSlash => "ExprResolvingSlash",
                 ExprResolvingDot => "ExprResolvingDot",
+                ExprParsedNegativeOperator => "ExprParsedNegativeOperator",
 
                 ParsedExpressionTokens => "ParsedExpressionTokens",
             }

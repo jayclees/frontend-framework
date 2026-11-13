@@ -609,6 +609,19 @@ impl Tokenizer {
         PipelineResult::Continue
     }
 
+    fn expr_expect_number_start(&mut self) -> PipelineResult {
+        let char = self.char;
+
+        if char.is_ascii_digit() {
+            self.reset_buffer();
+            self.pop_state_type(State::ExprParsedNegativeOperator);
+            self.push_state(State::ExprParsingNumber, Some(char));
+            return PipelineResult::Handled;
+        }
+
+        PipelineResult::Continue
+    }
+
     fn expr_expect_parenthesis_open(&mut self) -> PipelineResult {
         let char = self.char;
 
@@ -707,7 +720,8 @@ impl Tokenizer {
 
         if char == '-' {
             self.reset_buffer();
-            self.push_token(TokenType::ExprToken(ExprToken::BracketAccessorClose));
+            self.push_token(TokenType::ExprToken(ExprToken::Operator(Operator::Minus)));
+            self.push_state(State::ExprParsedNegativeOperator, None);
             return PipelineResult::Handled;
         }
 
@@ -823,7 +837,7 @@ impl Tokenizer {
                 TokenType::ExprToken(ExprToken::Dot)
             );
             let prev = self.tokens.pop().unwrap();
-            return if let TokenType::ExprToken(ExprToken::Number(num)) = prev.r#type() {
+            if let TokenType::ExprToken(ExprToken::Number(num)) = prev.r#type() {
                 let mut num = num.clone();
                 num.push('.');
                 self.tokens.push(Token::new(
@@ -833,13 +847,10 @@ impl Tokenizer {
                 self.pop_state_type(State::ExprResolvingDot);
                 if char.is_ascii_digit() {
                     self.push_state(State::ExprParsingFractionalNumber, Some(char));
-                    PipelineResult::Handled
+                    return PipelineResult::Handled;
                 } else {
-                    PipelineResult::Continue
+                    return PipelineResult::Continue;
                 }
-            } else {
-                // Previous token is not a number.
-                unimplemented!()
             };
         }
 
@@ -945,7 +956,11 @@ impl Tokenizer {
                 State::ParsedAttrColon => {
                     // Order should matter here? ExpectCommentStart
                     // must be before ExpectExpressionStart.
-                    self.pipeline(vec![Pipe::ExprExpectOperandStart])
+                    self.pipeline(vec![
+                        Pipe::ExprExpectOperandStart,
+                        Pipe::ExprExpectNegativeOperator,
+                        Pipe::ExprExpectParenthesisOpen,
+                    ])
                 }
                 State::ParsedExpressionTokens => self.pipeline(vec![
                     Pipe::ExpectCommentStart,
@@ -1081,6 +1096,9 @@ impl Tokenizer {
                     Pipe::ExpectAttrSeparator,
                     Pipe::ExpectBlockClose,
                 ]),
+                State::ExprParsedNegativeOperator =>  self.pipeline(vec![
+                    Pipe::ExprExpectNumberStart,
+                ]),
             }
         }
 
@@ -1136,6 +1154,7 @@ impl TokenizerContract for Tokenizer {
 
                 // Expressions
                 Pipe::ExprExpectOperandStart => self.expr_expect_operand_start(),
+                Pipe::ExprExpectNumberStart => self.expr_expect_number_start(),
                 Pipe::ExprExpectParenthesisOpen => self.expr_expect_parenthesis_open(),
                 Pipe::ExprParseString => self.expr_parse_string(),
                 Pipe::ExprParseNumber => self.expr_parse_number(),
@@ -1284,6 +1303,7 @@ pub enum Pipe {
 
     // Expressions
     ExprExpectOperandStart,
+    ExprExpectNumberStart,
     ExprExpectParenthesisOpen,
     ExprParseString,
     ExprParseNumber,

@@ -275,5 +275,5 @@ fn neg_decimal_0010_fail() {
         let string = file("expression/neg_decimal_0010_fail").unwrap();
         let mut tokenizer = Tokenizer::new();
         tokenizer.tokenize(string.clone());
-    }, r#"Number can only have one dot. At line: 2, column: 15. State: "GatheringExpressionTokens""#);
+    }, r#"Unexpected token "." at line: 2, column: 15. State: "ExprParsedNumber"."#);
 }

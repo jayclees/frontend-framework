@@ -258,11 +258,11 @@ fn test_untokenized_non_whitespace_chars_are_caught_5() {
 fn test_assert_fn_passes_when_panic_occurs() {
     assert_fails(
         || {
-            let string = "Page{}".to_owned();
+            let string = "Page[{}".to_owned();
             let mut tokenizer = Tokenizer::new();
             tokenizer.tokenize(string);
         },
-        r#"Unexpected token "{" at line: 1, column: 5. State: "ParsingIdentifier""#,
+        r#"Unexpected token "{" at line: 1, column: 6. State: "ParsingDirective"."#,
     );
 }
 
