@@ -40,6 +40,7 @@ fn match_tokens_to_source(source: String, tokens: &Vec<Token>) {
     let mut start = 0;
     // dbg!(&tokens);
     for token in tokens {
+        dbg!(&token);
         // If there are any non-whitespace characters in the gaps between tokens, that is an error.
         let non_tokenized = &source[start..token.start()];
         for (i, char) in non_tokenized.chars().enumerate() {
@@ -52,6 +53,7 @@ fn match_tokens_to_source(source: String, tokens: &Vec<Token>) {
             );
         }
 
+        // dbg!(token.r#type(), token.start(), token.end());
         // dbg!(&source[token.start()..token.end()]);
         assert!(token.test(source.as_ref()));
 
@@ -256,11 +258,11 @@ fn test_untokenized_non_whitespace_chars_are_caught_5() {
 fn test_assert_fn_passes_when_panic_occurs() {
     assert_fails(
         || {
-            let string = "Page{}".to_owned();
+            let string = "Page[{}".to_owned();
             let mut tokenizer = Tokenizer::new();
             tokenizer.tokenize(string);
         },
-        r#"Unexpected token "{" at line: 1, column: 5. State: "ParsingIdentifier""#,
+        r#"Unexpected token "{" at line: 1, column: 6. State: "ParsingDirective"."#,
     );
 }
 

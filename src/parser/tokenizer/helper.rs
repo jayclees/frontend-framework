@@ -2,6 +2,7 @@ use crate::parser::tokenizer::token::{Token, TokenType};
 
 pub trait TokenizerContract {
     type TokenizerState;
+    type PipeType;
     fn state(&self) -> &Self::TokenizerState;
     fn prev_state(&self) -> Option<&Self::TokenizerState>;
     fn push_state(&mut self, state: Self::TokenizerState, starting_char: Option<char>);
@@ -12,6 +13,7 @@ pub trait TokenizerContract {
     fn push_token_pop_state(&mut self, r#type: TokenType);
     fn buf_last(&self) -> Option<char>;
     fn reset_buffer(&mut self);
+    fn pipeline(&mut self, pipes: Vec<Self::PipeType>);
 }
 
 pub(super) fn current<T>(state_history: &[T]) -> &T {
@@ -28,12 +30,9 @@ pub(super) fn push_state<T>(
     state_history: &mut Vec<T>,
     state: T,
     buf: &mut String,
-    buf_start: &mut Option<usize>,
     starting_char: Option<char>,
-    cursor: usize,
 ) {
     state_history.push(state);
-    reset_buffer(buf, buf_start, cursor);
 
     if let Some(char) = starting_char
         && !char.is_whitespace()
@@ -59,21 +58,19 @@ pub(super) fn pop_state<T>(state_history: &mut Vec<T>) {
     state_history.pop();
 }
 
-pub(super) fn pop_state_type<T: PartialEq<T> + std::fmt::Display>(state_history: &mut Vec<T>, state: T) {
-    let last = state_history
-        .last()
-        .expect("Should always have at least 1 state_history (State::Start)");
+pub(super) fn pop_state_type<T: PartialEq<T> + std::fmt::Display + std::fmt::Debug>(
+    state_history: &mut Vec<T>,
+    state: T,
+) {
+    let last = state_history.last().unwrap();
     if last != &state {
-        panic!(r#"Expected to pop "{state}", found "{last}"."#);
+        dbg!(&state_history);
+        panic!(r#"Expected to pop "{state}", found "{last}" instead."#);
     }
     state_history.pop();
 }
 
-pub(super) fn push_token(
-    tokens: &mut Vec<Token>,
-    start: usize,
-    r#type: TokenType,
-) {
+pub(super) fn push_token(tokens: &mut Vec<Token>, start: usize, r#type: TokenType) {
     tokens.push(Token::new(start, r#type));
 }
 

@@ -84,7 +84,7 @@ fn attribute_0011_fail() {
         let string = file("attribute/attribute_0011_fail").unwrap();
         let mut tokenizer = Tokenizer::new();
         tokenizer.tokenize(string.clone());
-    }, r#"Unexpected token "c" at line: 3, column: 5. State: "GatheringExpressionTokens". Expr tokenizer state: ExpectOperatorStartOrExprEnd"#);
+    }, r#"Unexpected token "c" at line: 3, column: 5. State: "ExprParsedString"."#);
 }
 
 #[test]

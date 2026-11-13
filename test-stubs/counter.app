@@ -1,5 +1,5 @@
 div {
-    text: "foobar"
+    text: "foobar",
     button {
         class: "test-class",
         id: "myid",

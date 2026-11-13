@@ -4,50 +4,49 @@ use std::fmt::{Display, Formatter};
 #[derive(Debug, PartialEq)]
 pub enum State {
     Start,
-    InLineComment,
-    InBlockComment,
+    ResolvingCommentType,
+    ParsingLineComment,
+    ParsingBlockComment,
 
     ParsingIdentifier,
     ResolvingIdentifier,
     ParsedBlockIdentifier,
     ParsedAttrIdentifier,
 
-    ParsingBlockOpen,
     ParsingBlock,
-    ParsingBlockClose,
-
-    ParsingAttributeColon,
     ParsedAttrColon,
-    ParsingAttrSeparator,
-    ParsedAttrSeparator,
-
-    GatheringExpressionTokens,
-    ParsedExpressionTokens,
 
     ParsingDirective,
-    ParsingDirectiveOpen,
-    ParsedDirectiveOpen,
     ParsingDirectiveIdentifier,
     ParsedDirectiveIdentifier,
     ParsedDirectiveColon,
-    EmptyDirectiveParsed,
-    ParsingDirectiveColon,
     ParsingDirectiveValue,
-    ParsingDirectiveClose,
-    ParsedDirective,
 
     ParsingEventListenerOpen,
     ParsedEventListenerOpen,
     ParsingEventListenerIdentifier,
-    ParsingEventListenerColon,
+    ParsedEventListenerIdentifier,
     ParsedEventListenerColon,
     ParsingEventListenerHandler,
-    ParsedEventListener,
 
-    ParsedDirectiveOrEventClose,
+    // Expressions
+    ExprStart,
+    ExprParsingNumber,
+    ExprParsingFractionalNumber,
+    ExprParsedNumber,
+    ExprParsingString,
+    ExprParsedString,
+    ExprParsingVar,
+    ExprParsedVar,
+    ExprParsingOperator,
+    ExprParsedOperator,
+    ExprParsedBracketOpen,
+    ExprParsedParenthesisClose,
+    ExprResolvingSlash,
+    ExprResolvingDot,
+    ExprParsedNegativeOperator,
 
-    InDblQuoteUnescaped,
-    InDblQuoteEscaped,
+    ParsedExpressionTokens,
 }
 
 impl Display for State {
@@ -57,50 +56,50 @@ impl Display for State {
             "{}",
             match self {
                 Start => "Start",
-                InLineComment => "InLineComment",
-                InBlockComment => "InBlockComment",
+                ResolvingCommentType => "ResolvingCommentType",
+                ParsingLineComment => "ParsingLineComment",
+                ParsingBlockComment => "ParsingBlockComment",
 
                 ParsingIdentifier => "ParsingIdentifier",
                 ResolvingIdentifier => "ResolvingIdentifier",
                 ParsedBlockIdentifier => "ParsedBlockIdentifier",
                 ParsedAttrIdentifier => "ParsedAttrIdentifier",
 
-                ParsingBlockOpen => "ParsingBlockOpen",
                 ParsingBlock => "ParsingBlock",
-                ParsingBlockClose => "ParsingBlockClose",
 
-                ParsingAttributeColon => "ParsingAttributeColon",
                 ParsedAttrColon => "ParsedAttrColon",
-                ParsingAttrSeparator => "ParsingAttrSeparator",
-                ParsedAttrSeparator => "ParsedAttrSeparator",
-
-                GatheringExpressionTokens => "GatheringExpressionTokens",
-                ParsedExpressionTokens => "ParsedExpressionTokens",
 
                 ParsingDirective => "ParsingDirective",
-                ParsingDirectiveOpen => "ParsingDirectiveOpen",
-                ParsedDirectiveOpen => "ParsedDirectiveOpen",
                 ParsingDirectiveIdentifier => "ParsingDirectiveIdentifier",
                 ParsedDirectiveIdentifier => "ParsedDirectiveIdentifier",
                 ParsedDirectiveColon => "ParsedDirectiveColon",
-                EmptyDirectiveParsed => "EmptyDirectiveParsed",
-                ParsingDirectiveColon => "ParsingDirectiveColon",
                 ParsingDirectiveValue => "ParsingDirectiveValue",
-                ParsingDirectiveClose => "ParsingDirectiveClose",
-                ParsedDirective => "ParsedDirective",
 
                 ParsingEventListenerOpen => "ParsingEventListenerOpen",
                 ParsedEventListenerOpen => "ParsedEventListenerOpen",
                 ParsingEventListenerIdentifier => "ParsingEventListenerIdentifier",
-                ParsingEventListenerColon => "ParsingEventListenerColon",
+                ParsedEventListenerIdentifier => "ParsedEventListenerIdentifier",
                 ParsedEventListenerColon => "ParsedEventListenerColon",
                 ParsingEventListenerHandler => "ParsingEventListenerHandler",
-                ParsedEventListener => "ParsedEventListener",
 
-                ParsedDirectiveOrEventClose => "ParsedDirectiveOrEventClose",
+                // Expressions
+                ExprStart => "ExprStart",
+                ExprParsingNumber => "ExprParsingNumber",
+                ExprParsingFractionalNumber => "ExprParsingFractionalNumber",
+                ExprParsedNumber => "ExprParsedNumber",
+                ExprParsingString => "ExprParsingString",
+                ExprParsedString => "ExprParsedString",
+                ExprParsingVar => "ExprParsingVar",
+                ExprParsingOperator => "ExprParsingOperator",
+                ExprParsedOperator => "ExprParsedOperator",
+                ExprParsedBracketOpen => "ExprParsedBracketOpen",
+                ExprParsedVar => "ExprParsedVar",
+                ExprParsedParenthesisClose => "ExprParsedParenthesisClose",
+                ExprResolvingSlash => "ExprResolvingSlash",
+                ExprResolvingDot => "ExprResolvingDot",
+                ExprParsedNegativeOperator => "ExprParsedNegativeOperator",
 
-                InDblQuoteUnescaped => "InDblQuoteUnescaped",
-                InDblQuoteEscaped => "InDblQuoteEscaped",
+                ParsedExpressionTokens => "ParsedExpressionTokens",
             }
         )
     }

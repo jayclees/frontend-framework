@@ -1,4 +1,3 @@
-use super::TokenType::*;
 use std::fmt::{Display, Formatter};
 
 #[derive(Debug, PartialEq)]
@@ -42,34 +41,34 @@ impl Token {
     pub fn test(&self, source: &str) -> bool {
         let source_str = &source[self.start..self.end];
         match &self.r#type {
-            BlockIdentifier(str)
-            | LineComment(str)
-            | BlockComment(str)
-            | AttrIdentifier(str)
-            | DirectiveIdentifier(str)
-            | EventListenerIdentifier(str)
-            | EventListenerHandler(str)
-            | DirectiveValue(str) => source_str == str,
+            TokenType::BlockIdentifier(str)
+            | TokenType::LineComment(str)
+            | TokenType::BlockComment(str)
+            | TokenType::AttrIdentifier(str)
+            | TokenType::DirectiveIdentifier(str)
+            | TokenType::EventListenerIdentifier(str)
+            | TokenType::EventListenerHandler(str)
+            | TokenType::DirectiveValue(str) => source_str == str,
 
-            BlockOpen => source_str == "{",
-            BlockClose => source_str == "}",
-            AttrColon => source_str == ":",
-            AttrSeparator => source_str == ",",
-            DirectiveOpen => source_str == "[",
-            DirectiveClose => source_str == "]",
-            DirectiveColon => source_str == ":",
-            EventListenerOpen => source_str == "@[",
-            EventListenerClose => source_str == "]",
-            EventListenerColon => source_str == ":",
+            TokenType::BlockOpen => source_str == "{",
+            TokenType::BlockClose => source_str == "}",
+            TokenType::AttrColon => source_str == ":",
+            TokenType::AttrSeparator => source_str == ",",
+            TokenType::DirectiveOpen => source_str == "[",
+            TokenType::DirectiveClose => source_str == "]",
+            TokenType::DirectiveColon => source_str == ":",
+            TokenType::EventListenerOpen => source_str == "@[",
+            TokenType::EventListenerClose => source_str == "]",
+            TokenType::EventListenerColon => source_str == ":",
 
-            ExprToken(expr) => match expr {
+            TokenType::ExprToken(expr) => match expr {
                 ExprToken::String(str) => source_str == str,
                 ExprToken::Number(str) => source_str == str,
                 ExprToken::Operator(op) => source_str == op.symbol(),
                 ExprToken::Var(str) => source_str == str,
-                ExprToken::VarDotAccessor => source_str == ".",
-                ExprToken::VarBracketAccessorOpen => source_str == "[",
-                ExprToken::VarBracketAccessorClose => source_str == "]",
+                ExprToken::Dot => source_str == ".",
+                ExprToken::BracketAccessorOpen => source_str == "[",
+                ExprToken::BracketAccessorClose => source_str == "]",
                 ExprToken::FunctionArgsOpen => source_str == "(",
                 ExprToken::FunctionArgsClose => source_str == ")",
                 ExprToken::ArrayOpen => source_str == "[",
@@ -106,21 +105,66 @@ pub enum TokenType {
 impl TokenType {
     pub fn len(&self) -> usize {
         match self {
-            BlockIdentifier(str)
-            | LineComment(str)
-            | BlockComment(str)
-            | AttrIdentifier(str)
-            | DirectiveIdentifier(str)
-            | DirectiveValue(str)
-            | EventListenerHandler(str)
-            | EventListenerIdentifier(str) => str.len(),
+            TokenType::BlockIdentifier(str)
+            | TokenType::LineComment(str)
+            | TokenType::BlockComment(str)
+            | TokenType::AttrIdentifier(str)
+            | TokenType::DirectiveIdentifier(str)
+            | TokenType::DirectiveValue(str)
+            | TokenType::EventListenerHandler(str)
+            | TokenType::EventListenerIdentifier(str) => str.len(),
 
-            BlockOpen | BlockClose | AttrColon | AttrSeparator | DirectiveOpen | DirectiveClose
-            | EventListenerClose | EventListenerColon | DirectiveColon => 1,
+            TokenType::BlockOpen
+            | TokenType::BlockClose
+            | TokenType::AttrColon
+            | TokenType::AttrSeparator
+            | TokenType::DirectiveOpen
+            | TokenType::DirectiveClose
+            | TokenType::EventListenerClose
+            | TokenType::EventListenerColon
+            | TokenType::DirectiveColon => 1,
 
-            EventListenerOpen => 2,
+            TokenType::EventListenerOpen => 2,
 
-            ExprToken(expr) => expr.len(),
+            TokenType::ExprToken(expr) => expr.len(),
+        }
+    }
+
+    pub fn dump(&self) -> String {
+        match self {
+            TokenType::BlockIdentifier(str) |
+            TokenType::LineComment(str) |
+            TokenType::BlockComment(str) |
+            TokenType::AttrIdentifier(str) |
+            TokenType::DirectiveIdentifier(str) |
+            TokenType::DirectiveValue(str) |
+            TokenType::EventListenerIdentifier(str) |
+            TokenType::EventListenerHandler(str) => str.to_owned(),
+
+            TokenType::BlockOpen => "{".to_owned(),
+            TokenType::BlockClose => "}".to_owned(),
+            TokenType::AttrColon => ":".to_owned(),
+            TokenType::AttrSeparator => ",".to_owned(),
+            TokenType::DirectiveOpen => "[".to_owned(),
+            TokenType::DirectiveClose => "]".to_owned(),
+            TokenType::DirectiveColon => ":".to_owned(),
+            TokenType::EventListenerOpen => "@[".to_owned(),
+            TokenType::EventListenerClose => "]".to_owned(),
+            TokenType::EventListenerColon => ":".to_owned(),
+
+            TokenType::ExprToken(expr_tok) => match expr_tok {
+                ExprToken::String(str) |
+                ExprToken::Number(str) |
+                ExprToken::Var(str)  => str.to_owned(),
+                ExprToken::Operator(op) => op.symbol().to_owned(),
+                ExprToken::Dot => ".".to_owned(),
+                ExprToken::BracketAccessorOpen => "[".to_owned(),
+                ExprToken::BracketAccessorClose => "]".to_owned(),
+                ExprToken::FunctionArgsOpen => "(".to_owned(),
+                ExprToken::FunctionArgsClose => ")".to_owned(),
+                ExprToken::ArrayOpen => "[".to_owned(),
+                ExprToken::ArrayClose => "]".to_owned(),
+            }
         }
     }
 }
@@ -128,25 +172,25 @@ impl TokenType {
 impl Display for TokenType {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match &self {
-            BlockIdentifier(str) => write!(f, "BlockIdentifier({str})"),
-            LineComment(str) => write!(f, "LineComment({str})"),
-            BlockComment(str) => write!(f, "BlockComment({str})"),
-            BlockOpen => write!(f, "BlockOpen"),
-            BlockClose => write!(f, "BlockClose"),
-            AttrIdentifier(str) => write!(f, "AttrIdentifier({str})"),
-            AttrColon => write!(f, "AttrColon"),
-            AttrSeparator => write!(f, "AttrSeparator"),
-            ExprToken(expr) => write!(f, "ExpressionToken({expr})"),
-            DirectiveOpen => write!(f, "DirectiveOpen"),
-            DirectiveClose => write!(f, "DirectiveClose"),
-            DirectiveIdentifier(_) => write!(f, "DirectiveIdentifier"),
-            DirectiveColon => write!(f, "DirectiveColon"),
-            DirectiveValue(str) => write!(f, "DirectiveValue({str})"),
-            EventListenerOpen => write!(f, "EventListenerOpen"),
-            EventListenerClose => write!(f, "EventListenerClose"),
-            EventListenerIdentifier(str) => write!(f, "EventListenerIdentifier({str})"),
-            EventListenerColon => write!(f, "EventListenerColon"),
-            EventListenerHandler(str) => write!(f, "EventListenerHandler({str})"),
+            TokenType::BlockIdentifier(str) => write!(f, "BlockIdentifier({str})"),
+            TokenType::LineComment(str) => write!(f, "LineComment({str})"),
+            TokenType::BlockComment(str) => write!(f, "BlockComment({str})"),
+            TokenType::BlockOpen => write!(f, "BlockOpen"),
+            TokenType::BlockClose => write!(f, "BlockClose"),
+            TokenType::AttrIdentifier(str) => write!(f, "AttrIdentifier({str})"),
+            TokenType::AttrColon => write!(f, "AttrColon"),
+            TokenType::AttrSeparator => write!(f, "AttrSeparator"),
+            TokenType::ExprToken(expr) => write!(f, "ExpressionToken({expr})"),
+            TokenType::DirectiveOpen => write!(f, "DirectiveOpen"),
+            TokenType::DirectiveClose => write!(f, "DirectiveClose"),
+            TokenType::DirectiveIdentifier(_) => write!(f, "DirectiveIdentifier"),
+            TokenType::DirectiveColon => write!(f, "DirectiveColon"),
+            TokenType::DirectiveValue(str) => write!(f, "DirectiveValue({str})"),
+            TokenType::EventListenerOpen => write!(f, "EventListenerOpen"),
+            TokenType::EventListenerClose => write!(f, "EventListenerClose"),
+            TokenType::EventListenerIdentifier(str) => write!(f, "EventListenerIdentifier({str})"),
+            TokenType::EventListenerColon => write!(f, "EventListenerColon"),
+            TokenType::EventListenerHandler(str) => write!(f, "EventListenerHandler({str})"),
             // Expression token
         }
     }
@@ -158,9 +202,9 @@ pub enum ExprToken {
     Number(String),
     Operator(Operator),
     Var(String),
-    VarDotAccessor,
-    VarBracketAccessorOpen,
-    VarBracketAccessorClose,
+    Dot,
+    BracketAccessorOpen,
+    BracketAccessorClose,
     FunctionArgsOpen,
     FunctionArgsClose,
     ArrayOpen,
@@ -174,9 +218,9 @@ impl ExprToken {
             ExprToken::Number(str) => str.len(),
             ExprToken::Operator(op) => op.symbol().len(),
             ExprToken::Var(str) => str.len(),
-            ExprToken::VarDotAccessor => 1,
-            ExprToken::VarBracketAccessorOpen => 1,
-            ExprToken::VarBracketAccessorClose => 1,
+            ExprToken::Dot => 1,
+            ExprToken::BracketAccessorOpen => 1,
+            ExprToken::BracketAccessorClose => 1,
             ExprToken::FunctionArgsOpen => 1,
             ExprToken::FunctionArgsClose => 1,
             ExprToken::ArrayOpen => 1,
@@ -191,7 +235,8 @@ impl ExprToken {
                     if left.contains(".") || right.contains(".") {
                         (left.parse::<f64>().unwrap() + right.parse::<f64>().unwrap()).to_string()
                     } else {
-                        (left.parse::<usize>().unwrap() + right.parse::<usize>().unwrap()).to_string()
+                        (left.parse::<usize>().unwrap() + right.parse::<usize>().unwrap())
+                            .to_string()
                     }
                 }
                 token => {
@@ -210,7 +255,8 @@ impl ExprToken {
                     if left.contains(".") || right.contains(".") {
                         (left.parse::<f64>().unwrap() - right.parse::<f64>().unwrap()).to_string()
                     } else {
-                        (left.parse::<isize>().unwrap() - right.parse::<isize>().unwrap()).to_string()
+                        (left.parse::<isize>().unwrap() - right.parse::<isize>().unwrap())
+                            .to_string()
                     }
                 }
                 token => {
@@ -229,7 +275,8 @@ impl ExprToken {
                     if left.contains(".") || right.contains(".") {
                         (left.parse::<f64>().unwrap() * right.parse::<f64>().unwrap()).to_string()
                     } else {
-                        (left.parse::<usize>().unwrap() * right.parse::<usize>().unwrap()).to_string()
+                        (left.parse::<usize>().unwrap() * right.parse::<usize>().unwrap())
+                            .to_string()
                     }
                 }
                 token => {
@@ -261,13 +308,19 @@ impl ExprToken {
             match self {
                 ExprToken::Number(left) => {
                     if left.contains(".") || right.contains(".") {
-                        left.parse::<f64>().unwrap().powf(right.parse::<f64>().unwrap()).to_string()
+                        left.parse::<f64>()
+                            .unwrap()
+                            .powf(right.parse::<f64>().unwrap())
+                            .to_string()
                     } else {
-                        match left.parse::<usize>().unwrap().checked_pow(right.parse::<u32>().unwrap()) {
+                        match left
+                            .parse::<usize>()
+                            .unwrap()
+                            .checked_pow(right.parse::<u32>().unwrap())
+                        {
                             Some(result) => result.to_string(),
-                            None => panic!("Failed raising {left} to the power of {right}.")
+                            None => panic!("Failed raising {left} to the power of {right}."),
                         }
-
                     }
                 }
                 token => {
@@ -286,7 +339,8 @@ impl ExprToken {
                     if left.contains(".") || right.contains(".") {
                         (left.parse::<f64>().unwrap() % right.parse::<f64>().unwrap()).to_string()
                     } else {
-                        (left.parse::<usize>().unwrap() % right.parse::<usize>().unwrap()).to_string()
+                        (left.parse::<usize>().unwrap() % right.parse::<usize>().unwrap())
+                            .to_string()
                     }
                 }
                 token => {
@@ -305,10 +359,10 @@ impl Display for ExprToken {
             ExprToken::String(str) => write!(f, "String({str})"),
             ExprToken::Number(str) => write!(f, "Number({str})"),
             ExprToken::Operator(op) => write!(f, "Operator({op})"),
-            ExprToken::Var(str) => write!(f, "Variable({str})"),
-            ExprToken::VarDotAccessor => write!(f, "VariableDotAccessor"),
-            ExprToken::VarBracketAccessorOpen => write!(f, "VarBracketAccessorOpen"),
-            ExprToken::VarBracketAccessorClose => write!(f, "VarBracketAccessorClose"),
+            ExprToken::Var(str) => write!(f, "Var({str})"),
+            ExprToken::Dot => write!(f, "Dot"),
+            ExprToken::BracketAccessorOpen => write!(f, "BracketAccessorOpen"),
+            ExprToken::BracketAccessorClose => write!(f, "BracketAccessorClose"),
             ExprToken::FunctionArgsOpen => write!(f, "FunctionArgsOpen"),
             ExprToken::FunctionArgsClose => write!(f, "FunctionArgsClose"),
             ExprToken::ArrayOpen => write!(f, "ArrayOpen"),
@@ -319,6 +373,9 @@ impl Display for ExprToken {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Operator {
+    // String
+    Concatenation, // .
+
     // Arithmetic
     Plus,
     Minus,
@@ -411,6 +468,7 @@ impl Operator {
             Operator::And => "&&",
             Operator::Or => "||",
             Operator::Not => "!",
+            Operator::Concatenation => ".",
         }
     }
 
@@ -423,6 +481,7 @@ impl Operator {
             Operator::Divide => 3,
             Operator::Modulus => 3,
             Operator::Power => 4,
+            Operator::Concatenation => 5,
             Operator::ParenthesesClose => unimplemented!(),
             Operator::Assign => unimplemented!(),
             Operator::Increment => unimplemented!(),
@@ -471,6 +530,7 @@ impl Display for Operator {
             Operator::And => write!(f, "And"),
             Operator::Or => write!(f, "Or"),
             Operator::Not => write!(f, "Not"),
+            Operator::Concatenation => write!(f, "Concatenation"),
         }
     }
 }

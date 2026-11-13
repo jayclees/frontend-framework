@@ -54,29 +54,30 @@ impl<'a> PostfixProcessor<'a> {
                         }
                     }
                 }
-                Operator::Modulus => {}
-                Operator::Assign => {}
-                Operator::Increment => {}
-                Operator::Decrement => {}
-                Operator::IncrementBy => {}
-                Operator::DecrementBy => {}
-                Operator::MultiplyBy => {}
-                Operator::DivideBy => {}
-                Operator::EqualTo => {}
-                Operator::NotEqualTo => {}
-                Operator::GreaterThan => {}
-                Operator::GreaterThanOrEqualTo => {}
-                Operator::LessThan => {}
-                Operator::LessThanOrEqualTo => {}
-                Operator::And => {}
-                Operator::Or => {}
-                Operator::Not => {}
+                Operator::Modulus => unimplemented!("PostfixProcessor@process(Modulus) not implemented."),
+                Operator::Assign => unimplemented!("PostfixProcessor@process(Assign) not implemented."),
+                Operator::Increment => unimplemented!("PostfixProcessor@process(Increment) not implemented."),
+                Operator::Decrement => unimplemented!("PostfixProcessor@process(Decrement) not implemented."),
+                Operator::IncrementBy => unimplemented!("PostfixProcessor@process(IncrementBy) not implemented."),
+                Operator::DecrementBy => unimplemented!("PostfixProcessor@process(DecrementBy) not implemented."),
+                Operator::MultiplyBy => unimplemented!("PostfixProcessor@process(MultiplyBy) not implemented."),
+                Operator::DivideBy => unimplemented!("PostfixProcessor@process(DivideBy) not implemented."),
+                Operator::EqualTo => unimplemented!("PostfixProcessor@process(EqualTo) not implemented."),
+                Operator::NotEqualTo => unimplemented!("PostfixProcessor@process(NotEqualTo) not implemented."),
+                Operator::GreaterThan => unimplemented!("PostfixProcessor@process(GreaterThan) not implemented."),
+                Operator::GreaterThanOrEqualTo => unimplemented!("PostfixProcessor@process(GreaterThanOrEqualTo) not implemented."),
+                Operator::LessThan => unimplemented!("PostfixProcessor@process(LessThan) not implemented."),
+                Operator::LessThanOrEqualTo => unimplemented!("PostfixProcessor@process(LessThanOrEqualTo) not implemented."),
+                Operator::And => unimplemented!("PostfixProcessor@process(And) not implemented."),
+                Operator::Or => unimplemented!("PostfixProcessor@process(Or) not implemented."),
+                Operator::Not => unimplemented!("PostfixProcessor@process(Not) not implemented."),
+                Operator::Concatenation => unimplemented!("PostfixProcessor@process(Concatenation) not implemented."),
             },
             ExprToken::String(_) => {}
             ExprToken::Var(_) => {}
-            ExprToken::VarDotAccessor => {}
-            ExprToken::VarBracketAccessorOpen => {}
-            ExprToken::VarBracketAccessorClose => {}
+            ExprToken::Dot => {}
+            ExprToken::BracketAccessorOpen => {}
+            ExprToken::BracketAccessorClose => {}
             ExprToken::FunctionArgsOpen => {}
             ExprToken::FunctionArgsClose => {}
             ExprToken::ArrayOpen => {}
@@ -120,6 +121,7 @@ impl<'a> PostfixProcessor<'a> {
                             Operator::Divide => buf.push(ExprToken::Number(left.divide(right))),
                             Operator::Power => buf.push(ExprToken::Number(left.power(right))),
                             Operator::Modulus => buf.push(ExprToken::Number(left.modulus(right))),
+                            Operator::Concatenation => buf.push(ExprToken::String(format!("{left}{right}"))),
                             Operator::Assign => {}
                             Operator::Increment => {}
                             Operator::Decrement => {}
@@ -147,11 +149,15 @@ impl<'a> PostfixProcessor<'a> {
             }
         }
 
-        dbg!(&buf);
+        // dbg!(&buf);
 
         self.reset();
 
-        BlockContent::Text("hello".to_owned())
+        if let Some(ExprToken::Number(num)) = buf.first() {
+            BlockContent::Text(num.to_owned())
+        } else {
+            panic!("Buf should not be empty.");
+        }
     }
 
     pub fn is_empty(&self) -> bool {
