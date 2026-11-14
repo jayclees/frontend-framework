@@ -12,9 +12,10 @@ fn main() {
     let mut tokenizer = Tokenizer::new();
 
     // let tokens = tokenizer.tokenize(read_to_string("test-stubs/expression/operation/add_0001").unwrap());
-    let tokens = tokenizer.tokenize(read_to_string("test-stubs/basic.app").unwrap());
+    let tokens = tokenizer.tokenize(read_to_string("test-stubs/welcome.app").unwrap());
     let mut builder = TreeBuilder::new();
     let tree = builder.build(tokens);
+    dbg!(&tree);
     let mut generator = Generator::new(&tree, PathBuf::from("dist/target.html"));
     generator.generate();
 }

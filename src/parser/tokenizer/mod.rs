@@ -185,7 +185,7 @@ impl Tokenizer {
     fn parse_identifier_char(&mut self) -> PipelineResult {
         let char = self.char;
 
-        if char.is_ascii_alphanumeric() {
+        if char.is_ascii_alphanumeric() || char == '-' || char == '_' {
             self.buf.push(char);
             return PipelineResult::Handled;
         }

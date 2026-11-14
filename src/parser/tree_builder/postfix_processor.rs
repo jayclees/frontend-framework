@@ -24,7 +24,11 @@ impl<'a> PostfixProcessor<'a> {
         match token {
             ExprToken::Number(_) => self.output.push(Part::Operand(token)),
             ExprToken::Operator(op) => match op {
-                Operator::Plus | Operator::Minus | Operator::Multiply | Operator::Divide | Operator::Power => {
+                Operator::Plus
+                | Operator::Minus
+                | Operator::Multiply
+                | Operator::Divide
+                | Operator::Power => {
                     // Pop each operator on the stack that has higher
                     // or equal precedence and append to output.
                     for i in (0..self.op_stack.len()).rev() {
@@ -54,34 +58,36 @@ impl<'a> PostfixProcessor<'a> {
                         }
                     }
                 }
-                Operator::Modulus => unimplemented!("PostfixProcessor@process(Modulus) not implemented."),
-                Operator::Assign => unimplemented!("PostfixProcessor@process(Assign) not implemented."),
-                Operator::Increment => unimplemented!("PostfixProcessor@process(Increment) not implemented."),
-                Operator::Decrement => unimplemented!("PostfixProcessor@process(Decrement) not implemented."),
-                Operator::IncrementBy => unimplemented!("PostfixProcessor@process(IncrementBy) not implemented."),
-                Operator::DecrementBy => unimplemented!("PostfixProcessor@process(DecrementBy) not implemented."),
-                Operator::MultiplyBy => unimplemented!("PostfixProcessor@process(MultiplyBy) not implemented."),
-                Operator::DivideBy => unimplemented!("PostfixProcessor@process(DivideBy) not implemented."),
-                Operator::EqualTo => unimplemented!("PostfixProcessor@process(EqualTo) not implemented."),
-                Operator::NotEqualTo => unimplemented!("PostfixProcessor@process(NotEqualTo) not implemented."),
-                Operator::GreaterThan => unimplemented!("PostfixProcessor@process(GreaterThan) not implemented."),
-                Operator::GreaterThanOrEqualTo => unimplemented!("PostfixProcessor@process(GreaterThanOrEqualTo) not implemented."),
-                Operator::LessThan => unimplemented!("PostfixProcessor@process(LessThan) not implemented."),
-                Operator::LessThanOrEqualTo => unimplemented!("PostfixProcessor@process(LessThanOrEqualTo) not implemented."),
-                Operator::And => unimplemented!("PostfixProcessor@process(And) not implemented."),
-                Operator::Or => unimplemented!("PostfixProcessor@process(Or) not implemented."),
-                Operator::Not => unimplemented!("PostfixProcessor@process(Not) not implemented."),
-                Operator::Concatenation => unimplemented!("PostfixProcessor@process(Concatenation) not implemented."),
+                Operator::Concatenation => todo!(),
+                Operator::Modulus
+                | Operator::Assign
+                | Operator::Increment
+                | Operator::Decrement
+                | Operator::IncrementBy
+                | Operator::DecrementBy
+                | Operator::MultiplyBy
+                | Operator::DivideBy
+                | Operator::EqualTo
+                | Operator::NotEqualTo
+                | Operator::GreaterThan
+                | Operator::GreaterThanOrEqualTo
+                | Operator::LessThan
+                | Operator::LessThanOrEqualTo
+                | Operator::And
+                | Operator::Or
+                | Operator::Not => unimplemented!("Operator not implemented."),
             },
-            ExprToken::String(_) => {}
-            ExprToken::Var(_) => {}
-            ExprToken::Dot => {}
-            ExprToken::BracketAccessorOpen => {}
-            ExprToken::BracketAccessorClose => {}
-            ExprToken::FunctionArgsOpen => {}
-            ExprToken::FunctionArgsClose => {}
-            ExprToken::ArrayOpen => {}
-            ExprToken::ArrayClose => {}
+            ExprToken::String(_) => {
+                self.output.push(Part::Operand(token));
+            }
+            ExprToken::Var(_) => unimplemented!(),
+            ExprToken::Dot => unimplemented!(),
+            ExprToken::BracketAccessorOpen => unimplemented!(),
+            ExprToken::BracketAccessorClose => unimplemented!(),
+            ExprToken::FunctionArgsOpen => unimplemented!(),
+            ExprToken::FunctionArgsClose => unimplemented!(),
+            ExprToken::ArrayOpen => unimplemented!(),
+            ExprToken::ArrayClose => unimplemented!(),
         }
         self.step += 1;
     }
@@ -96,15 +102,8 @@ impl<'a> PostfixProcessor<'a> {
 
         let mut output: Vec<Part> = std::mem::take(&mut self.output);
         let mut buf: Vec<ExprToken> = vec![];
-        let mut step = 0;
 
         while !output.is_empty() {
-            step += 1;
-
-            // if step == 5 {
-            //     crate::dd!(buf, output.remove(0));
-            // }
-
             match output.remove(0) {
                 Part::Operand(operand) => {
                     buf.push(operand.clone());
@@ -121,7 +120,9 @@ impl<'a> PostfixProcessor<'a> {
                             Operator::Divide => buf.push(ExprToken::Number(left.divide(right))),
                             Operator::Power => buf.push(ExprToken::Number(left.power(right))),
                             Operator::Modulus => buf.push(ExprToken::Number(left.modulus(right))),
-                            Operator::Concatenation => buf.push(ExprToken::String(format!("{left}{right}"))),
+                            Operator::Concatenation => {
+                                buf.push(ExprToken::String(format!("{left}{right}")))
+                            }
                             Operator::Assign => {}
                             Operator::Increment => {}
                             Operator::Decrement => {}
@@ -155,6 +156,8 @@ impl<'a> PostfixProcessor<'a> {
 
         if let Some(ExprToken::Number(num)) = buf.first() {
             BlockContent::Text(num.to_owned())
+        } else if let Some(ExprToken::String(str)) = buf.first() {
+            BlockContent::Text(str.to_owned())
         } else {
             panic!("Buf should not be empty.");
         }
