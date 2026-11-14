@@ -18,43 +18,66 @@ impl Block {
 
     pub fn to_html(&self) -> String {
         let mut html = String::new();
+        let is_self_closing = matches!(
+            self.tag.to_lowercase().as_ref(),
+            "area"
+                | "base"
+                | "br"
+                | "col"
+                | "embed"
+                | "hr"
+                | "img"
+                | "input"
+                | "link"
+                | "meta"
+                | "param"
+                | "source"
+                | "track"
+                | "wbr"
+        );
 
         // todo handle custom components
         html.push_str(format!("<{}", self.tag).as_str());
 
+        let mut content: Vec<String> = vec![];
+
         // Append attributes to string
         for attr in &self.attributes {
-            html.push_str(
-                format!(
-                    r#" {}="{}""#,
-                    attr.handle,
-                    html_escape::encode_double_quoted_attribute(&attr.value)
-                )
-                .as_ref(),
-            );
+            let chars = attr.value.chars();
+            let string = chars.skip(1).take(attr.value.len() - 2).collect::<String>();
+
+            match attr.handle.to_lowercase().as_ref() {
+                "text" => content.push(html_escape::encode_double_quoted_attribute(&string).to_string()),
+                "html" => content.push(string),
+                handle => {
+                    html.push_str(
+                        format!(
+                            r#" {}="{}""#,
+                            handle,
+                            html_escape::encode_double_quoted_attribute(&string)
+                        )
+                        .as_ref(),
+                    );
+                }
+            }
         }
 
         html.push('>');
 
+        for item in content {
+            html.push_str(item.as_ref());
+        }
+
         for child in &self.children {
             html.push_str(child.to_html().as_str());
-            // match child {
-            //     BlockContent::Html(str) => {
-            //         html.push_str(str);
-            //     }
-            //     BlockContent::Text(str) => {
-            //         html.push_str(html_escape::encode_text(str).as_ref());
-            //     }
-            //     BlockContent::Block(block) => {
-            //         html.push_str(block.to_html().as_str());
-            //     }
-            // }
         }
 
         // todo:
         // Create a list or enum of html tags that are self closing, check
         // against it, and close it only if the tag requires it.
-        html.push_str(format!("</{}>", self.tag).as_str());
+        if !is_self_closing {
+            html.push_str(format!("</{}>", self.tag).as_str());
+        }
 
         html
     }

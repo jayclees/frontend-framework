@@ -14,7 +14,7 @@ impl<'a> Generator<'a> {
     }
 
     pub fn generate(&mut self) {
-        let mut html = String::new();
+        let mut html = String::from("<!doctype html>");
         for block in self.blocks {
             html.push_str(block.to_html().as_str());
         }
