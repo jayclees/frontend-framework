@@ -1,8 +1,10 @@
+pub mod directive;
 mod state;
 #[cfg(test)]
 mod test;
 pub(crate) mod token;
 
+use crate::parser::tokenizer::directive::{Directive, DirectiveElse, DirectiveElseIf, DirectiveExtends, DirectiveFor, DirectiveIf, DirectiveParseResult, DirectiveTest, DirectiveValueType};
 use crate::parser::tokenizer::token::{ExprToken, Operator, OperatorMatchResult};
 use state::State;
 use std::assert_matches;
@@ -11,7 +13,6 @@ use std::fs::{OpenOptions, read_to_string};
 use std::io::Write;
 use token::{Token, TokenType};
 
-#[derive(Debug)]
 pub struct Tokenizer {
     state_history: Vec<State>,
     char: char,
@@ -21,6 +22,7 @@ pub struct Tokenizer {
     buf: String,
     buf_start: Option<usize>,
     tokens: Vec<Token>,
+    active_directive: Option<Box<dyn Directive>>,
 }
 
 impl Tokenizer {
@@ -34,6 +36,7 @@ impl Tokenizer {
             buf: String::new(),
             buf_start: None,
             tokens: vec![],
+            active_directive: None,
         }
     }
 }
@@ -91,15 +94,11 @@ impl Tokenizer {
                     Pipe::ExpectIdentifierStart,
                     Pipe::ExpectBlockClose,
                 ]),
-                State::ParsedAttrColon => {
-                    // Order should matter here? ExpectCommentStart
-                    // must be before ExpectExpressionStart.
-                    self.pipeline(vec![
-                        Pipe::ExprExpectOperandStart,
-                        Pipe::ExprExpectNegativeOperator,
-                        Pipe::ExprExpectParenthesisOpen,
-                    ])
-                }
+                State::ParsedAttrColon => self.pipeline(vec![
+                    Pipe::ExpectOperandStart,
+                    Pipe::ExpectNegativeOperator,
+                    Pipe::ExpectParenthesisOpen,
+                ]),
                 State::ParsedExpressionTokens => self.pipeline(vec![
                     Pipe::ExpectCommentStart,
                     Pipe::ExpectAttrSeparator,
@@ -120,12 +119,17 @@ impl Tokenizer {
                     Pipe::ExpectDirectiveColon,
                     Pipe::ExpectDirectiveClose,
                 ]),
-                State::ParsedDirectiveColon => {
-                    self.pipeline(vec![Pipe::ParseDirectiveValue, Pipe::ExpectDirectiveClose])
-                }
+                State::ExpectDirectiveExpression => self.pipeline(vec![
+                    Pipe::ExpectCommentStart,
+                    Pipe::ExpectNegativeOperator,
+                    Pipe::ExpectOperandStart,
+                    Pipe::ExpectParenthesisOpen,
+                    Pipe::ExpectDirectiveClose,
+                ]),
                 State::ParsingDirectiveValue => {
                     self.pipeline(vec![Pipe::ParseDirectiveValue, Pipe::ExpectDirectiveClose])
                 }
+                State::ExpectDirectiveClose => self.pipeline(vec![Pipe::ExpectDirectiveClose]),
                 State::ParsingEventListenerOpen => {
                     self.pipeline(vec![Pipe::ParseEventListenerOpen])
                 }
@@ -152,95 +156,101 @@ impl Tokenizer {
                 ]),
                 State::ExprStart => self.pipeline(vec![
                     Pipe::ExpectCommentStart,
-                    Pipe::ExprExpectNegativeOperator,
-                    Pipe::ExprExpectOperandStart,
-                    Pipe::ExprExpectParenthesisOpen,
+                    Pipe::ExpectNegativeOperator,
+                    Pipe::ExpectOperandStart,
+                    Pipe::ExpectParenthesisOpen,
                 ]),
                 // todo if current char is not a number in the following state,
                 // todo make sure to pop ExprParsingNumber state in handler
                 State::ExprParsingNumber => self.pipeline(vec![
-                    Pipe::ExprParseNumber,
-                    Pipe::ExprExpectSlash,
-                    Pipe::ExprExpectOperatorStart,
-                    Pipe::ExprExpectParenthesisClose,
-                    Pipe::ExprExpectDot,
+                    Pipe::ParseNumber,
+                    Pipe::ExpectSlash,
+                    Pipe::ExpectOperatorStart,
+                    Pipe::ExpectParenthesisClose,
+                    Pipe::ExpectDot,
                     Pipe::ExpectAttrSeparator,
                     Pipe::ExpectBlockClose,
                 ]),
                 State::ExprParsedNumber => self.pipeline(vec![
-                    Pipe::ExprExpectSlash,
-                    Pipe::ExprExpectOperatorStart,
-                    Pipe::ExprExpectParenthesisClose,
+                    Pipe::ExpectSlash,
+                    Pipe::ExpectOperatorStart,
+                    Pipe::ExpectParenthesisClose,
                     Pipe::ExpectAttrSeparator,
                     Pipe::ExpectBlockClose,
+                    Pipe::ExpectDirectiveClose,
                 ]),
                 State::ExprParsingFractionalNumber => self.pipeline(vec![
-                    Pipe::ExprParseFractionalNumber,
-                    Pipe::ExprExpectSlash,
-                    Pipe::ExprExpectOperatorStart,
-                    Pipe::ExprExpectParenthesisClose,
+                    Pipe::ParseFractionalNumber,
+                    Pipe::ExpectSlash,
+                    Pipe::ExpectOperatorStart,
+                    Pipe::ExpectParenthesisClose,
                     Pipe::ExpectAttrSeparator,
                     Pipe::ExpectBlockClose,
+                    Pipe::ExpectDirectiveClose,
                 ]),
-                State::ExprParsingString => self.pipeline(vec![Pipe::ExprParseString]),
+                State::ExprExpectStringStart => self.pipeline(vec![Pipe::ExpectStringStart]),
+                State::ExprParsingString => self.pipeline(vec![Pipe::ParseString]),
                 State::ExprParsedString => self.pipeline(vec![
                     Pipe::ExpectCommentStart,
-                    Pipe::ExprExpectDot,
-                    Pipe::ExprExpectParenthesisClose,
+                    Pipe::ExpectDot,
+                    Pipe::ExpectParenthesisClose,
                     Pipe::ExpectAttrSeparator,
                     Pipe::ExpectBlockClose,
+                    Pipe::ExpectDirectiveClose,
                 ]),
                 State::ExprParsingVar => self.pipeline(vec![
-                    Pipe::ExprParseVar,
-                    Pipe::ExprExpectSlash,
-                    Pipe::ExprExpectDot,
-                    Pipe::ExprExpectBracketOpen,
-                    Pipe::ExprExpectParenthesisClose,
+                    Pipe::ParseVar,
+                    Pipe::ExpectSlash,
+                    Pipe::ExpectDot,
+                    Pipe::ExpectBracketOpen,
+                    Pipe::ExpectParenthesisClose,
                     Pipe::ExpectAttrSeparator,
                     Pipe::ExpectBlockClose,
+                    Pipe::ExpectDirectiveClose,
                 ]),
                 State::ExprParsedVar => self.pipeline(vec![
-                    Pipe::ExprExpectSlash,
-                    Pipe::ExprExpectDot,
-                    Pipe::ExprExpectBracketOpen,
-                    Pipe::ExprExpectParenthesisClose,
+                    Pipe::ExpectSlash,
+                    Pipe::ExpectDot,
+                    Pipe::ExpectBracketOpen,
+                    Pipe::ExpectParenthesisClose,
                     Pipe::ExpectAttrSeparator,
                     Pipe::ExpectBlockClose,
+                    Pipe::ExpectDirectiveClose,
                 ]),
                 State::ExprParsingOperator => self.pipeline(vec![
-                    Pipe::ExprParseOperator,
-                    Pipe::ExprExpectSlash,
-                    Pipe::ExprExpectOperandStart,
+                    Pipe::ParseOperator,
+                    Pipe::ExpectSlash,
+                    Pipe::ExpectOperandStart,
                 ]),
                 State::ExprParsedOperator => {
-                    self.pipeline(vec![Pipe::ExpectCommentStart, Pipe::ExprExpectOperandStart])
+                    self.pipeline(vec![Pipe::ExpectCommentStart, Pipe::ExpectOperandStart])
                 }
                 State::ExprParsedBracketOpen => self.pipeline(vec![
                     Pipe::UNIMPLEMENTED,
                     Pipe::ExpectCommentStart,
-                    Pipe::ExprExpectOperandStart,
+                    Pipe::ExpectOperandStart,
                 ]),
                 State::ExprParsedParenthesisClose => self.pipeline(vec![
-                    Pipe::ExprExpectSlash,
-                    Pipe::ExprExpectOperatorStart,
-                    Pipe::ExprExpectParenthesisClose,
-                    Pipe::ExprExpectDot,
+                    Pipe::ExpectSlash,
+                    Pipe::ExpectOperatorStart,
+                    Pipe::ExpectParenthesisClose,
+                    Pipe::ExpectDot,
                     Pipe::ExpectAttrSeparator,
                     Pipe::ExpectBlockClose,
+                    Pipe::ExpectDirectiveClose,
                 ]),
                 State::ExprResolvingSlash => {
-                    self.pipeline(vec![Pipe::ExprResolveSlash, Pipe::ExprExpectOperandStart])
+                    self.pipeline(vec![Pipe::ResolveSlash, Pipe::ExpectOperandStart])
                 }
                 State::ExprResolvingDot => self.pipeline(vec![
-                    Pipe::ExprResolveDot,
-                    Pipe::ExprExpectOperandStart,
-                    Pipe::ExprExpectFractionalNumberStart,
+                    Pipe::ResolveDot,
+                    Pipe::ExpectOperandStart,
+                    Pipe::ExpectFractionalNumberStart,
                     Pipe::ExpectAttrSeparator,
                     Pipe::ExpectBlockClose,
+                    Pipe::ExpectDirectiveClose,
                 ]),
-                State::ExprParsedNegativeOperator => {
-                    self.pipeline(vec![Pipe::ExprExpectNumberStart])
-                }
+                State::ExprParsedNegativeOperator => self.pipeline(vec![Pipe::ExpectNumberStart]),
             }
         }
 
@@ -290,25 +300,26 @@ impl Tokenizer {
                 Pipe::ExpectAttrSeparator => self.expect_attr_separator(),
 
                 // Expressions
-                Pipe::ExprExpectOperandStart => self.expr_expect_operand_start(),
-                Pipe::ExprExpectNumberStart => self.expr_expect_number_start(),
-                Pipe::ExprExpectParenthesisOpen => self.expr_expect_parenthesis_open(),
-                Pipe::ExprParseString => self.expr_parse_string(),
-                Pipe::ExprParseNumber => self.expr_parse_number(),
-                Pipe::ExprParseVar => self.expr_parse_var(),
-                Pipe::ExprParseOperator => self.expr_parse_operator(),
-                Pipe::ExprExpectBracketAccessorOpen => self.expr_expect_bracket_accessor_open(),
-                Pipe::ExprExpectBracketAccessorClose => self.expr_expect_bracket_accessor_close(),
-                Pipe::ExprExpectNegativeOperator => self.expr_expect_negative_operator(),
-                Pipe::ExprExpectOperatorStart => self.expr_expect_operator_start(),
-                Pipe::ExprExpectParenthesisClose => self.expr_expect_parenthesis_close(),
-                Pipe::ExprExpectSlash => self.expr_expect_slash(),
-                Pipe::ExprExpectDot => self.expr_expect_dot(),
-                Pipe::ExprExpectBracketOpen => self.expr_expect_bracket_open(),
-                Pipe::ExprResolveDot => self.expr_resolve_dot(),
-                Pipe::ExprResolveSlash => self.expr_resolve_slash(),
-                Pipe::ExprExpectFractionalNumberStart => self.expr_expect_fractional_number_start(),
-                Pipe::ExprParseFractionalNumber => self.expr_parse_fractional_number(),
+                Pipe::ExpectOperandStart => self.expect_operand_start(),
+                Pipe::ExpectStringStart => self.expect_string_start(),
+                Pipe::ExpectNumberStart => self.expect_number_start(),
+                Pipe::ExpectParenthesisOpen => self.expect_parenthesis_open(),
+                Pipe::ParseString => self.parse_string(),
+                Pipe::ParseNumber => self.parse_number(),
+                Pipe::ParseVar => self.parse_var(),
+                Pipe::ParseOperator => self.parse_operator(),
+                Pipe::ExpectBracketAccessorOpen => self.expect_bracket_accessor_open(),
+                Pipe::ExpectBracketAccessorClose => self.expect_bracket_accessor_close(),
+                Pipe::ExpectNegativeOperator => self.expect_negative_operator(),
+                Pipe::ExpectOperatorStart => self.expect_operator_start(),
+                Pipe::ExpectParenthesisClose => self.expect_parenthesis_close(),
+                Pipe::ExpectSlash => self.expect_slash(),
+                Pipe::ExpectDot => self.expect_dot(),
+                Pipe::ExpectBracketOpen => self.expect_bracket_open(),
+                Pipe::ResolveDot => self.resolve_dot(),
+                Pipe::ResolveSlash => self.resolve_slash(),
+                Pipe::ExpectFractionalNumberStart => self.expect_fractional_number_start(),
+                Pipe::ParseFractionalNumber => self.parse_fractional_number(),
             };
 
             match result {
@@ -714,7 +725,17 @@ impl Tokenizer {
             return PipelineResult::Handled;
         }
 
-        self.push_token(TokenType::DirectiveIdentifier(self.buf.clone()));
+        let directive_id = self.buf.clone();
+        match directive_id.as_ref() {
+            "if" => self.active_directive = Some(Box::new(DirectiveIf {})),
+            "else" => self.active_directive = Some(Box::new(DirectiveElse {})),
+            "elseif" => self.active_directive = Some(Box::new(DirectiveElseIf {})),
+            "for" => self.active_directive = Some(Box::new(DirectiveFor {})),
+            "extends" => self.active_directive = Some(Box::new(DirectiveExtends {})),
+            "test" => self.active_directive = Some(Box::new(DirectiveTest {})),
+            id => return PipelineResult::Err(format!(r#""{id}" directive does not exist."#)),
+        }
+        self.push_token(TokenType::DirectiveIdentifier(directive_id));
         self.pop_state_type(State::ParsingDirectiveIdentifier);
         self.push_state(State::ParsedDirectiveIdentifier, None);
 
@@ -727,7 +748,15 @@ impl Tokenizer {
         if char == ':' {
             self.reset_buffer();
             self.push_token(TokenType::DirectiveColon);
-            self.push_state(State::ParsedDirectiveColon, None);
+            let directive = self.active_directive.as_mut().expect("Should be set.");
+            match directive.value_type() {
+                DirectiveValueType::Expression => {
+                    self.push_state(State::ExpectDirectiveExpression, None)
+                }
+                DirectiveValueType::Custom => self.push_state(State::ParsingDirectiveValue, None),
+                DirectiveValueType::None => self.push_state(State::ExpectDirectiveClose, None),
+                DirectiveValueType::String => self.push_state(State::ExprExpectStringStart, None),
+            }
             return PipelineResult::Handled;
         }
 
@@ -754,36 +783,62 @@ impl Tokenizer {
     fn parse_directive_value(&mut self) -> PipelineResult {
         let char = self.char;
 
-        if char == ']' {
-            if self.buf.is_empty() {
-                return PipelineResult::ErrUnexpected;
-            }
+        match self.active_directive.as_mut().unwrap().parse(char) {
+            DirectiveParseResult::Handled => PipelineResult::Handled,
+            DirectiveParseResult::Done => {
 
-            self.push_token(TokenType::DirectiveValue(self.buf.clone()));
-            return PipelineResult::Continue;
+                PipelineResult::Continue
+            },
+            DirectiveParseResult::Err(msg) => PipelineResult::Err(msg),
+            DirectiveParseResult::Void => unimplemented!(),
         }
-
-        if self.buf.is_empty() {
-            self.reset_buffer();
-        }
-        self.buf.push(char);
-
-        PipelineResult::Handled
     }
 
     fn expect_directive_close(&mut self) -> PipelineResult {
         let char = self.char;
 
         if char == ']' {
-            // todo ensure at least one character for directive value for testing
-
-            self.reset_buffer();
-            self.push_token(TokenType::DirectiveClose);
-            if self.state() == &State::ParsedDirectiveColon {
-                self.pop_state_type(State::ParsedDirectiveColon);
+            let directive = self.active_directive.as_ref().expect("Should be set.");
+            match directive.value_type() {
+                // If directive value is of type expression, ensure
+                // that the last token is a valid expression end
+                DirectiveValueType::Expression => match self.tokens.last().unwrap().r#type() {
+                    TokenType::ExprToken(_) => {
+                        self.reset_buffer();
+                        self.push_token(TokenType::DirectiveClose);
+                        if matches!(
+                            self.state(),
+                            State::ExprParsedNumber
+                                | State::ExprParsedString
+                                | State::ExprParsedVar
+                                | State::ExprParsedParenthesisClose
+                        ) {
+                            self.pop_state();
+                        }
+                        self.pop_state_type(State::ExpectDirectiveExpression);
+                    }
+                    TokenType::DirectiveColon => {
+                        return PipelineResult::Err(
+                            "Expected directive expression before close.".to_lowercase(),
+                        );
+                    }
+                    _ => panic!("err"),
+                },
+                DirectiveValueType::Custom |
+                DirectiveValueType::None => {
+                    self.reset_buffer();
+                    self.push_token(TokenType::DirectiveClose);
+                }
+                DirectiveValueType::String => {
+                    self.reset_buffer();
+                    self.push_token(TokenType::DirectiveClose);
+                    self.pop_state_type(State::ExprParsedString);
+                },
             }
+
             self.pop_state_type(State::ParsedDirectiveIdentifier);
             self.pop_state_type(State::ParsingDirective);
+            self.active_directive = None;
             return PipelineResult::Handled;
         }
 
@@ -954,7 +1009,7 @@ impl Tokenizer {
 
     // Expressions
 
-    fn expr_expect_operand_start(&mut self) -> PipelineResult {
+    fn expect_operand_start(&mut self) -> PipelineResult {
         let char = self.char;
 
         if char.is_ascii_digit() {
@@ -980,7 +1035,21 @@ impl Tokenizer {
         PipelineResult::Continue
     }
 
-    fn expr_expect_number_start(&mut self) -> PipelineResult {
+    fn expect_string_start(&mut self) -> PipelineResult {
+        let char = self.char;
+
+        // todo support single quote
+        if char == '"' {
+            self.pop_state_type(State::ExprExpectStringStart);
+            self.reset_buffer();
+            self.push_state(State::ExprParsingString, Some(char));
+            return PipelineResult::Handled;
+        }
+
+        PipelineResult::Continue
+    }
+
+    fn expect_number_start(&mut self) -> PipelineResult {
         let char = self.char;
 
         if char.is_ascii_digit() {
@@ -998,7 +1067,7 @@ impl Tokenizer {
         PipelineResult::Continue
     }
 
-    fn expr_expect_parenthesis_open(&mut self) -> PipelineResult {
+    fn expect_parenthesis_open(&mut self) -> PipelineResult {
         let char = self.char;
 
         if char == '(' {
@@ -1012,7 +1081,7 @@ impl Tokenizer {
         PipelineResult::Continue
     }
 
-    fn expr_parse_string(&mut self) -> PipelineResult {
+    fn parse_string(&mut self) -> PipelineResult {
         let char = self.char;
 
         // todo support single quotes
@@ -1032,7 +1101,7 @@ impl Tokenizer {
         PipelineResult::Handled
     }
 
-    fn expr_parse_number(&mut self) -> PipelineResult {
+    fn parse_number(&mut self) -> PipelineResult {
         let char = self.char;
 
         if self.char.is_ascii_digit() {
@@ -1047,7 +1116,7 @@ impl Tokenizer {
         PipelineResult::Continue
     }
 
-    fn expr_parse_var(&mut self) -> PipelineResult {
+    fn parse_var(&mut self) -> PipelineResult {
         let char = self.char;
 
         if char.is_ascii_alphanumeric() {
@@ -1062,7 +1131,7 @@ impl Tokenizer {
         PipelineResult::Continue
     }
 
-    fn expr_expect_bracket_accessor_open(&mut self) -> PipelineResult {
+    fn expect_bracket_accessor_open(&mut self) -> PipelineResult {
         let char = self.char;
 
         if char == '[' {
@@ -1077,7 +1146,7 @@ impl Tokenizer {
         PipelineResult::Continue
     }
 
-    fn expr_expect_bracket_accessor_close(&mut self) -> PipelineResult {
+    fn expect_bracket_accessor_close(&mut self) -> PipelineResult {
         let char = self.char;
 
         if char == ']' {
@@ -1091,7 +1160,7 @@ impl Tokenizer {
         PipelineResult::Continue
     }
 
-    fn expr_expect_negative_operator(&mut self) -> PipelineResult {
+    fn expect_negative_operator(&mut self) -> PipelineResult {
         let char = self.char;
 
         if char == '-' {
@@ -1104,7 +1173,7 @@ impl Tokenizer {
         PipelineResult::Continue
     }
 
-    fn expr_expect_operator_start(&mut self) -> PipelineResult {
+    fn expect_operator_start(&mut self) -> PipelineResult {
         let char = self.char;
 
         if Operator::is_operator_char(char) {
@@ -1136,7 +1205,7 @@ impl Tokenizer {
         PipelineResult::Continue
     }
 
-    fn expr_parse_operator(&mut self) -> PipelineResult {
+    fn parse_operator(&mut self) -> PipelineResult {
         let char = self.char;
 
         if Operator::is_operator_char(char) {
@@ -1174,7 +1243,7 @@ impl Tokenizer {
         }
     }
 
-    fn expr_expect_parenthesis_close(&mut self) -> PipelineResult {
+    fn expect_parenthesis_close(&mut self) -> PipelineResult {
         let char = self.char;
 
         if char == ')' {
@@ -1188,13 +1257,13 @@ impl Tokenizer {
         PipelineResult::Continue
     }
 
-    fn expr_expect_slash(&mut self) -> PipelineResult {
+    fn expect_slash(&mut self) -> PipelineResult {
         let char = self.char;
 
         PipelineResult::Continue
     }
 
-    fn expr_expect_dot(&mut self) -> PipelineResult {
+    fn expect_dot(&mut self) -> PipelineResult {
         let char = self.char;
 
         if char == '.' {
@@ -1207,13 +1276,13 @@ impl Tokenizer {
         PipelineResult::Continue
     }
 
-    fn expr_expect_bracket_open(&mut self) -> PipelineResult {
+    fn expect_bracket_open(&mut self) -> PipelineResult {
         let char = self.char;
 
         PipelineResult::Continue
     }
 
-    fn expr_resolve_dot(&mut self) -> PipelineResult {
+    fn resolve_dot(&mut self) -> PipelineResult {
         let char = self.char;
 
         if char.is_ascii_digit() || matches!(char, ',' | '}' | ')') {
@@ -1247,14 +1316,14 @@ impl Tokenizer {
         PipelineResult::Continue
     }
 
-    fn expr_resolve_slash(&mut self) -> PipelineResult {
+    fn resolve_slash(&mut self) -> PipelineResult {
         todo!();
         let char = self.char;
 
         PipelineResult::Continue
     }
 
-    fn expr_expect_fractional_number_start(&mut self) -> PipelineResult {
+    fn expect_fractional_number_start(&mut self) -> PipelineResult {
         let char = self.char;
 
         if char.is_ascii_digit() {
@@ -1266,7 +1335,7 @@ impl Tokenizer {
         PipelineResult::Continue
     }
 
-    fn expr_parse_fractional_number(&mut self) -> PipelineResult {
+    fn parse_fractional_number(&mut self) -> PipelineResult {
         let char = self.char;
 
         if char.is_ascii_digit() {
@@ -1339,25 +1408,26 @@ pub enum Pipe {
     ExpectAttrSeparator,
 
     // Expressions
-    ExprExpectOperandStart,
-    ExprExpectNumberStart,
-    ExprExpectParenthesisOpen,
-    ExprParseString,
-    ExprParseNumber,
-    ExprParseVar,
-    ExprParseOperator,
-    ExprExpectBracketAccessorOpen,
-    ExprExpectBracketAccessorClose,
-    // ExprExpectFunctionArgsOpen,
-    // ExprExpectFunctionArgsClose,
-    ExprExpectNegativeOperator,
-    ExprExpectOperatorStart,
-    ExprExpectParenthesisClose,
-    ExprExpectSlash,
-    ExprExpectDot,
-    ExprExpectBracketOpen,
-    ExprResolveDot,
-    ExprResolveSlash,
-    ExprExpectFractionalNumberStart,
-    ExprParseFractionalNumber,
+    ExpectOperandStart,
+    ExpectNumberStart,
+    ExpectParenthesisOpen,
+    ExpectStringStart,
+    ParseString,
+    ParseNumber,
+    ParseVar,
+    ParseOperator,
+    ExpectBracketAccessorOpen,
+    ExpectBracketAccessorClose,
+    // ExpectFunctionArgsOpen,
+    // ExpectFunctionArgsClose,
+    ExpectNegativeOperator,
+    ExpectOperatorStart,
+    ExpectParenthesisClose,
+    ExpectSlash,
+    ExpectDot,
+    ExpectBracketOpen,
+    ResolveDot,
+    ResolveSlash,
+    ExpectFractionalNumberStart,
+    ParseFractionalNumber,
 }

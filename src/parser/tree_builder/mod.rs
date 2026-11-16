@@ -3,9 +3,11 @@ mod expression;
 mod html;
 mod postfix_processor;
 
+use std::panic::RefUnwindSafe;
 use super::tokenizer::token::{Token, TokenType};
 use super::tree_builder::block::AttrBuilder;
 use block::{Block, BlockBuilder};
+use crate::parser::tokenizer::directive::Directive;
 
 pub struct TreeBuilder<'a> {
     blocks: Vec<Block>,
@@ -23,7 +25,9 @@ impl<'a> TreeBuilder<'a> {
     }
 
     pub fn build(&mut self, tokens: &'a Vec<Token>) -> Vec<Block> {
+        let mut active_directive: Option<&Box<dyn Directive + RefUnwindSafe>> = None;
         for token in tokens {
+            dbg!(&token);
             match token.r#type() {
                 TokenType::BlockIdentifier(id) => {
                     self.block_builders.push(BlockBuilder::new(id.to_owned()));
@@ -68,10 +72,14 @@ impl<'a> TreeBuilder<'a> {
                         .process(expr_tok);
                 }
                 TokenType::DirectiveOpen => {}
-                TokenType::DirectiveClose => {}
+                TokenType::DirectiveClose => {
+                    active_directive = None;
+                }
                 TokenType::DirectiveIdentifier(id) => {}
                 TokenType::DirectiveColon => {}
-                TokenType::DirectiveValue(str) => {}
+                TokenType::DirectiveValue(directive, str) => {
+                    active_directive = Some(directive);
+                }
                 TokenType::EventListenerOpen => {}
                 TokenType::EventListenerClose => {}
                 TokenType::EventListenerIdentifier(id) => {}

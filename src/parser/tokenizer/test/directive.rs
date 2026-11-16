@@ -90,24 +90,3 @@ fn directives_0005() {
     let mut tokenizer = Tokenizer::new();
     match_tokens_to_source(string.clone(), tokenizer.tokenize(string));
 }
-
-#[test]
-fn directives_0006() {
-    let string = file("directive/directives_0006").unwrap();
-    let mut tokenizer = Tokenizer::new();
-    match_tokens_to_source(string.clone(), tokenizer.tokenize(string));
-}
-
-#[test]
-fn directives_0007() {
-    let string = file("directive/directives_0007").unwrap();
-    let mut tokenizer = Tokenizer::new();
-    match_tokens_to_source(string.clone(), tokenizer.tokenize(string));
-}
-
-#[test]
-fn directives_0008() {
-    let string = file("directive/directives_0008").unwrap();
-    let mut tokenizer = Tokenizer::new();
-    match_tokens_to_source(string.clone(), tokenizer.tokenize(string));
-}

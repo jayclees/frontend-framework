@@ -1,10 +1,13 @@
+use std::panic::RefUnwindSafe;
+use crate::parser::tokenizer::directive::Directive;
 use crate::parser::tree_builder::postfix_processor::PostfixProcessor;
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug)]
 pub struct Block {
     tag: String,
     attributes: Vec<Attr>,
     children: Vec<Block>,
+    directives: Vec<Box<dyn Directive + RefUnwindSafe>>
 }
 
 impl Block {
@@ -13,6 +16,7 @@ impl Block {
             tag,
             attributes: Default::default(),
             children: vec![],
+            directives: vec![],
         }
     }
 
@@ -83,7 +87,7 @@ impl Block {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug)]
 pub enum BlockContent {
     Html(String),
     Text(String),
@@ -125,6 +129,7 @@ impl BlockBuilder {
             tag: std::mem::take(&mut self.tag),
             attributes: std::mem::take(&mut self.attributes),
             children: content,
+            directives: vec![],
         }
     }
 }

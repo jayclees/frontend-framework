@@ -1,4 +1,4 @@
 Page [
     extends: "layout"
-] [ marker ] [
-meta : "hello" ] { }
+] [ test ] [
+if : "hello" ] { }

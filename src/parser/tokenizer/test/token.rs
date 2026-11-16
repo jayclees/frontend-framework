@@ -1,3 +1,4 @@
+use crate::parser::tokenizer::directive::DirectiveIf;
 use crate::parser::tokenizer::token::{ExprToken, Operator, TokenType};
 
 #[test]
@@ -35,8 +36,8 @@ fn test_token_len_with_val() {
 
     //
 
-    assert_eq!(9, TokenType::DirectiveValue("something".to_owned()).len());
-    assert_eq!(13, TokenType::DirectiveValue("post in posts".to_owned()).len());
+    assert_eq!(9, TokenType::DirectiveValue(Box::new(DirectiveIf {}), "something".to_owned()).len());
+    assert_eq!(13, TokenType::DirectiveValue(Box::new(DirectiveIf {}), "post in posts".to_owned()).len());
 
     //
 

@@ -20,11 +20,13 @@ html {
             class: "h-100 container",
             div {
                 class: "h-100 d-flex justify-content-center align-items-center",
-                h1 {
-                    text: "Hello world!",
-                }
-                p {
-                    text: "This is the first page!",
+                div {
+                    h1 [if: true] {
+                        text: "Hello world!",
+                    }
+                    p [else] {
+                        text: "This is the first page!",
+                    }
                 }
             }
         }

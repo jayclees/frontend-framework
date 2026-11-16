@@ -16,6 +16,7 @@ use std::fs::read_to_string;
 use std::io;
 use std::panic::UnwindSafe;
 use std::path::PathBuf;
+use crate::parser::tokenizer::directive::DirectiveIf;
 
 fn base_path(path: &'static str) -> PathBuf {
     PathBuf::from("test-stubs").join(path)
@@ -121,7 +122,7 @@ fn test_match_tokens_to_source() {
         Token::new(5, DirectiveOpen),
         Token::new(6, DirectiveIdentifier("hello".to_owned())),
         Token::new(11, DirectiveColon),
-        Token::new(12, DirectiveValue(r#" "world""#.to_owned())),
+        Token::new(12, DirectiveValue(Box::new(DirectiveIf {}), r#" "world""#.to_owned())),
         Token::new(20, DirectiveClose),
         Token::new(22, EventListenerOpen),
         Token::new(24, EventListenerIdentifier("click".to_owned())),
@@ -142,7 +143,7 @@ fn test_untokenized_non_whitespace_chars_are_caught_1() {
         Token::new(5, DirectiveOpen),
         Token::new(6, DirectiveIdentifier("hello".to_owned())),
         Token::new(11, DirectiveColon),
-        Token::new(12, DirectiveValue(r#" "world""#.to_owned())),
+        Token::new(12, DirectiveValue(Box::new(DirectiveIf {}), r#" "world""#.to_owned())),
         Token::new(20, DirectiveClose),
         Token::new(22, EventListenerOpen),
         Token::new(24, EventListenerIdentifier("click".to_owned())),
@@ -166,7 +167,7 @@ fn test_untokenized_non_whitespace_chars_are_caught_2() {
         Token::new(5, DirectiveOpen),
         Token::new(6, DirectiveIdentifier("hello".to_owned())),
         Token::new(11, DirectiveColon),
-        Token::new(12, DirectiveValue(r#" "world""#.to_owned())),
+        Token::new(12, DirectiveValue(Box::new(DirectiveIf {}), r#" "world""#.to_owned())),
         Token::new(20, DirectiveClose),
         Token::new(22, EventListenerOpen),
         Token::new(24, EventListenerIdentifier("click".to_owned())),
@@ -190,7 +191,7 @@ fn test_untokenized_non_whitespace_chars_are_caught_3() {
         Token::new(5, DirectiveOpen),
         Token::new(6, DirectiveIdentifier("hello".to_owned())),
         Token::new(11, DirectiveColon),
-        Token::new(12, DirectiveValue(r#" "world""#.to_owned())),
+        Token::new(12, DirectiveValue(Box::new(DirectiveIf {}), r#" "world""#.to_owned())),
         Token::new(20, DirectiveClose),
         Token::new(22, EventListenerOpen),
         Token::new(24, EventListenerIdentifier("click".to_owned())),
@@ -214,7 +215,7 @@ fn test_untokenized_non_whitespace_chars_are_caught_4() {
         Token::new(5, DirectiveOpen),
         Token::new(6, DirectiveIdentifier("hello".to_owned())),
         // Token::new(11, DirectiveColon),
-        Token::new(12, DirectiveValue(r#" "world""#.to_owned())),
+        Token::new(12, DirectiveValue(Box::new(DirectiveIf {}), r#" "world""#.to_owned())),
         Token::new(20, DirectiveClose),
         Token::new(22, EventListenerOpen),
         Token::new(24, EventListenerIdentifier("click".to_owned())),

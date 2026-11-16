@@ -1,6 +1,8 @@
 use std::fmt::{Display, Formatter};
+use std::panic::RefUnwindSafe;
+use crate::parser::tokenizer::directive::Directive;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug)]
 pub struct Token {
     start: usize,
     end: usize,
@@ -48,7 +50,7 @@ impl Token {
             | TokenType::DirectiveIdentifier(str)
             | TokenType::EventListenerIdentifier(str)
             | TokenType::EventListenerHandler(str)
-            | TokenType::DirectiveValue(str) => source_str == str,
+            | TokenType::DirectiveValue(_, str) => source_str == str,
 
             TokenType::BlockOpen => source_str == "{",
             TokenType::BlockClose => source_str == "}",
@@ -78,7 +80,7 @@ impl Token {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug)]
 pub enum TokenType {
     // Keyword(KeywordEnum),
     BlockIdentifier(String),
@@ -94,7 +96,7 @@ pub enum TokenType {
     DirectiveClose,
     DirectiveIdentifier(String),
     DirectiveColon,
-    DirectiveValue(String),
+    DirectiveValue(Box<dyn Directive + RefUnwindSafe>, String),
     EventListenerOpen,
     EventListenerClose,
     EventListenerIdentifier(String),
@@ -110,7 +112,7 @@ impl TokenType {
             | TokenType::BlockComment(str)
             | TokenType::AttrIdentifier(str)
             | TokenType::DirectiveIdentifier(str)
-            | TokenType::DirectiveValue(str)
+            | TokenType::DirectiveValue(_, str)
             | TokenType::EventListenerHandler(str)
             | TokenType::EventListenerIdentifier(str) => str.len(),
 
@@ -137,7 +139,7 @@ impl TokenType {
             TokenType::BlockComment(str) |
             TokenType::AttrIdentifier(str) |
             TokenType::DirectiveIdentifier(str) |
-            TokenType::DirectiveValue(str) |
+            TokenType::DirectiveValue(_, str) |
             TokenType::EventListenerIdentifier(str) |
             TokenType::EventListenerHandler(str) => str.to_owned(),
 
@@ -185,7 +187,7 @@ impl Display for TokenType {
             TokenType::DirectiveClose => write!(f, "DirectiveClose"),
             TokenType::DirectiveIdentifier(_) => write!(f, "DirectiveIdentifier"),
             TokenType::DirectiveColon => write!(f, "DirectiveColon"),
-            TokenType::DirectiveValue(str) => write!(f, "DirectiveValue({str})"),
+            TokenType::DirectiveValue(_, str) => write!(f, "DirectiveValue({}, {})", "directive", str),
             TokenType::EventListenerOpen => write!(f, "EventListenerOpen"),
             TokenType::EventListenerClose => write!(f, "EventListenerClose"),
             TokenType::EventListenerIdentifier(str) => write!(f, "EventListenerIdentifier({str})"),
