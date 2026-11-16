@@ -8,11 +8,10 @@ html {
         meta { http-equiv: "X-UA-Compatible", content:"ie=edge" }
         title { text: "Welcome to Wire" }
         link {
-            ref: "stylesheet",
-            href: "https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.9/css/bootstrap.min.css",
-            integrity: "sha512-ZuV2yPmu5OcwTgfUHURSM2QYEMPA9UIPpMr/U9gJEdRB+1VcCJaUc/GJrO9WwZVNR3JB7mgzkRtRwor+BcaPAA==",
+            rel: "stylesheet",
+            href: "https://cdn.jsdelivr.net/npm/bootstrap@6.0.0-alpha.1/dist/css/bootstrap.min.css",
+            integrity: "sha384-B/GM4XqrwHnWXNOWMbloTmrYXZg10cakYGmpfsR/bbzQ6JAJI4ihuyADKLnBgrCe",
             crossorigin: "anonymous",
-            referrerpolicy: "no-referrer",
         }
     }
     body {
@@ -29,6 +28,11 @@ html {
                 }
             }
         }
-        script { src: "https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.9/js/bootstrap.min.js" }
+        script {
+            type: "module",
+            src: "https://cdn.jsdelivr.net/npm/bootstrap@6.0.0-alpha.1/dist/js/bootstrap.bundle.min.js",
+            integrity: "sha384-1a/pXj49ZQ1aHEmrJ+gMw1otqoVsYwlEnlD8mIfY2TV03r20Y0CN7uqx1tQogjPL",
+            crossorigin: "anonymous"
+        }
     }
 }
