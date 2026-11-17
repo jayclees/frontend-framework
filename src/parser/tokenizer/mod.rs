@@ -544,7 +544,6 @@ impl Tokenizer {
 
     fn active_directive(&self) -> Option<&Box<dyn Directive + RefUnwindSafe>> {
         let mut directive_is_closed = false;
-
         for token in self.tokens.iter().rev() {
             if let TokenType::DirectiveClose = token.r#type() {
                 directive_is_closed = true;
@@ -749,12 +748,12 @@ impl Tokenizer {
         self.push_token(TokenType::DirectiveIdentifier(
             self.buf.clone(),
             match self.buf.as_ref() {
-                "if" => Box::new(DirectiveIf {}),
-                "else" => Box::new(DirectiveElse {}),
-                "elseif" => Box::new(DirectiveElseIf {}),
-                "for" => Box::new(DirectiveFor {}),
-                "extends" => Box::new(DirectiveExtends {}),
-                "dummymarker" => Box::new(DirectiveDummyMarker {}),
+                "if" => Box::new(DirectiveIf::new()),
+                "else" => Box::new(DirectiveElse::new()),
+                "elseif" => Box::new(DirectiveElseIf::new()),
+                "for" => Box::new(DirectiveFor::new()),
+                "extends" => Box::new(DirectiveExtends::new()),
+                "dummymarker" => Box::new(DirectiveDummyMarker::new()),
                 id => return PipelineResult::Err(format!(r#""{id}" directive does not exist."#)),
             },
         ));
@@ -806,7 +805,6 @@ impl Tokenizer {
             // We must first ensure that if the directive is being
             // closed, that it is being closed in a valid state.
             let active_directive = self.active_directive();
-            dbg!(&active_directive);
             match active_directive
                 .expect("No active directive found.")
                 .value_type()

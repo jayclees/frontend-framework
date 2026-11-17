@@ -115,7 +115,7 @@ fn test_match_tokens_to_source() {
     let tokens = vec![
         Token::new(0, TokenType::BlockIdentifier("Page".to_owned())),
         Token::new(5, TokenType::DirectiveOpen),
-        Token::new(6, TokenType::DirectiveIdentifier("hello".to_owned(), Box::new(DirectiveDummyString {}))),
+        Token::new(6, TokenType::DirectiveIdentifier("hello".to_owned(), Box::new(DirectiveDummyString::new()))),
         Token::new(11, TokenType::DirectiveColon),
         Token::new(12, TokenType::DirectiveValue(r#" "world""#.to_owned())),
         Token::new(20, TokenType::DirectiveClose),
@@ -136,7 +136,7 @@ fn test_untokenized_non_whitespace_chars_are_caught_1() {
     let tokens = vec![
         Token::new(1, TokenType::BlockIdentifier("age".to_owned())),
         Token::new(5, TokenType::DirectiveOpen),
-        Token::new(6, TokenType::DirectiveIdentifier("hello".to_owned(), Box::new(DirectiveDummyString {}))),
+        Token::new(6, TokenType::DirectiveIdentifier("hello".to_owned(), Box::new(DirectiveDummyString::new()))),
         Token::new(11, TokenType::DirectiveColon),
         Token::new(12, TokenType::DirectiveValue(r#" "world""#.to_owned())),
         Token::new(20, TokenType::DirectiveClose),
@@ -161,7 +161,7 @@ fn test_untokenized_non_whitespace_chars_are_caught_2() {
         // Comment out this next line to leave it untokenized
         // Token::new(0, TokenType::BlockIdentifier("Page".to_owned())),
         Token::new(5, TokenType::DirectiveOpen),
-        Token::new(6, TokenType::DirectiveIdentifier("hello".to_owned(), Box::new(DirectiveDummyString {}))),
+        Token::new(6, TokenType::DirectiveIdentifier("hello".to_owned(), Box::new(DirectiveDummyString::new()))),
         Token::new(11, TokenType::DirectiveColon),
         Token::new(12, TokenType::DirectiveValue(r#" "world""#.to_owned())),
         Token::new(20, TokenType::DirectiveClose),
@@ -185,7 +185,7 @@ fn test_untokenized_non_whitespace_chars_are_caught_3() {
     let tokens = vec![
         Token::new(0, TokenType::BlockIdentifier("Page".to_owned())),
         Token::new(5, TokenType::DirectiveOpen),
-        Token::new(6, TokenType::DirectiveIdentifier("hello".to_owned(), Box::new(DirectiveDummyString {}))),
+        Token::new(6, TokenType::DirectiveIdentifier("hello".to_owned(), Box::new(DirectiveDummyString::new()))),
         Token::new(11, TokenType::DirectiveColon),
         Token::new(12, TokenType::DirectiveValue(r#" "world""#.to_owned())),
         Token::new(20, TokenType::DirectiveClose),
@@ -209,7 +209,7 @@ fn test_untokenized_non_whitespace_chars_are_caught_4() {
     let tokens = vec![
         Token::new(0, TokenType::BlockIdentifier("Page".to_owned())),
         Token::new(5, TokenType::DirectiveOpen),
-        Token::new(6, TokenType::DirectiveIdentifier("hello".to_owned(), Box::new(DirectiveDummyString {}))),
+        Token::new(6, TokenType::DirectiveIdentifier("hello".to_owned(), Box::new(DirectiveDummyString::new()))),
         // Token::new(11, TokenType::DirectiveColon),
         Token::new(12, TokenType::DirectiveValue(r#" "world""#.to_owned())),
         Token::new(20, TokenType::DirectiveClose),
@@ -233,7 +233,7 @@ fn test_untokenized_non_whitespace_chars_are_caught_5() {
     let tokens = vec![
         Token::new(0, TokenType::BlockIdentifier("Page".to_owned())),
         Token::new(5, TokenType::DirectiveOpen),
-        Token::new(6, TokenType::DirectiveIdentifier("hello".to_owned(), Box::new(DirectiveDummyString {}))),
+        Token::new(6, TokenType::DirectiveIdentifier("hello".to_owned(), Box::new(DirectiveDummyString::new()))),
         Token::new(11, TokenType::DirectiveColon),
         // Token::new(12, TokenType::DirectiveValue(r#" "world""#.to_owned())),
         Token::new(20, TokenType::DirectiveClose),

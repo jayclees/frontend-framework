@@ -30,9 +30,9 @@ fn test_token_len_with_val() {
 
     //
 
-    assert_eq!(2, TokenType::DirectiveIdentifier("if".to_owned(), Box::new(DirectiveIf {})).len());
-    assert_eq!(3, TokenType::DirectiveIdentifier("for".to_owned(), Box::new(DirectiveFor {})).len());
-    assert_eq!(16, TokenType::DirectiveIdentifier("marker-directive".to_owned(), Box::new(DirectiveDummyMarker {})).len());
+    assert_eq!(2, TokenType::DirectiveIdentifier("if".to_owned(), Box::new(DirectiveIf::new())).len());
+    assert_eq!(3, TokenType::DirectiveIdentifier("for".to_owned(), Box::new(DirectiveFor::new())).len());
+    assert_eq!(16, TokenType::DirectiveIdentifier("marker-directive".to_owned(), Box::new(DirectiveDummyMarker::new())).len());
 
     //
 

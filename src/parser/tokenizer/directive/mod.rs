@@ -1,3 +1,4 @@
+use crate::parser::tokenizer::token::ExprToken;
 use std::fmt::Debug;
 
 pub trait Directive: Debug {
@@ -5,15 +6,23 @@ pub trait Directive: Debug {
 }
 
 #[derive(Debug)]
-pub struct DirectiveIf {}
+pub struct DirectiveIf<'a> {
+    tokens: Vec<&'a ExprToken>,
+}
 
-impl Directive for DirectiveIf {
+impl<'a> DirectiveIf<'a> {
+    pub fn new() -> Self {
+        Self { tokens: vec![] }
+    }
+}
+
+impl<'a> Directive for DirectiveIf<'a> {
     fn value_type(&self) -> DirectiveValueType {
         DirectiveValueType::Expression
     }
 }
 
-impl PartialEq for DirectiveIf {
+impl<'a> PartialEq for DirectiveIf<'a> {
     fn eq(&self, other: &Self) -> bool {
         todo!()
     }
@@ -22,35 +31,43 @@ impl PartialEq for DirectiveIf {
 #[derive(Debug)]
 pub struct DirectiveElse {}
 
+impl DirectiveElse {
+    pub fn new() -> Self {
+        Self {}
+    }
+}
+
 impl Directive for DirectiveElse {
     fn value_type(&self) -> DirectiveValueType {
         DirectiveValueType::None
     }
 }
 
-impl PartialEq for DirectiveElse {
-    fn eq(&self, other: &Self) -> bool {
-        todo!()
+#[derive(Debug)]
+pub struct DirectiveElseIf<'a> {
+    tokens: Vec<&'a ExprToken>,
+}
+
+impl<'a> DirectiveElseIf<'a> {
+    pub fn new() -> Self {
+        Self { tokens: vec![] }
     }
 }
 
-#[derive(Debug)]
-pub struct DirectiveElseIf {}
-
-impl Directive for DirectiveElseIf {
+impl<'a> Directive for DirectiveElseIf<'a> {
     fn value_type(&self) -> DirectiveValueType {
         DirectiveValueType::Expression
     }
 }
 
-impl PartialEq for DirectiveElseIf {
-    fn eq(&self, other: &Self) -> bool {
-        todo!()
-    }
-}
-
 #[derive(Debug)]
 pub struct DirectiveFor {}
+
+impl DirectiveFor {
+    pub fn new() -> Self {
+        Self {}
+    }
+}
 
 impl Directive for DirectiveFor {
     fn value_type(&self) -> DirectiveValueType {
@@ -58,24 +75,20 @@ impl Directive for DirectiveFor {
     }
 }
 
-impl PartialEq for DirectiveFor {
-    fn eq(&self, other: &Self) -> bool {
-        todo!()
+#[derive(Debug)]
+pub struct DirectiveExtends<'a> {
+    layout: Option<&'a String>,
+}
+
+impl<'a> DirectiveExtends<'a> {
+    pub fn new() -> Self {
+        Self { layout: None }
     }
 }
 
-#[derive(Debug)]
-pub struct DirectiveExtends {}
-
-impl Directive for DirectiveExtends {
+impl<'a> Directive for DirectiveExtends<'a> {
     fn value_type(&self) -> DirectiveValueType {
         DirectiveValueType::String
-    }
-}
-
-impl PartialEq for DirectiveExtends {
-    fn eq(&self, other: &Self) -> bool {
-        todo!()
     }
 }
 
@@ -83,31 +96,33 @@ impl PartialEq for DirectiveExtends {
 #[derive(Debug)]
 pub struct DirectiveDummyMarker {}
 
+impl<'a> DirectiveDummyMarker {
+    pub fn new() -> Self {
+        Self {}
+    }
+}
+
 impl Directive for DirectiveDummyMarker {
     fn value_type(&self) -> DirectiveValueType {
         DirectiveValueType::None
     }
 }
 
-impl PartialEq for DirectiveDummyMarker {
-    fn eq(&self, other: &Self) -> bool {
-        todo!()
-    }
-}
-
 /// This is for testing
 #[derive(Debug)]
-pub struct DirectiveDummyString {}
+pub struct DirectiveDummyString<'a> {
+    layout: Option<&'a String>,
+}
 
-impl Directive for DirectiveDummyString {
-    fn value_type(&self) -> DirectiveValueType {
-        DirectiveValueType::None
+impl<'a> DirectiveDummyString<'a> {
+    pub fn new() -> Self {
+        Self { layout: None }
     }
 }
 
-impl PartialEq for DirectiveDummyString {
-    fn eq(&self, other: &Self) -> bool {
-        todo!()
+impl<'a> Directive for DirectiveDummyString<'a> {
+    fn value_type(&self) -> DirectiveValueType {
+        DirectiveValueType::None
     }
 }
 

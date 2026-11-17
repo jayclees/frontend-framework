@@ -3,16 +3,17 @@ mod expression;
 mod html;
 mod postfix_processor;
 
-use std::panic::RefUnwindSafe;
 use super::tokenizer::token::{Token, TokenType};
 use super::tree_builder::block::AttrBuilder;
-use block::{Block, BlockBuilder};
 use crate::parser::tokenizer::directive::Directive;
+use block::{Block, BlockBuilder};
+use std::panic::RefUnwindSafe;
 
 pub struct TreeBuilder<'a> {
     blocks: Vec<Block>,
     block_builders: Vec<BlockBuilder>,
     attr_builder: Option<AttrBuilder<'a>>,
+    active_directive: Option<&'a Box<dyn Directive + RefUnwindSafe>>
 }
 
 impl<'a> TreeBuilder<'a> {
@@ -21,13 +22,12 @@ impl<'a> TreeBuilder<'a> {
             blocks: vec![],
             block_builders: vec![],
             attr_builder: None,
+            active_directive: None,
         }
     }
 
     pub fn build(&mut self, tokens: &'a Vec<Token>) -> Vec<Block> {
-        let mut active_directive: Option<&Box<dyn Directive + RefUnwindSafe>> = None;
         for token in tokens {
-            dbg!(&token);
             match token.r#type() {
                 TokenType::BlockIdentifier(id) => {
                     self.block_builders.push(BlockBuilder::new(id.to_owned()));
@@ -65,7 +65,7 @@ impl<'a> TreeBuilder<'a> {
                     self.block_builders.push(block_builder);
                 }
                 TokenType::ExprToken(expr_tok) => {
-                    if active_directive.is_none() {
+                    if self.active_directive.is_none() {
                         self.attr_builder
                             .as_mut()
                             .expect("Should be set.")
@@ -75,11 +75,9 @@ impl<'a> TreeBuilder<'a> {
                 }
                 TokenType::DirectiveOpen => {}
                 TokenType::DirectiveClose => {
-                    active_directive = None;
+                    self.active_directive = None;
                 }
-                TokenType::DirectiveIdentifier(id, directive) => {
-                    active_directive = Some(directive)
-                }
+                TokenType::DirectiveIdentifier(id, directive) => self.active_directive = Some(directive),
                 TokenType::DirectiveColon => {}
                 TokenType::DirectiveValue(str) => {
                     // active_directive = Some(directive);
