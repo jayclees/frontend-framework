@@ -5,15 +5,14 @@ mod postfix_processor;
 
 use super::tokenizer::token::{Token, TokenType};
 use super::tree_builder::block::AttrBuilder;
-use crate::parser::tokenizer::directive::{Directive, DirectiveEnum};
+use crate::parser::tokenizer::directive::DirectiveEnum;
 use block::{Block, BlockBuilder};
-use std::panic::RefUnwindSafe;
 
 pub struct TreeBuilder<'token> {
     blocks: Vec<Block>,
     block_builders: Vec<BlockBuilder>,
     attr_builder: Option<AttrBuilder<'token>>,
-    active_directive: Option<&'token DirectiveEnum<'token>>
+    active_directive: Option<&'token DirectiveEnum<'token>>,
 }
 
 impl<'token> TreeBuilder<'token> {
@@ -77,7 +76,9 @@ impl<'token> TreeBuilder<'token> {
                 TokenType::DirectiveClose => {
                     self.active_directive = None;
                 }
-                TokenType::DirectiveIdentifier(id, directive) => self.active_directive = Some(directive),
+                TokenType::DirectiveIdentifier(id, directive) => {
+                    self.active_directive = Some(directive)
+                }
                 TokenType::DirectiveColon => {}
                 TokenType::DirectiveValue(str) => {
                     // active_directive = Some(directive);

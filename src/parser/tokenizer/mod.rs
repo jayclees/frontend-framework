@@ -4,14 +4,13 @@ mod state;
 mod test;
 pub(crate) mod token;
 
-use crate::parser::tokenizer::directive::{Directive, ElseDirective, ElseIfDirective, ExtendsDirective, ForDirective, IfDirective, DummyMarkerDirective, DirectiveValueType, DirectiveEnum};
+use crate::parser::tokenizer::directive::{DirectiveEnum, DirectiveValueType};
 use crate::parser::tokenizer::token::{ExprToken, Operator, OperatorMatchResult};
 use state::State;
 use std::assert_matches;
 use std::cell::RefCell;
 use std::fs::{OpenOptions, read_to_string};
 use std::io::Write;
-use std::panic::RefUnwindSafe;
 use token::{Token, TokenType};
 
 pub struct Tokenizer<'token> {
@@ -471,7 +470,7 @@ impl<'token> Tokenizer<'token> {
     }
 
     fn match_with_source(&self) {
-        let source = read_to_string("app/my-page.app").unwrap();
+        let source = read_to_string("test-stubs/welcome.app").unwrap();
         let mut source = RefCell::new(source.chars());
         let mut highlighted = String::new();
         let mut prev: Option<&Token> = None;
@@ -765,7 +764,7 @@ impl<'token> Tokenizer<'token> {
                 DirectiveValueType::Custom => self.push_state(State::ParsingDirectiveValue, None),
                 DirectiveValueType::None => self.push_state(State::ExpectDirectiveClose, None),
                 DirectiveValueType::String => self.push_state(State::ExprExpectStringStart, None),
-                DirectiveValueType::ForStatement => todo!()
+                DirectiveValueType::ForStatement => todo!(),
             }
             return PipelineResult::Handled;
         }
@@ -845,7 +844,7 @@ impl<'token> Tokenizer<'token> {
                     self.push_token(TokenType::DirectiveClose);
                     self.pop_state_type(State::ExprParsedString);
                 }
-                DirectiveValueType::ForStatement => todo!()
+                DirectiveValueType::ForStatement => todo!(),
             }
 
             self.pop_state_type(State::ParsedDirectiveIdentifier);
@@ -1099,10 +1098,19 @@ impl<'token> Tokenizer<'token> {
         self.buf.push(char);
 
         if char == '"' {
-            let trailing = self.buf.rsplit_once('\\');
-            let trailing_backslash_count = trailing.iter().len();
+            let mut trailing_backslash_count: usize = 0;
+            for (i, c) in self.buf.chars().rev().enumerate() {
+                if i == 0 {
+                    continue;
+                }
+                if c == '\\' {
+                    trailing_backslash_count += 1;
+                } else {
+                    break;
+                }
+            }
 
-            if trailing_backslash_count % 2 == 0 {
+            if trailing_backslash_count.is_multiple_of(2) {
                 self.push_token(TokenType::ExprToken(ExprToken::String(self.buf.clone())));
                 self.pop_state_type(State::ExprParsingString);
                 self.push_state(State::ExprParsedString, None);
@@ -1382,8 +1390,10 @@ enum PipelineResult {
     Void,
 }
 
-/** {@see Tokenizer@pipeline} */
 pub enum Pipe {
+    #[allow(
+        clippy::upper_case_acronyms
+    )]
     // Dummy pipe that will trigger "unimplemented" to mark unhandled tokenizer states
     UNIMPLEMENTED,
 
