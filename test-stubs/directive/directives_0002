@@ -1,1 +1,1 @@
-Page [extends: "layout"][test] [if: "hello"] { }
+Page [extends: "layout"][dummymarker] [if: "hello"] { }

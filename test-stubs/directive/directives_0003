@@ -1,5 +1,5 @@
 Page
     [extends:"layout"]
-    [test]
+    [dummymarker]
     [if: "hello"]
 { }

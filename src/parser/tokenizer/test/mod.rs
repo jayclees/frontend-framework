@@ -6,17 +6,12 @@ mod expression;
 mod token;
 
 use super::Tokenizer;
-use crate::parser::tokenizer::token::TokenType::{
-    BlockClose, BlockOpen, DirectiveClose, DirectiveColon, DirectiveIdentifier, DirectiveOpen,
-    DirectiveValue, EventListenerClose, EventListenerColon, EventListenerHandler,
-    EventListenerIdentifier, EventListenerOpen,
-};
 use crate::parser::tokenizer::token::{Token, TokenType};
 use std::fs::read_to_string;
 use std::io;
 use std::panic::UnwindSafe;
 use std::path::PathBuf;
-use crate::parser::tokenizer::directive::DirectiveIf;
+use crate::parser::tokenizer::directive::{DirectiveDummyMarker, DirectiveDummyString, DirectiveIf};
 
 fn base_path(path: &'static str) -> PathBuf {
     PathBuf::from("test-stubs").join(path)
@@ -118,19 +113,19 @@ fn token_test_method_fails_on_shifted_string_match() {
 fn test_match_tokens_to_source() {
     let source = r#"Page [hello: "world"] @[click: do_thing()] {}"#.to_owned();
     let tokens = vec![
-        Token::new(0, DirectiveIdentifier("Page".to_owned())),
-        Token::new(5, DirectiveOpen),
-        Token::new(6, DirectiveIdentifier("hello".to_owned())),
-        Token::new(11, DirectiveColon),
-        Token::new(12, DirectiveValue(Box::new(DirectiveIf {}), r#" "world""#.to_owned())),
-        Token::new(20, DirectiveClose),
-        Token::new(22, EventListenerOpen),
-        Token::new(24, EventListenerIdentifier("click".to_owned())),
-        Token::new(29, EventListenerColon),
-        Token::new(30, EventListenerHandler(" do_thing()".to_owned())),
-        Token::new(41, EventListenerClose),
-        Token::new(43, BlockOpen),
-        Token::new(44, BlockClose),
+        Token::new(0, TokenType::BlockIdentifier("Page".to_owned())),
+        Token::new(5, TokenType::DirectiveOpen),
+        Token::new(6, TokenType::DirectiveIdentifier("hello".to_owned(), Box::new(DirectiveDummyString {}))),
+        Token::new(11, TokenType::DirectiveColon),
+        Token::new(12, TokenType::DirectiveValue(r#" "world""#.to_owned())),
+        Token::new(20, TokenType::DirectiveClose),
+        Token::new(22, TokenType::EventListenerOpen),
+        Token::new(24, TokenType::EventListenerIdentifier("click".to_owned())),
+        Token::new(29, TokenType::EventListenerColon),
+        Token::new(30, TokenType::EventListenerHandler(" do_thing()".to_owned())),
+        Token::new(41, TokenType::EventListenerClose),
+        Token::new(43, TokenType::BlockOpen),
+        Token::new(44, TokenType::BlockClose),
     ];
     match_tokens_to_source(source, &tokens);
 }
@@ -139,19 +134,19 @@ fn test_match_tokens_to_source() {
 fn test_untokenized_non_whitespace_chars_are_caught_1() {
     let source = r#"Page [hello: "world"] @[click: do_thing()] {}"#.to_owned();
     let tokens = vec![
-        Token::new(1, DirectiveIdentifier("age".to_owned())),
-        Token::new(5, DirectiveOpen),
-        Token::new(6, DirectiveIdentifier("hello".to_owned())),
-        Token::new(11, DirectiveColon),
-        Token::new(12, DirectiveValue(Box::new(DirectiveIf {}), r#" "world""#.to_owned())),
-        Token::new(20, DirectiveClose),
-        Token::new(22, EventListenerOpen),
-        Token::new(24, EventListenerIdentifier("click".to_owned())),
-        Token::new(29, EventListenerColon),
-        Token::new(30, EventListenerHandler(" do_thing()".to_owned())),
-        Token::new(41, EventListenerClose),
-        Token::new(43, BlockOpen),
-        Token::new(44, BlockClose),
+        Token::new(1, TokenType::BlockIdentifier("age".to_owned())),
+        Token::new(5, TokenType::DirectiveOpen),
+        Token::new(6, TokenType::DirectiveIdentifier("hello".to_owned(), Box::new(DirectiveDummyString {}))),
+        Token::new(11, TokenType::DirectiveColon),
+        Token::new(12, TokenType::DirectiveValue(r#" "world""#.to_owned())),
+        Token::new(20, TokenType::DirectiveClose),
+        Token::new(22, TokenType::EventListenerOpen),
+        Token::new(24, TokenType::EventListenerIdentifier("click".to_owned())),
+        Token::new(29, TokenType::EventListenerColon),
+        Token::new(30, TokenType::EventListenerHandler(" do_thing()".to_owned())),
+        Token::new(41, TokenType::EventListenerClose),
+        Token::new(43, TokenType::BlockOpen),
+        Token::new(44, TokenType::BlockClose),
     ];
     assert_fails(
         || match_tokens_to_source(source, &tokens),
@@ -163,19 +158,20 @@ fn test_untokenized_non_whitespace_chars_are_caught_1() {
 fn test_untokenized_non_whitespace_chars_are_caught_2() {
     let source = r#"Page [hello: "world"] @[click: do_thing()] {}"#.to_owned();
     let tokens = vec![
-        // Token::new(0, DirectiveIdentifier("Page".to_owned())),
-        Token::new(5, DirectiveOpen),
-        Token::new(6, DirectiveIdentifier("hello".to_owned())),
-        Token::new(11, DirectiveColon),
-        Token::new(12, DirectiveValue(Box::new(DirectiveIf {}), r#" "world""#.to_owned())),
-        Token::new(20, DirectiveClose),
-        Token::new(22, EventListenerOpen),
-        Token::new(24, EventListenerIdentifier("click".to_owned())),
-        Token::new(29, EventListenerColon),
-        Token::new(30, EventListenerHandler(" do_thing()".to_owned())),
-        Token::new(41, EventListenerClose),
-        Token::new(43, BlockOpen),
-        Token::new(44, BlockClose),
+        // Comment out this next line to leave it untokenized
+        // Token::new(0, TokenType::BlockIdentifier("Page".to_owned())),
+        Token::new(5, TokenType::DirectiveOpen),
+        Token::new(6, TokenType::DirectiveIdentifier("hello".to_owned(), Box::new(DirectiveDummyString {}))),
+        Token::new(11, TokenType::DirectiveColon),
+        Token::new(12, TokenType::DirectiveValue(r#" "world""#.to_owned())),
+        Token::new(20, TokenType::DirectiveClose),
+        Token::new(22, TokenType::EventListenerOpen),
+        Token::new(24, TokenType::EventListenerIdentifier("click".to_owned())),
+        Token::new(29, TokenType::EventListenerColon),
+        Token::new(30, TokenType::EventListenerHandler(" do_thing()".to_owned())),
+        Token::new(41, TokenType::EventListenerClose),
+        Token::new(43, TokenType::BlockOpen),
+        Token::new(44, TokenType::BlockClose),
     ];
     assert_fails(
         || match_tokens_to_source(source, &tokens),
@@ -187,18 +183,18 @@ fn test_untokenized_non_whitespace_chars_are_caught_2() {
 fn test_untokenized_non_whitespace_chars_are_caught_3() {
     let source = r#"Page [hello: "world"] @[click: do_thing()] {}"#.to_owned();
     let tokens = vec![
-        Token::new(0, DirectiveIdentifier("Page".to_owned())),
-        Token::new(5, DirectiveOpen),
-        Token::new(6, DirectiveIdentifier("hello".to_owned())),
-        Token::new(11, DirectiveColon),
-        Token::new(12, DirectiveValue(Box::new(DirectiveIf {}), r#" "world""#.to_owned())),
-        Token::new(20, DirectiveClose),
-        Token::new(22, EventListenerOpen),
-        Token::new(24, EventListenerIdentifier("click".to_owned())),
-        Token::new(29, EventListenerColon),
-        Token::new(30, EventListenerHandler(" do_thing()".to_owned())),
-        Token::new(41, EventListenerClose),
-        Token::new(43, BlockOpen),
+        Token::new(0, TokenType::BlockIdentifier("Page".to_owned())),
+        Token::new(5, TokenType::DirectiveOpen),
+        Token::new(6, TokenType::DirectiveIdentifier("hello".to_owned(), Box::new(DirectiveDummyString {}))),
+        Token::new(11, TokenType::DirectiveColon),
+        Token::new(12, TokenType::DirectiveValue(r#" "world""#.to_owned())),
+        Token::new(20, TokenType::DirectiveClose),
+        Token::new(22, TokenType::EventListenerOpen),
+        Token::new(24, TokenType::EventListenerIdentifier("click".to_owned())),
+        Token::new(29, TokenType::EventListenerColon),
+        Token::new(30, TokenType::EventListenerHandler(" do_thing()".to_owned())),
+        Token::new(41, TokenType::EventListenerClose),
+        Token::new(43, TokenType::BlockOpen),
         // Token::new(44, BlockClose),
     ];
     assert_fails(
@@ -211,19 +207,19 @@ fn test_untokenized_non_whitespace_chars_are_caught_3() {
 fn test_untokenized_non_whitespace_chars_are_caught_4() {
     let source = r#"Page [hello: "world"] @[click: do_thing()] {}"#.to_owned();
     let tokens = vec![
-        Token::new(0, DirectiveIdentifier("Page".to_owned())),
-        Token::new(5, DirectiveOpen),
-        Token::new(6, DirectiveIdentifier("hello".to_owned())),
-        // Token::new(11, DirectiveColon),
-        Token::new(12, DirectiveValue(Box::new(DirectiveIf {}), r#" "world""#.to_owned())),
-        Token::new(20, DirectiveClose),
-        Token::new(22, EventListenerOpen),
-        Token::new(24, EventListenerIdentifier("click".to_owned())),
-        Token::new(29, EventListenerColon),
-        Token::new(30, EventListenerHandler(" do_thing()".to_owned())),
-        Token::new(41, EventListenerClose),
-        Token::new(43, BlockOpen),
-        Token::new(44, BlockClose),
+        Token::new(0, TokenType::BlockIdentifier("Page".to_owned())),
+        Token::new(5, TokenType::DirectiveOpen),
+        Token::new(6, TokenType::DirectiveIdentifier("hello".to_owned(), Box::new(DirectiveDummyString {}))),
+        // Token::new(11, TokenType::DirectiveColon),
+        Token::new(12, TokenType::DirectiveValue(r#" "world""#.to_owned())),
+        Token::new(20, TokenType::DirectiveClose),
+        Token::new(22, TokenType::EventListenerOpen),
+        Token::new(24, TokenType::EventListenerIdentifier("click".to_owned())),
+        Token::new(29, TokenType::EventListenerColon),
+        Token::new(30, TokenType::EventListenerHandler(" do_thing()".to_owned())),
+        Token::new(41, TokenType::EventListenerClose),
+        Token::new(43, TokenType::BlockOpen),
+        Token::new(44, TokenType::BlockClose),
     ];
     assert_fails(
         || match_tokens_to_source(source, &tokens),
@@ -235,19 +231,19 @@ fn test_untokenized_non_whitespace_chars_are_caught_4() {
 fn test_untokenized_non_whitespace_chars_are_caught_5() {
     let source = r#"Page [hello: "world"] @[click: do_thing()] {}"#.to_owned();
     let tokens = vec![
-        Token::new(0, DirectiveIdentifier("Page".to_owned())),
-        Token::new(5, DirectiveOpen),
-        Token::new(6, DirectiveIdentifier("hello".to_owned())),
-        Token::new(11, DirectiveColon),
-        // Token::new(12, DirectiveValue(r#" "world""#.to_owned())),
-        Token::new(20, DirectiveClose),
-        Token::new(22, EventListenerOpen),
-        Token::new(24, EventListenerIdentifier("click".to_owned())),
-        Token::new(29, EventListenerColon),
-        Token::new(30, EventListenerHandler(" do_thing()".to_owned())),
-        Token::new(41, EventListenerClose),
-        Token::new(43, BlockOpen),
-        Token::new(44, BlockClose),
+        Token::new(0, TokenType::BlockIdentifier("Page".to_owned())),
+        Token::new(5, TokenType::DirectiveOpen),
+        Token::new(6, TokenType::DirectiveIdentifier("hello".to_owned(), Box::new(DirectiveDummyString {}))),
+        Token::new(11, TokenType::DirectiveColon),
+        // Token::new(12, TokenType::DirectiveValue(r#" "world""#.to_owned())),
+        Token::new(20, TokenType::DirectiveClose),
+        Token::new(22, TokenType::EventListenerOpen),
+        Token::new(24, TokenType::EventListenerIdentifier("click".to_owned())),
+        Token::new(29, TokenType::EventListenerColon),
+        Token::new(30, TokenType::EventListenerHandler(" do_thing()".to_owned())),
+        Token::new(41, TokenType::EventListenerClose),
+        Token::new(43, TokenType::BlockOpen),
+        Token::new(44, TokenType::BlockClose),
     ];
     assert_fails(
         || match_tokens_to_source(source, &tokens),

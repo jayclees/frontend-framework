@@ -47,10 +47,10 @@ impl Token {
             | TokenType::LineComment(str)
             | TokenType::BlockComment(str)
             | TokenType::AttrIdentifier(str)
-            | TokenType::DirectiveIdentifier(str)
+            | TokenType::DirectiveIdentifier(str, _)
             | TokenType::EventListenerIdentifier(str)
             | TokenType::EventListenerHandler(str)
-            | TokenType::DirectiveValue(_, str) => source_str == str,
+            | TokenType::DirectiveValue(str) => source_str == str,
 
             TokenType::BlockOpen => source_str == "{",
             TokenType::BlockClose => source_str == "}",
@@ -94,9 +94,9 @@ pub enum TokenType {
     ExprToken(ExprToken),
     DirectiveOpen,
     DirectiveClose,
-    DirectiveIdentifier(String),
+    DirectiveIdentifier(String, Box<dyn Directive + RefUnwindSafe>),
     DirectiveColon,
-    DirectiveValue(Box<dyn Directive + RefUnwindSafe>, String),
+    DirectiveValue(String),
     EventListenerOpen,
     EventListenerClose,
     EventListenerIdentifier(String),
@@ -111,8 +111,8 @@ impl TokenType {
             | TokenType::LineComment(str)
             | TokenType::BlockComment(str)
             | TokenType::AttrIdentifier(str)
-            | TokenType::DirectiveIdentifier(str)
-            | TokenType::DirectiveValue(_, str)
+            | TokenType::DirectiveIdentifier(str, _)
+            | TokenType::DirectiveValue(str)
             | TokenType::EventListenerHandler(str)
             | TokenType::EventListenerIdentifier(str) => str.len(),
 
@@ -138,8 +138,8 @@ impl TokenType {
             TokenType::LineComment(str) |
             TokenType::BlockComment(str) |
             TokenType::AttrIdentifier(str) |
-            TokenType::DirectiveIdentifier(str) |
-            TokenType::DirectiveValue(_, str) |
+            TokenType::DirectiveIdentifier(str, _) |
+            TokenType::DirectiveValue(str) |
             TokenType::EventListenerIdentifier(str) |
             TokenType::EventListenerHandler(str) => str.to_owned(),
 
@@ -185,9 +185,9 @@ impl Display for TokenType {
             TokenType::ExprToken(expr) => write!(f, "ExpressionToken({expr})"),
             TokenType::DirectiveOpen => write!(f, "DirectiveOpen"),
             TokenType::DirectiveClose => write!(f, "DirectiveClose"),
-            TokenType::DirectiveIdentifier(_) => write!(f, "DirectiveIdentifier"),
+            TokenType::DirectiveIdentifier(str, _) => write!(f, "DirectiveIdentifier({str})"),
             TokenType::DirectiveColon => write!(f, "DirectiveColon"),
-            TokenType::DirectiveValue(_, str) => write!(f, "DirectiveValue({}, {})", "directive", str),
+            TokenType::DirectiveValue(str) => write!(f, "DirectiveValue({}, {})", "directive", str),
             TokenType::EventListenerOpen => write!(f, "EventListenerOpen"),
             TokenType::EventListenerClose => write!(f, "EventListenerClose"),
             TokenType::EventListenerIdentifier(str) => write!(f, "EventListenerIdentifier({str})"),

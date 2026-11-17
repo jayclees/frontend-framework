@@ -1,8 +1,6 @@
 use std::fmt::Debug;
-use crate::parser::tokenizer::token::{Token, TokenType};
 
 pub trait Directive: Debug {
-    fn parse(&mut self, char: char) -> DirectiveParseResult;
     fn value_type(&self) -> DirectiveValueType;
 }
 
@@ -10,10 +8,6 @@ pub trait Directive: Debug {
 pub struct DirectiveIf {}
 
 impl Directive for DirectiveIf {
-    fn parse(&mut self, char: char) -> DirectiveParseResult {
-        DirectiveParseResult::Void
-    }
-
     fn value_type(&self) -> DirectiveValueType {
         DirectiveValueType::Expression
     }
@@ -29,11 +23,6 @@ impl PartialEq for DirectiveIf {
 pub struct DirectiveElse {}
 
 impl Directive for DirectiveElse {
-    fn parse(&mut self, char: char) -> DirectiveParseResult {
-        // Since this directive has no value, just return done.
-        DirectiveParseResult::Done
-    }
-
     fn value_type(&self) -> DirectiveValueType {
         DirectiveValueType::None
     }
@@ -49,10 +38,6 @@ impl PartialEq for DirectiveElse {
 pub struct DirectiveElseIf {}
 
 impl Directive for DirectiveElseIf {
-    fn parse(&mut self, char: char) -> DirectiveParseResult {
-        DirectiveParseResult::Void
-    }
-
     fn value_type(&self) -> DirectiveValueType {
         DirectiveValueType::Expression
     }
@@ -68,10 +53,6 @@ impl PartialEq for DirectiveElseIf {
 pub struct DirectiveFor {}
 
 impl Directive for DirectiveFor {
-    fn parse(&mut self, char: char) -> DirectiveParseResult {
-        todo!()
-    }
-
     fn value_type(&self) -> DirectiveValueType {
         DirectiveValueType::Custom
     }
@@ -87,10 +68,6 @@ impl PartialEq for DirectiveFor {
 pub struct DirectiveExtends {}
 
 impl Directive for DirectiveExtends {
-    fn parse(&mut self, char: char) -> DirectiveParseResult {
-        DirectiveParseResult::Void
-    }
-
     fn value_type(&self) -> DirectiveValueType {
         DirectiveValueType::String
     }
@@ -102,21 +79,33 @@ impl PartialEq for DirectiveExtends {
     }
 }
 
-/// This is for testing compiler
+/// This is for testing
 #[derive(Debug)]
-pub struct DirectiveTest {}
+pub struct DirectiveDummyMarker {}
 
-impl Directive for DirectiveTest {
-    fn parse(&mut self, char: char) -> DirectiveParseResult {
-        DirectiveParseResult::Void
-    }
-
+impl Directive for DirectiveDummyMarker {
     fn value_type(&self) -> DirectiveValueType {
         DirectiveValueType::None
     }
 }
 
-impl PartialEq for DirectiveTest {
+impl PartialEq for DirectiveDummyMarker {
+    fn eq(&self, other: &Self) -> bool {
+        todo!()
+    }
+}
+
+/// This is for testing
+#[derive(Debug)]
+pub struct DirectiveDummyString {}
+
+impl Directive for DirectiveDummyString {
+    fn value_type(&self) -> DirectiveValueType {
+        DirectiveValueType::None
+    }
+}
+
+impl PartialEq for DirectiveDummyString {
     fn eq(&self, other: &Self) -> bool {
         todo!()
     }
