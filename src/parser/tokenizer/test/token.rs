@@ -1,4 +1,4 @@
-use crate::parser::tokenizer::directive::{DirectiveDummyMarker, DirectiveFor, DirectiveIf};
+use crate::parser::tokenizer::directive::{DirectiveEnum, DummyMarkerDirective, ForDirective, IfDirective};
 use crate::parser::tokenizer::token::{ExprToken, Operator, TokenType};
 
 #[test]
@@ -30,9 +30,9 @@ fn test_token_len_with_val() {
 
     //
 
-    assert_eq!(2, TokenType::DirectiveIdentifier("if".to_owned(), Box::new(DirectiveIf::new())).len());
-    assert_eq!(3, TokenType::DirectiveIdentifier("for".to_owned(), Box::new(DirectiveFor::new())).len());
-    assert_eq!(16, TokenType::DirectiveIdentifier("marker-directive".to_owned(), Box::new(DirectiveDummyMarker::new())).len());
+    assert_eq!(2, TokenType::DirectiveIdentifier("if".to_owned(), DirectiveEnum::from("if")).len());
+    assert_eq!(3, TokenType::DirectiveIdentifier("for".to_owned(), DirectiveEnum::from("for")).len());
+    assert_eq!(16, TokenType::DirectiveIdentifier("marker-directive".to_owned(), DirectiveEnum::from("dummymarker")).len());
 
     //
 

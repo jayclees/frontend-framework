@@ -1,92 +1,130 @@
 use crate::parser::tokenizer::token::ExprToken;
 use std::fmt::Debug;
 
+#[derive(Debug)]
+pub(crate) enum DirectiveEnum<'token> {
+    If(IfDirective<'token>),
+    ElseIf(ElseIfDirective<'token>),
+    Else(ElseDirective),
+    For(ForDirective),
+    Extends(ExtendsDirective<'token>),
+    DummyMarker(DummyMarkerDirective),
+    DummyString(DummyStringDirective<'token>),
+}
+
+impl<'token> DirectiveEnum<'token> {
+    pub fn from(id: &str) -> Self {
+        match id {
+            "if" => Self::If(IfDirective::new()),
+            "elseif" => Self::ElseIf(ElseIfDirective::new()),
+            "else" => Self::Else(ElseDirective::new()),
+            "for" => Self::For(ForDirective::new()),
+            "extends" => Self::Extends(ExtendsDirective::new()),
+            "dummymarker" => Self::DummyMarker(DummyMarkerDirective::new()),
+            "dummystring" => Self::DummyString(DummyStringDirective::new()),
+            _ => todo!("Allow custom directives?")
+        }
+    }
+
+    pub fn value_type(&self) -> DirectiveValueType {
+        match self {
+            DirectiveEnum::If(_) => DirectiveValueType::Expression,
+            DirectiveEnum::ElseIf(_) => DirectiveValueType::Expression,
+            DirectiveEnum::Else(_) => DirectiveValueType::None,
+            DirectiveEnum::For(_) => DirectiveValueType::ForStatement,
+            DirectiveEnum::DummyMarker(_) => DirectiveValueType::None,
+            DirectiveEnum::DummyString(_) => DirectiveValueType::String,
+            DirectiveEnum::Extends(_) => DirectiveValueType::String,
+        }
+    }
+}
+
 pub trait Directive: Debug {
     fn value_type(&self) -> DirectiveValueType;
 }
 
 #[derive(Debug)]
-pub struct DirectiveIf<'a> {
-    tokens: Vec<&'a ExprToken>,
+pub struct IfDirective<'token> {
+    tokens: Vec<&'token ExprToken>,
 }
 
-impl<'a> DirectiveIf<'a> {
+impl<'token> IfDirective<'token> {
     pub fn new() -> Self {
         Self { tokens: vec![] }
     }
 }
 
-impl<'a> Directive for DirectiveIf<'a> {
+impl<'token> Directive for IfDirective<'token> {
     fn value_type(&self) -> DirectiveValueType {
         DirectiveValueType::Expression
     }
 }
 
-impl<'a> PartialEq for DirectiveIf<'a> {
+impl<'token> PartialEq for IfDirective<'token> {
     fn eq(&self, other: &Self) -> bool {
         todo!()
     }
 }
 
 #[derive(Debug)]
-pub struct DirectiveElse {}
+pub struct ElseDirective {}
 
-impl DirectiveElse {
+impl ElseDirective {
     pub fn new() -> Self {
         Self {}
     }
 }
 
-impl Directive for DirectiveElse {
+impl Directive for ElseDirective {
     fn value_type(&self) -> DirectiveValueType {
         DirectiveValueType::None
     }
 }
 
 #[derive(Debug)]
-pub struct DirectiveElseIf<'a> {
-    tokens: Vec<&'a ExprToken>,
+pub struct ElseIfDirective<'token> {
+    tokens: Vec<&'token ExprToken>,
 }
 
-impl<'a> DirectiveElseIf<'a> {
+impl<'token> ElseIfDirective<'token> {
     pub fn new() -> Self {
         Self { tokens: vec![] }
     }
 }
 
-impl<'a> Directive for DirectiveElseIf<'a> {
+impl<'token> Directive for ElseIfDirective<'token> {
     fn value_type(&self) -> DirectiveValueType {
         DirectiveValueType::Expression
     }
 }
 
 #[derive(Debug)]
-pub struct DirectiveFor {}
+pub struct ForDirective {}
 
-impl DirectiveFor {
+impl ForDirective {
     pub fn new() -> Self {
         Self {}
     }
 }
 
-impl Directive for DirectiveFor {
+impl Directive for ForDirective {
     fn value_type(&self) -> DirectiveValueType {
         DirectiveValueType::Custom
     }
 }
 
 #[derive(Debug)]
-pub struct DirectiveExtends<'a> {
-    layout: Option<&'a String>,
+pub struct ExtendsDirective<'token> {
+    layout: Option<&'token String>,
 }
 
-impl<'a> DirectiveExtends<'a> {
+impl<'token> ExtendsDirective<'token> {
     pub fn new() -> Self {
         Self { layout: None }
     }
 }
 
-impl<'a> Directive for DirectiveExtends<'a> {
+impl<'token> Directive for ExtendsDirective<'token> {
     fn value_type(&self) -> DirectiveValueType {
         DirectiveValueType::String
     }
@@ -94,15 +132,15 @@ impl<'a> Directive for DirectiveExtends<'a> {
 
 /// This is for testing
 #[derive(Debug)]
-pub struct DirectiveDummyMarker {}
+pub struct DummyMarkerDirective {}
 
-impl<'a> DirectiveDummyMarker {
+impl<'token> DummyMarkerDirective {
     pub fn new() -> Self {
         Self {}
     }
 }
 
-impl Directive for DirectiveDummyMarker {
+impl Directive for DummyMarkerDirective {
     fn value_type(&self) -> DirectiveValueType {
         DirectiveValueType::None
     }
@@ -110,17 +148,17 @@ impl Directive for DirectiveDummyMarker {
 
 /// This is for testing
 #[derive(Debug)]
-pub struct DirectiveDummyString<'a> {
-    layout: Option<&'a String>,
+pub struct DummyStringDirective<'token> {
+    layout: Option<&'token String>,
 }
 
-impl<'a> DirectiveDummyString<'a> {
+impl<'token> DummyStringDirective<'token> {
     pub fn new() -> Self {
         Self { layout: None }
     }
 }
 
-impl<'a> Directive for DirectiveDummyString<'a> {
+impl<'token> Directive for DummyStringDirective<'token> {
     fn value_type(&self) -> DirectiveValueType {
         DirectiveValueType::None
     }
@@ -136,6 +174,7 @@ pub(crate) enum DirectiveParseResult {
 pub(crate) enum DirectiveValueType {
     Expression,
     String,
+    ForStatement,
     Custom,
     None,
 }

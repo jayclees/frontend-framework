@@ -5,19 +5,19 @@ mod postfix_processor;
 
 use super::tokenizer::token::{Token, TokenType};
 use super::tree_builder::block::AttrBuilder;
-use crate::parser::tokenizer::directive::Directive;
+use crate::parser::tokenizer::directive::{Directive, DirectiveEnum};
 use block::{Block, BlockBuilder};
 use std::panic::RefUnwindSafe;
 
-pub struct TreeBuilder<'a> {
+pub struct TreeBuilder<'token> {
     blocks: Vec<Block>,
     block_builders: Vec<BlockBuilder>,
-    attr_builder: Option<AttrBuilder<'a>>,
-    active_directive: Option<&'a Box<dyn Directive + RefUnwindSafe>>
+    attr_builder: Option<AttrBuilder<'token>>,
+    active_directive: Option<&'token DirectiveEnum<'token>>
 }
 
-impl<'a> TreeBuilder<'a> {
-    pub fn new() -> TreeBuilder<'a> {
+impl<'token> TreeBuilder<'token> {
+    pub fn new() -> TreeBuilder<'token> {
         TreeBuilder {
             blocks: vec![],
             block_builders: vec![],
@@ -26,7 +26,7 @@ impl<'a> TreeBuilder<'a> {
         }
     }
 
-    pub fn build(&mut self, tokens: &'a Vec<Token>) -> Vec<Block> {
+    pub fn build(&mut self, tokens: &'token Vec<Token>) -> Vec<Block> {
         for token in tokens {
             match token.r#type() {
                 TokenType::BlockIdentifier(id) => {

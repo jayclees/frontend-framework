@@ -4,10 +4,7 @@ mod state;
 mod test;
 pub(crate) mod token;
 
-use crate::parser::tokenizer::directive::{
-    Directive, DirectiveElse, DirectiveElseIf, DirectiveExtends, DirectiveFor, DirectiveIf,
-    DirectiveDummyMarker, DirectiveValueType,
-};
+use crate::parser::tokenizer::directive::{Directive, ElseDirective, ElseIfDirective, ExtendsDirective, ForDirective, IfDirective, DummyMarkerDirective, DirectiveValueType, DirectiveEnum};
 use crate::parser::tokenizer::token::{ExprToken, Operator, OperatorMatchResult};
 use state::State;
 use std::assert_matches;
@@ -17,7 +14,7 @@ use std::io::Write;
 use std::panic::RefUnwindSafe;
 use token::{Token, TokenType};
 
-pub struct Tokenizer {
+pub struct Tokenizer<'token> {
     state_history: Vec<State>,
     char: char,
     cursor: usize,
@@ -25,11 +22,11 @@ pub struct Tokenizer {
     column: usize,
     buf: String,
     buf_start: Option<usize>,
-    tokens: Vec<Token>,
+    tokens: Vec<Token<'token>>,
 }
 
-impl Tokenizer {
-    pub fn new() -> Tokenizer {
+impl<'token> Tokenizer<'token> {
+    pub fn new() -> Tokenizer<'token> {
         Tokenizer {
             state_history: vec![State::Start],
             char: 'a', // dummy char
@@ -407,14 +404,14 @@ impl Tokenizer {
         self.state_history.pop();
     }
 
-    fn push_token(&mut self, r#type: TokenType) {
+    fn push_token(&mut self, r#type: TokenType<'token>) {
         self.tokens
             .push(Token::new(self.buf_start.expect("Should be set."), r#type));
 
         self.reset_buffer();
     }
 
-    fn push_token_pop_state(&mut self, r#type: TokenType) {
+    fn push_token_pop_state(&mut self, r#type: TokenType<'token>) {
         self.push_token(r#type);
         self.pop_state();
     }
@@ -542,7 +539,7 @@ impl Tokenizer {
         }
     }
 
-    fn active_directive(&self) -> Option<&Box<dyn Directive + RefUnwindSafe>> {
+    fn active_directive(&'token self) -> Option<&'token DirectiveEnum<'token>> {
         let mut directive_is_closed = false;
         for token in self.tokens.iter().rev() {
             if let TokenType::DirectiveClose = token.r#type() {
@@ -747,15 +744,7 @@ impl Tokenizer {
 
         self.push_token(TokenType::DirectiveIdentifier(
             self.buf.clone(),
-            match self.buf.as_ref() {
-                "if" => Box::new(DirectiveIf::new()),
-                "else" => Box::new(DirectiveElse::new()),
-                "elseif" => Box::new(DirectiveElseIf::new()),
-                "for" => Box::new(DirectiveFor::new()),
-                "extends" => Box::new(DirectiveExtends::new()),
-                "dummymarker" => Box::new(DirectiveDummyMarker::new()),
-                id => return PipelineResult::Err(format!(r#""{id}" directive does not exist."#)),
-            },
+            DirectiveEnum::from(self.buf.as_str()),
         ));
         self.pop_state_type(State::ParsingDirectiveIdentifier);
         self.push_state(State::ParsedDirectiveIdentifier, None);
@@ -776,6 +765,7 @@ impl Tokenizer {
                 DirectiveValueType::Custom => self.push_state(State::ParsingDirectiveValue, None),
                 DirectiveValueType::None => self.push_state(State::ExpectDirectiveClose, None),
                 DirectiveValueType::String => self.push_state(State::ExprExpectStringStart, None),
+                DirectiveValueType::ForStatement => todo!()
             }
             return PipelineResult::Handled;
         }
@@ -795,6 +785,7 @@ impl Tokenizer {
             }
             DirectiveValueType::Custom => unimplemented!(),
             DirectiveValueType::None => PipelineResult::Continue,
+            DirectiveValueType::ForStatement => todo!(),
         }
     }
 
@@ -854,6 +845,7 @@ impl Tokenizer {
                     self.push_token(TokenType::DirectiveClose);
                     self.pop_state_type(State::ExprParsedString);
                 }
+                DirectiveValueType::ForStatement => todo!()
             }
 
             self.pop_state_type(State::ParsedDirectiveIdentifier);

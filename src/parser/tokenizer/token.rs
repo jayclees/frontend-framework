@@ -1,15 +1,15 @@
 use std::fmt::{Display, Formatter};
 use std::panic::RefUnwindSafe;
-use crate::parser::tokenizer::directive::Directive;
+use crate::parser::tokenizer::directive::{Directive, DirectiveEnum};
 
 #[derive(Debug)]
-pub struct Token {
+pub struct Token<'token> {
     start: usize,
     end: usize,
-    r#type: TokenType,
+    r#type: TokenType<'token>,
 }
 
-impl Token {
+impl<'token> Token<'token> {
     pub fn new(start: usize, r#type: TokenType) -> Token {
         // match and validate start/end with token len
 
@@ -81,7 +81,7 @@ impl Token {
 }
 
 #[derive(Debug)]
-pub enum TokenType {
+pub enum TokenType<'token> {
     // Keyword(KeywordEnum),
     BlockIdentifier(String),
     LineComment(String),
@@ -94,7 +94,7 @@ pub enum TokenType {
     ExprToken(ExprToken),
     DirectiveOpen,
     DirectiveClose,
-    DirectiveIdentifier(String, Box<dyn Directive + RefUnwindSafe>),
+    DirectiveIdentifier(String, DirectiveEnum<'token>),
     DirectiveColon,
     DirectiveValue(String),
     EventListenerOpen,
@@ -104,7 +104,7 @@ pub enum TokenType {
     EventListenerHandler(String),
 }
 
-impl TokenType {
+impl<'token> TokenType<'token> {
     pub fn len(&self) -> usize {
         match self {
             TokenType::BlockIdentifier(str)
@@ -171,7 +171,7 @@ impl TokenType {
     }
 }
 
-impl Display for TokenType {
+impl<'token> Display for TokenType<'token> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match &self {
             TokenType::BlockIdentifier(str) => write!(f, "BlockIdentifier({str})"),
