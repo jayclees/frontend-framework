@@ -1,4 +1,5 @@
 use std::fmt::Debug;
+use crate::parser::tokenizer::token::{Token, TokenType};
 
 pub trait Directive: Debug {
     fn parse(&mut self, char: char) -> DirectiveParseResult;

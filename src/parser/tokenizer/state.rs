@@ -19,8 +19,8 @@ pub enum State {
     ParsingDirective,
     ParsingDirectiveIdentifier,
     ParsedDirectiveIdentifier,
-    ExpectDirectiveExpression,
     ParsingDirectiveValue,
+    DirectiveExprStart,
     ExpectDirectiveClose,
 
     ParsingEventListenerOpen,
@@ -61,30 +61,24 @@ impl Display for State {
                 ResolvingCommentType => "ResolvingCommentType",
                 ParsingLineComment => "ParsingLineComment",
                 ParsingBlockComment => "ParsingBlockComment",
-
                 ParsingIdentifier => "ParsingIdentifier",
                 ResolvingIdentifier => "ResolvingIdentifier",
                 ParsedBlockIdentifier => "ParsedBlockIdentifier",
                 ParsedAttrIdentifier => "ParsedAttrIdentifier",
-
                 ParsingBlock => "ParsingBlock",
-
                 ParsedAttrColon => "ParsedAttrColon",
-
                 ParsingDirective => "ParsingDirective",
                 ParsingDirectiveIdentifier => "ParsingDirectiveIdentifier",
                 ParsedDirectiveIdentifier => "ParsedDirectiveIdentifier",
-                ExpectDirectiveExpression => "ExpectDirectiveExpression",
                 ParsingDirectiveValue => "ParsingDirectiveValue",
+                DirectiveExprStart => "DirectiveExprStart",
                 ExpectDirectiveClose => "ExpectDirectiveClose",
-
                 ParsingEventListenerOpen => "ParsingEventListenerOpen",
                 ParsedEventListenerOpen => "ParsedEventListenerOpen",
                 ParsingEventListenerIdentifier => "ParsingEventListenerIdentifier",
                 ParsedEventListenerIdentifier => "ParsedEventListenerIdentifier",
                 ParsedEventListenerColon => "ParsedEventListenerColon",
                 ParsingEventListenerHandler => "ParsingEventListenerHandler",
-
                 // Expressions
                 ExprStart => "ExprStart",
                 ExprParsingNumber => "ExprParsingNumber",
@@ -102,7 +96,6 @@ impl Display for State {
                 ExprResolvingSlash => "ExprResolvingSlash",
                 ExprResolvingDot => "ExprResolvingDot",
                 ExprParsedNegativeOperator => "ExprParsedNegativeOperator",
-
                 ParsedExpressionTokens => "ParsedExpressionTokens",
             }
         )

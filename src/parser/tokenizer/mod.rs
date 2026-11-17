@@ -4,7 +4,10 @@ mod state;
 mod test;
 pub(crate) mod token;
 
-use crate::parser::tokenizer::directive::{Directive, DirectiveElse, DirectiveElseIf, DirectiveExtends, DirectiveFor, DirectiveIf, DirectiveParseResult, DirectiveTest, DirectiveValueType};
+use crate::parser::tokenizer::directive::{
+    Directive, DirectiveElse, DirectiveElseIf, DirectiveExtends, DirectiveFor, DirectiveIf,
+    DirectiveParseResult, DirectiveTest, DirectiveValueType,
+};
 use crate::parser::tokenizer::token::{ExprToken, Operator, OperatorMatchResult};
 use state::State;
 use std::assert_matches;
@@ -39,9 +42,7 @@ impl Tokenizer {
             active_directive: None,
         }
     }
-}
 
-impl Tokenizer {
     pub fn tokenize(&mut self, string: String) -> &Vec<Token> {
         // todo:
         // Create method to attempt to recover from unexpected token and keep going? Recovery
@@ -119,16 +120,21 @@ impl Tokenizer {
                     Pipe::ExpectDirectiveColon,
                     Pipe::ExpectDirectiveClose,
                 ]),
-                State::ExpectDirectiveExpression => self.pipeline(vec![
+                State::ParsingDirectiveValue => self.pipeline(vec![
+                    Pipe::SetStateForDirectiveValue,
                     Pipe::ExpectCommentStart,
                     Pipe::ExpectNegativeOperator,
                     Pipe::ExpectOperandStart,
                     Pipe::ExpectParenthesisOpen,
                     Pipe::ExpectDirectiveClose,
                 ]),
-                State::ParsingDirectiveValue => {
-                    self.pipeline(vec![Pipe::ParseDirectiveValue, Pipe::ExpectDirectiveClose])
-                }
+                State::DirectiveExprStart => self.pipeline(vec![
+                    Pipe::ExpectCommentStart,
+                    Pipe::ExpectNegativeOperator,
+                    Pipe::ExpectOperandStart,
+                    Pipe::ExpectParenthesisOpen,
+                    Pipe::ExpectDirectiveClose,
+                ]),
                 State::ExpectDirectiveClose => self.pipeline(vec![Pipe::ExpectDirectiveClose]),
                 State::ParsingEventListenerOpen => {
                     self.pipeline(vec![Pipe::ParseEventListenerOpen])
@@ -160,8 +166,6 @@ impl Tokenizer {
                     Pipe::ExpectOperandStart,
                     Pipe::ExpectParenthesisOpen,
                 ]),
-                // todo if current char is not a number in the following state,
-                // todo make sure to pop ExprParsingNumber state in handler
                 State::ExprParsingNumber => self.pipeline(vec![
                     Pipe::ParseNumber,
                     Pipe::ExpectSlash,
@@ -170,6 +174,7 @@ impl Tokenizer {
                     Pipe::ExpectDot,
                     Pipe::ExpectAttrSeparator,
                     Pipe::ExpectBlockClose,
+                    Pipe::ExpectDirectiveClose,
                 ]),
                 State::ExprParsedNumber => self.pipeline(vec![
                     Pipe::ExpectSlash,
@@ -281,8 +286,7 @@ impl Tokenizer {
                 Pipe::ExpectDirectiveIdentifierStart => self.expect_directive_identifier_start(),
                 Pipe::ParseDirectiveIdentifier => self.parse_directive_identifier(),
                 Pipe::ExpectDirectiveColon => self.expect_directive_colon(),
-                Pipe::ExpectDirectiveValueStart => self.expect_directive_value_start(),
-                Pipe::ParseDirectiveValue => self.parse_directive_value(),
+                Pipe::SetStateForDirectiveValue => self.set_state_for_directive_value(),
                 Pipe::ExpectDirectiveClose => self.expect_directive_close(),
                 Pipe::ExpectEventListenerOpenStart => self.expect_event_listener_open_start(),
                 Pipe::ParseEventListenerOpen => self.parse_event_listener_open(),
@@ -751,7 +755,7 @@ impl Tokenizer {
             let directive = self.active_directive.as_mut().expect("Should be set.");
             match directive.value_type() {
                 DirectiveValueType::Expression => {
-                    self.push_state(State::ExpectDirectiveExpression, None)
+                    self.push_state(State::DirectiveExprStart, None)
                 }
                 DirectiveValueType::Custom => self.push_state(State::ParsingDirectiveValue, None),
                 DirectiveValueType::None => self.push_state(State::ExpectDirectiveClose, None),
@@ -763,34 +767,18 @@ impl Tokenizer {
         PipelineResult::Continue
     }
 
-    fn expect_directive_value_start(&mut self) -> PipelineResult {
-        unimplemented!();
-        // let char = self.char;
-        //
-        // // todo for now we are just looking for a ] and closing it.
-        // // todo finish implementation later
-        // if char == ']' {
-        //     self.push_token(TokenType::DirectiveValue(self.buf.clone()));
-        //     self.pop_state_type(State::ParsedDirectiveColon);
-        //     return PipelineResult::Continue;
-        // }
-        //
-        // self.buf.push(char);
-        //
-        // PipelineResult::Handled
-    }
-
-    fn parse_directive_value(&mut self) -> PipelineResult {
-        let char = self.char;
-
-        match self.active_directive.as_mut().unwrap().parse(char) {
-            DirectiveParseResult::Handled => PipelineResult::Handled,
-            DirectiveParseResult::Done => {
-
+    fn set_state_for_directive_value(&mut self) -> PipelineResult {
+        match self.active_directive.as_ref().unwrap().value_type() {
+            DirectiveValueType::Expression => {
+                self.push_state(State::DirectiveExprStart, None);
                 PipelineResult::Continue
             },
-            DirectiveParseResult::Err(msg) => PipelineResult::Err(msg),
-            DirectiveParseResult::Void => unimplemented!(),
+            DirectiveValueType::String => {
+                self.push_state(State::ExprExpectStringStart, None);
+                PipelineResult::Continue
+            }
+            DirectiveValueType::Custom => unimplemented!(),
+            DirectiveValueType::None => PipelineResult::Continue
         }
     }
 
@@ -815,7 +803,7 @@ impl Tokenizer {
                         ) {
                             self.pop_state();
                         }
-                        self.pop_state_type(State::ExpectDirectiveExpression);
+                        self.pop_state_type(State::DirectiveExprStart);
                     }
                     TokenType::DirectiveColon => {
                         return PipelineResult::Err(
@@ -824,8 +812,7 @@ impl Tokenizer {
                     }
                     _ => panic!("err"),
                 },
-                DirectiveValueType::Custom |
-                DirectiveValueType::None => {
+                DirectiveValueType::Custom | DirectiveValueType::None => {
                     self.reset_buffer();
                     self.push_token(TokenType::DirectiveClose);
                 }
@@ -833,7 +820,7 @@ impl Tokenizer {
                     self.reset_buffer();
                     self.push_token(TokenType::DirectiveClose);
                     self.pop_state_type(State::ExprParsedString);
-                },
+                }
             }
 
             self.pop_state_type(State::ParsedDirectiveIdentifier);
@@ -1177,6 +1164,7 @@ impl Tokenizer {
         let char = self.char;
 
         if Operator::is_operator_char(char) {
+            self.reset_buffer();
             self.buf.push(char);
 
             return match Operator::get_match(&self.buf) {
@@ -1391,8 +1379,7 @@ pub enum Pipe {
     ExpectDirectiveIdentifierStart,
     ParseDirectiveIdentifier,
     ExpectDirectiveColon,
-    ExpectDirectiveValueStart,
-    ParseDirectiveValue,
+    SetStateForDirectiveValue,
     ExpectDirectiveClose,
 
     ExpectEventListenerOpenStart,

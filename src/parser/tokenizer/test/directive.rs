@@ -57,6 +57,13 @@ fn directive_0008() {
 }
 
 #[test]
+fn directive_0009() {
+    let string = file("directive/directive_0009").unwrap();
+    let mut tokenizer = Tokenizer::new();
+    match_tokens_to_source(string.clone(), tokenizer.tokenize(string));
+}
+
+#[test]
 fn directives_0001() {
     let string = file("directive/directives_0001").unwrap();
     let mut tokenizer = Tokenizer::new();
