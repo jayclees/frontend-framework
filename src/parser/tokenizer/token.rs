@@ -1,6 +1,5 @@
+use crate::parser::tokenizer::directive::DirectiveEnum;
 use std::fmt::{Display, Formatter};
-use std::panic::RefUnwindSafe;
-use crate::parser::tokenizer::directive::{Directive, DirectiveEnum};
 
 #[derive(Debug)]
 pub struct Token<'token> {
@@ -42,41 +41,7 @@ impl<'token> Token<'token> {
     #[cfg(test)]
     pub fn test(&self, source: &str) -> bool {
         let source_str = &source[self.start..self.end];
-        match &self.r#type {
-            TokenType::BlockIdentifier(str)
-            | TokenType::LineComment(str)
-            | TokenType::BlockComment(str)
-            | TokenType::AttrIdentifier(str)
-            | TokenType::DirectiveIdentifier(str, _)
-            | TokenType::EventListenerIdentifier(str)
-            | TokenType::EventListenerHandler(str)
-            | TokenType::DirectiveValue(str) => source_str == str,
-
-            TokenType::BlockOpen => source_str == "{",
-            TokenType::BlockClose => source_str == "}",
-            TokenType::AttrColon => source_str == ":",
-            TokenType::AttrSeparator => source_str == ",",
-            TokenType::DirectiveOpen => source_str == "[",
-            TokenType::DirectiveClose => source_str == "]",
-            TokenType::DirectiveColon => source_str == ":",
-            TokenType::EventListenerOpen => source_str == "@[",
-            TokenType::EventListenerClose => source_str == "]",
-            TokenType::EventListenerColon => source_str == ":",
-
-            TokenType::ExprToken(expr) => match expr {
-                ExprToken::String(str) => source_str == str,
-                ExprToken::Number(str) => source_str == str,
-                ExprToken::Operator(op) => source_str == op.symbol(),
-                ExprToken::Var(str) => source_str == str,
-                ExprToken::Dot => source_str == ".",
-                ExprToken::BracketAccessorOpen => source_str == "[",
-                ExprToken::BracketAccessorClose => source_str == "]",
-                ExprToken::FunctionArgsOpen => source_str == "(",
-                ExprToken::FunctionArgsClose => source_str == ")",
-                ExprToken::ArrayOpen => source_str == "[",
-                ExprToken::ArrayClose => source_str == "]",
-            },
-        }
+        source_str == self.r#type.symbol()
     }
 }
 
@@ -105,7 +70,7 @@ pub enum TokenType<'token> {
 }
 
 impl<'token> TokenType<'token> {
-    pub fn len(&self) -> usize {
+    pub fn symbol(&self) -> &str {
         match self {
             TokenType::BlockIdentifier(str)
             | TokenType::LineComment(str)
@@ -114,60 +79,25 @@ impl<'token> TokenType<'token> {
             | TokenType::DirectiveIdentifier(str, _)
             | TokenType::DirectiveValue(str)
             | TokenType::EventListenerHandler(str)
-            | TokenType::EventListenerIdentifier(str) => str.len(),
+            | TokenType::EventListenerIdentifier(str) => str,
 
-            TokenType::BlockOpen
-            | TokenType::BlockClose
-            | TokenType::AttrColon
-            | TokenType::AttrSeparator
-            | TokenType::DirectiveOpen
-            | TokenType::DirectiveClose
-            | TokenType::EventListenerClose
-            | TokenType::EventListenerColon
-            | TokenType::DirectiveColon => 1,
+            TokenType::BlockOpen => "{",
+            TokenType::BlockClose => "}",
+            TokenType::AttrColon => ":",
+            TokenType::AttrSeparator => ",",
+            TokenType::DirectiveOpen => "[",
+            TokenType::DirectiveClose => "]",
+            TokenType::EventListenerOpen => "@[",
+            TokenType::EventListenerClose => "]",
+            TokenType::EventListenerColon => ":",
+            TokenType::DirectiveColon => ":",
 
-            TokenType::EventListenerOpen => 2,
-
-            TokenType::ExprToken(expr) => expr.len(),
+            TokenType::ExprToken(expr) => expr.symbol(),
         }
     }
 
-    pub fn dump(&self) -> String {
-        match self {
-            TokenType::BlockIdentifier(str) |
-            TokenType::LineComment(str) |
-            TokenType::BlockComment(str) |
-            TokenType::AttrIdentifier(str) |
-            TokenType::DirectiveIdentifier(str, _) |
-            TokenType::DirectiveValue(str) |
-            TokenType::EventListenerIdentifier(str) |
-            TokenType::EventListenerHandler(str) => str.to_owned(),
-
-            TokenType::BlockOpen => "{".to_owned(),
-            TokenType::BlockClose => "}".to_owned(),
-            TokenType::AttrColon => ":".to_owned(),
-            TokenType::AttrSeparator => ",".to_owned(),
-            TokenType::DirectiveOpen => "[".to_owned(),
-            TokenType::DirectiveClose => "]".to_owned(),
-            TokenType::DirectiveColon => ":".to_owned(),
-            TokenType::EventListenerOpen => "@[".to_owned(),
-            TokenType::EventListenerClose => "]".to_owned(),
-            TokenType::EventListenerColon => ":".to_owned(),
-
-            TokenType::ExprToken(expr_tok) => match expr_tok {
-                ExprToken::String(str) |
-                ExprToken::Number(str) |
-                ExprToken::Var(str)  => str.to_owned(),
-                ExprToken::Operator(op) => op.symbol().to_owned(),
-                ExprToken::Dot => ".".to_owned(),
-                ExprToken::BracketAccessorOpen => "[".to_owned(),
-                ExprToken::BracketAccessorClose => "]".to_owned(),
-                ExprToken::FunctionArgsOpen => "(".to_owned(),
-                ExprToken::FunctionArgsClose => ")".to_owned(),
-                ExprToken::ArrayOpen => "[".to_owned(),
-                ExprToken::ArrayClose => "]".to_owned(),
-            }
-        }
+    pub fn len(&self) -> usize {
+        self.symbol().len()
     }
 }
 
@@ -204,7 +134,9 @@ pub enum ExprToken {
     Number(String),
     Operator(Operator),
     Var(String),
-    Dot,
+    PropAccessorVar(String),
+    PropAccessorDot,
+    UnresolvedDot,
     BracketAccessorOpen,
     BracketAccessorClose,
     FunctionArgsOpen,
@@ -214,20 +146,27 @@ pub enum ExprToken {
 }
 
 impl ExprToken {
-    fn len(&self) -> usize {
+    // todo use these in tests to match tokens
+    fn symbol(&self) -> &str {
         match self {
-            ExprToken::String(str) => str.len(),
-            ExprToken::Number(str) => str.len(),
-            ExprToken::Operator(op) => op.symbol().len(),
-            ExprToken::Var(str) => str.len(),
-            ExprToken::Dot => 1,
-            ExprToken::BracketAccessorOpen => 1,
-            ExprToken::BracketAccessorClose => 1,
-            ExprToken::FunctionArgsOpen => 1,
-            ExprToken::FunctionArgsClose => 1,
-            ExprToken::ArrayOpen => 1,
-            ExprToken::ArrayClose => 1,
+            ExprToken::String(str)
+            | ExprToken::Number(str)
+            | ExprToken::Var(str)
+            | ExprToken::PropAccessorVar(str) => str,
+            ExprToken::Operator(op) => op.symbol(),
+            ExprToken::PropAccessorDot => ".",
+            ExprToken::UnresolvedDot => ".",
+            ExprToken::BracketAccessorOpen => "[",
+            ExprToken::BracketAccessorClose => "]",
+            ExprToken::FunctionArgsOpen => "(",
+            ExprToken::FunctionArgsClose => ")",
+            ExprToken::ArrayOpen => "[",
+            ExprToken::ArrayClose => "]",
         }
+    }
+
+    fn len(&self) -> usize {
+        self.symbol().len()
     }
 
     pub(crate) fn add(&self, right: ExprToken) -> String {
@@ -362,7 +301,9 @@ impl Display for ExprToken {
             ExprToken::Number(str) => write!(f, "Number({str})"),
             ExprToken::Operator(op) => write!(f, "Operator({op})"),
             ExprToken::Var(str) => write!(f, "Var({str})"),
-            ExprToken::Dot => write!(f, "Dot"),
+            ExprToken::PropAccessorVar(str) => write!(f, "PropAccessorVar({str})"),
+            ExprToken::PropAccessorDot => write!(f, "PropAccessorDot"),
+            ExprToken::UnresolvedDot => write!(f, "UnresolvedDot"),
             ExprToken::BracketAccessorOpen => write!(f, "BracketAccessorOpen"),
             ExprToken::BracketAccessorClose => write!(f, "BracketAccessorClose"),
             ExprToken::FunctionArgsOpen => write!(f, "FunctionArgsOpen"),
@@ -375,9 +316,6 @@ impl Display for ExprToken {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Operator {
-    // String
-    Concatenation, // .
-
     // Arithmetic
     Plus,
     Minus,
@@ -470,7 +408,6 @@ impl Operator {
             Operator::And => "&&",
             Operator::Or => "||",
             Operator::Not => "!",
-            Operator::Concatenation => ".",
         }
     }
 
@@ -483,7 +420,6 @@ impl Operator {
             Operator::Divide => 3,
             Operator::Modulus => 3,
             Operator::Power => 4,
-            Operator::Concatenation => 5,
             Operator::ParenthesesClose => unimplemented!(),
             Operator::Assign => unimplemented!(),
             Operator::Increment => unimplemented!(),
@@ -532,7 +468,6 @@ impl Display for Operator {
             Operator::And => write!(f, "And"),
             Operator::Or => write!(f, "Or"),
             Operator::Not => write!(f, "Not"),
-            Operator::Concatenation => write!(f, "Concatenation"),
         }
     }
 }

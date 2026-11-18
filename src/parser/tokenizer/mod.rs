@@ -192,7 +192,7 @@ impl<'token> Tokenizer<'token> {
                 State::ExprParsingString => self.pipeline(vec![Pipe::ParseString]),
                 State::ExprParsedString => self.pipeline(vec![
                     Pipe::ExpectCommentStart,
-                    Pipe::ExpectDot,
+                    Pipe::ExpectPropAccessor,
                     Pipe::ExpectParenthesisClose,
                     Pipe::ExpectAttrSeparator,
                     Pipe::ExpectBlockClose,
@@ -201,7 +201,7 @@ impl<'token> Tokenizer<'token> {
                 State::ExprParsingVar => self.pipeline(vec![
                     Pipe::ParseVar,
                     Pipe::ExpectSlash,
-                    Pipe::ExpectDot,
+                    Pipe::ExpectPropAccessor,
                     Pipe::ExpectBracketOpen,
                     Pipe::ExpectParenthesisClose,
                     Pipe::ExpectAttrSeparator,
@@ -210,7 +210,7 @@ impl<'token> Tokenizer<'token> {
                 ]),
                 State::ExprParsedVar => self.pipeline(vec![
                     Pipe::ExpectSlash,
-                    Pipe::ExpectDot,
+                    Pipe::ExpectPropAccessor,
                     Pipe::ExpectBracketOpen,
                     Pipe::ExpectParenthesisClose,
                     Pipe::ExpectAttrSeparator,
@@ -234,7 +234,7 @@ impl<'token> Tokenizer<'token> {
                     Pipe::ExpectSlash,
                     Pipe::ExpectOperatorStart,
                     Pipe::ExpectParenthesisClose,
-                    Pipe::ExpectDot,
+                    Pipe::ExpectPropAccessor,
                     Pipe::ExpectAttrSeparator,
                     Pipe::ExpectBlockClose,
                     Pipe::ExpectDirectiveClose,
@@ -307,6 +307,7 @@ impl<'token> Tokenizer<'token> {
                 Pipe::ParseNumber => self.parse_number(),
                 Pipe::ParseVar => self.parse_var(),
                 Pipe::ParseOperator => self.parse_operator(),
+                Pipe::ExpectPropAccessor => self.expect_prop_accessor(),
                 Pipe::ExpectBracketAccessorOpen => self.expect_bracket_accessor_open(),
                 Pipe::ExpectBracketAccessorClose => self.expect_bracket_accessor_close(),
                 Pipe::ExpectNegativeOperator => self.expect_negative_operator(),
@@ -323,18 +324,7 @@ impl<'token> Tokenizer<'token> {
 
             match result {
                 PipelineResult::Handled => return,
-                PipelineResult::Continue | PipelineResult::Void => { /* Do nothing */ }
-                PipelineResult::ReplaceState(next) => {
-                    self.pop_state();
-                    self.push_state(next, None);
-                    return;
-                }
-                PipelineResult::HandledPushState(next) => return self.push_state(next, None),
-                PipelineResult::PushStateKeepBuf(next, char) => {
-                    return self.push_state_keep_buf(next, char);
-                }
-                PipelineResult::PopState => {}
-                PipelineResult::PopStateType(_) => {}
+                PipelineResult::Continue => { /* Continue to next pipe or finish loop. */ }
                 PipelineResult::Err(msg) => self.err_msg(msg),
                 PipelineResult::ErrUnexpected => self.err_unexpected(None),
             };
@@ -356,7 +346,7 @@ impl<'token> Tokenizer<'token> {
     fn dump_tokens(&self) {
         let mut output = String::new();
         for token in &self.tokens {
-            output.push_str(token.r#type().dump().as_ref())
+            output.push_str(token.r#type().symbol())
         }
         dbg!(output);
     }
@@ -372,16 +362,6 @@ impl<'token> Tokenizer<'token> {
     }
 
     fn push_state(&mut self, state: State, starting_char: Option<char>) {
-        self.state_history.push(state);
-
-        if let Some(char) = starting_char
-            && !char.is_whitespace()
-        {
-            self.buf.push(char);
-        }
-    }
-
-    fn push_state_keep_buf(&mut self, state: State, starting_char: Option<char>) {
         self.state_history.push(state);
 
         if let Some(char) = starting_char {
@@ -560,7 +540,8 @@ impl<'token> Tokenizer<'token> {
         if char.is_ascii_alphabetic() {
             self.reset_buffer();
             self.buf.push(char);
-            return PipelineResult::HandledPushState(State::ParsingIdentifier);
+            self.push_state(State::ParsingIdentifier, None);
+            return PipelineResult::Handled;
         }
 
         PipelineResult::Continue
@@ -617,13 +598,13 @@ impl<'token> Tokenizer<'token> {
 
         if char == '/' {
             self.pop_state();
-            self.push_state_keep_buf(State::ParsingLineComment, Some(char));
+            self.push_state(State::ParsingLineComment, Some(char));
             return PipelineResult::Handled;
         }
 
         if char == '*' {
             self.pop_state();
-            self.push_state_keep_buf(State::ParsingBlockComment, Some(char));
+            self.push_state(State::ParsingBlockComment, Some(char));
             return PipelineResult::Handled;
         }
 
@@ -1143,7 +1124,14 @@ impl<'token> Tokenizer<'token> {
             return PipelineResult::Handled;
         }
 
-        self.push_token(TokenType::ExprToken(ExprToken::Var(self.buf.clone())));
+        self.push_token(TokenType::ExprToken(
+            match self.tokens.last().unwrap().r#type() {
+                TokenType::ExprToken(ExprToken::PropAccessorDot) => {
+                    ExprToken::PropAccessorVar(self.buf.clone())
+                }
+                _ => ExprToken::Var(self.buf.clone()),
+            }
+        ));
         self.pop_state_type(State::ExprParsingVar);
         self.push_state(State::ExprParsedVar, None);
 
@@ -1263,6 +1251,18 @@ impl<'token> Tokenizer<'token> {
         }
     }
 
+    fn expect_prop_accessor(&mut self) -> PipelineResult {
+        let char = self.char;
+
+        if char == '.' {
+            self.reset_buffer();
+            self.push_token(TokenType::ExprToken(ExprToken::PropAccessorDot));
+            return PipelineResult::Handled;
+        }
+
+        PipelineResult::Continue
+    }
+
     fn expect_parenthesis_close(&mut self) -> PipelineResult {
         let char = self.char;
 
@@ -1288,7 +1288,7 @@ impl<'token> Tokenizer<'token> {
 
         if char == '.' {
             self.reset_buffer();
-            self.push_token(TokenType::ExprToken(ExprToken::Dot));
+            self.push_token(TokenType::ExprToken(ExprToken::UnresolvedDot));
             self.push_state(State::ExprResolvingDot, None);
             return PipelineResult::Handled;
         }
@@ -1304,14 +1304,13 @@ impl<'token> Tokenizer<'token> {
 
     fn resolve_dot(&mut self) -> PipelineResult {
         let char = self.char;
+        assert_matches!(
+            self.tokens.last().unwrap().r#type(),
+            TokenType::ExprToken(ExprToken::UnresolvedDot)
+        );
 
-        // cases:
-        // previous token is string, check next
         if char.is_ascii_digit() || matches!(char, ',' | '}' | ')') {
-            assert_matches!(
-                self.tokens.pop().unwrap().r#type(),
-                TokenType::ExprToken(ExprToken::Dot)
-            );
+            self.tokens.pop(); // Pop the unresolved dot
             let prev = self.tokens.pop().unwrap();
             if let TokenType::ExprToken(ExprToken::Number(num)) = prev.r#type() {
                 let mut num = num.clone();
@@ -1331,8 +1330,12 @@ impl<'token> Tokenizer<'token> {
         }
 
         if char.is_ascii_alphabetic() {
-            // Is a var dot accessor. Potentially for property getter or method call.
-            unimplemented!()
+            // Is a prop accessor dot
+            self.tokens.pop(); // Pop the unresolved dot
+            self.reset_buffer();
+            self.push_token(TokenType::ExprToken(ExprToken::PropAccessorDot));
+            self.pop_state_type(State::ExprResolvingDot);
+            self.push_state(State::ExprParsingVar, Some(char))
         }
 
         PipelineResult::Continue
@@ -1382,14 +1385,8 @@ impl<'token> Tokenizer<'token> {
 enum PipelineResult {
     Handled,
     Continue,
-    ReplaceState(State),
-    HandledPushState(State),
-    PushStateKeepBuf(State, Option<char>),
-    PopState,
-    PopStateType(State),
     Err(String),
     ErrUnexpected,
-    Void,
 }
 
 pub enum Pipe {
@@ -1437,6 +1434,7 @@ pub enum Pipe {
     ParseNumber,
     ParseVar,
     ParseOperator,
+    ExpectPropAccessor,
     ExpectBracketAccessorOpen,
     ExpectBracketAccessorClose,
     // ExpectFunctionArgsOpen,

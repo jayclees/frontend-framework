@@ -58,7 +58,6 @@ impl<'a> PostfixProcessor<'a> {
                         }
                     }
                 }
-                Operator::Concatenation => todo!(),
                 Operator::Modulus
                 | Operator::Assign
                 | Operator::Increment
@@ -81,7 +80,9 @@ impl<'a> PostfixProcessor<'a> {
                 self.output.push(Part::Operand(token));
             }
             ExprToken::Var(_) => unimplemented!(),
-            ExprToken::Dot => unimplemented!(),
+            ExprToken::PropAccessorVar(_) => unimplemented!(),
+            ExprToken::PropAccessorDot => unimplemented!(),
+            ExprToken::UnresolvedDot => unimplemented!(),
             ExprToken::BracketAccessorOpen => unimplemented!(),
             ExprToken::BracketAccessorClose => unimplemented!(),
             ExprToken::FunctionArgsOpen => unimplemented!(),
@@ -120,9 +121,11 @@ impl<'a> PostfixProcessor<'a> {
                             Operator::Divide => buf.push(ExprToken::Number(left.divide(right))),
                             Operator::Power => buf.push(ExprToken::Number(left.power(right))),
                             Operator::Modulus => buf.push(ExprToken::Number(left.modulus(right))),
-                            Operator::Concatenation => {
-                                buf.push(ExprToken::String(format!("{left}{right}")))
-                            }
+                            // todo move this into Operator::Plus match arm and conditionally handle
+                            // todo based on operand types
+                            // Operator::Concatenation => {
+                            //     buf.push(ExprToken::String(format!("{left}{right}")))
+                            // }
                             Operator::Assign => {}
                             Operator::Increment => {}
                             Operator::Decrement => {}
