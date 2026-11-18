@@ -2,20 +2,29 @@ use crate::parser::tree_builder::block::Block;
 use std::fs::OpenOptions;
 use std::io::Write;
 use std::path::PathBuf;
+use crate::parser::tokenizer::directive::DirectiveEnum;
 
-pub struct Generator<'a> {
-    blocks: &'a Vec<Block>,
+pub struct Generator<'token> {
+    blocks: &'token Vec<Block<'token>>,
     target_dir: PathBuf,
 }
 
-impl<'a> Generator<'a> {
-    pub fn new(blocks: &'a Vec<Block>, target_dir: PathBuf) -> Generator<'a> {
+impl<'token> Generator<'token> {
+    pub fn new(blocks: &'token Vec<Block>, target_dir: PathBuf) -> Self {
         Generator { blocks, target_dir }
     }
 
     pub fn generate(&mut self) {
         let mut html = String::from("<!doctype html>");
         for block in self.blocks {
+            // if block has `if` directive, check that expression
+            // resolves to true if not, skip rendering block.
+            for directive in block.directives() {
+                if let DirectiveEnum::If(inner) = directive {
+                    let is_true = inner.is_true();
+                };
+            }
+            
             html.push_str(block.to_html().as_str());
         }
         // todo use rayon for certain tasks?
@@ -28,7 +37,10 @@ impl<'a> Generator<'a> {
 
         match file.write(html.as_bytes()) {
             Ok(written) => {
-                println!("{written} bytes written to {}", self.target_dir.to_str().unwrap());
+                println!(
+                    "{written} bytes written to {}",
+                    self.target_dir.to_str().unwrap()
+                );
             }
             Err(e) => {
                 eprintln!("{e}");

@@ -1305,6 +1305,8 @@ impl<'token> Tokenizer<'token> {
     fn resolve_dot(&mut self) -> PipelineResult {
         let char = self.char;
 
+        // cases:
+        // previous token is string, check next
         if char.is_ascii_digit() || matches!(char, ',' | '}' | ')') {
             assert_matches!(
                 self.tokens.pop().unwrap().r#type(),
@@ -1319,12 +1321,12 @@ impl<'token> Tokenizer<'token> {
                     TokenType::ExprToken(ExprToken::Number(num)),
                 ));
                 self.pop_state_type(State::ExprResolvingDot);
-                if char.is_ascii_digit() {
+                return if char.is_ascii_digit() {
                     self.push_state(State::ExprParsingFractionalNumber, Some(char));
-                    return PipelineResult::Handled;
+                    PipelineResult::Handled
                 } else {
-                    return PipelineResult::Continue;
-                }
+                    PipelineResult::Continue
+                };
             };
         }
 
@@ -1391,10 +1393,8 @@ enum PipelineResult {
 }
 
 pub enum Pipe {
-    #[allow(
-        clippy::upper_case_acronyms
-    )]
     // Dummy pipe that will trigger "unimplemented" to mark unhandled tokenizer states
+    #[allow(clippy::upper_case_acronyms)]
     UNIMPLEMENTED,
 
     ExpectIdentifierStart,

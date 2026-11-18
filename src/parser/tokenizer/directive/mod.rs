@@ -1,5 +1,6 @@
 use crate::parser::tokenizer::token::ExprToken;
 use std::fmt::Debug;
+use crate::parser::tree_builder::postfix_processor::PostfixProcessor;
 
 #[derive(Debug)]
 pub(crate) enum DirectiveEnum<'token> {
@@ -51,6 +52,14 @@ pub struct IfDirective<'token> {
 impl<'token> IfDirective<'token> {
     pub fn new() -> Self {
         Self { tokens: vec![] }
+    }
+
+    pub fn is_true(&self) -> bool {
+        let mut expr = PostfixProcessor::new();
+        for token in &self.tokens {
+            expr.process(token);
+        }
+        true
     }
 }
 

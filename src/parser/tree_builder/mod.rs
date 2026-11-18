@@ -1,7 +1,5 @@
 pub mod block;
-mod expression;
-mod html;
-mod postfix_processor;
+pub(crate) mod postfix_processor;
 
 use super::tokenizer::token::{Token, TokenType};
 use super::tree_builder::block::AttrBuilder;
@@ -9,8 +7,8 @@ use crate::parser::tokenizer::directive::DirectiveEnum;
 use block::{Block, BlockBuilder};
 
 pub struct TreeBuilder<'token> {
-    blocks: Vec<Block>,
-    block_builders: Vec<BlockBuilder>,
+    blocks: Vec<Block<'token>>,
+    block_builders: Vec<BlockBuilder<'token>>,
     attr_builder: Option<AttrBuilder<'token>>,
     active_directive: Option<&'token DirectiveEnum<'token>>,
 }
@@ -73,9 +71,11 @@ impl<'token> TreeBuilder<'token> {
                     }
                 }
                 TokenType::DirectiveOpen => {}
-                TokenType::DirectiveClose => {
-                    self.active_directive = None;
-                }
+                TokenType::DirectiveClose => self
+                    .block_builders
+                    .last_mut()
+                    .unwrap()
+                    .add_directive(self.active_directive.take().unwrap()),
                 TokenType::DirectiveIdentifier(id, directive) => {
                     self.active_directive = Some(directive)
                 }

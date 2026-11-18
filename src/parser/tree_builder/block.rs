@@ -1,23 +1,27 @@
 use std::panic::RefUnwindSafe;
-use crate::parser::tokenizer::directive::Directive;
+use crate::parser::tokenizer::directive::{Directive, DirectiveEnum};
 use crate::parser::tree_builder::postfix_processor::PostfixProcessor;
 
 #[derive(Debug)]
-pub struct Block {
+pub struct Block<'token> {
     tag: String,
     attributes: Vec<Attr>,
-    children: Vec<Block>,
-    directives: Vec<Box<dyn Directive + RefUnwindSafe>>
+    children: Vec<Block<'token>>,
+    directives: Vec<&'token DirectiveEnum<'token>>
 }
 
-impl Block {
-    pub fn new(tag: String) -> Block {
+impl<'token> Block<'token> {
+    pub fn new(tag: String) -> Self {
         Block {
             tag,
             attributes: Default::default(),
             children: vec![],
             directives: vec![],
         }
+    }
+
+    pub fn directives(&self) -> &Vec<&'token DirectiveEnum<'token>> {
+        &self.directives
     }
 
     pub fn to_html(&self) -> String {
@@ -88,25 +92,27 @@ impl Block {
 }
 
 #[derive(Debug)]
-pub enum BlockContent {
+pub enum BlockContent<'token> {
     Html(String),
     Text(String),
-    Block(Block),
+    Block(Block<'token>),
 }
 
-#[derive(PartialEq, Clone, Debug)]
-pub struct BlockBuilder {
+#[derive(Debug)]
+pub struct BlockBuilder<'token> {
     tag: String,
     attributes: Vec<Attr>,
-    children: Vec<BlockBuilder>,
+    children: Vec<BlockBuilder<'token>>,
+    directives: Vec<&'token DirectiveEnum<'token>>
 }
 
-impl BlockBuilder {
-    pub fn new(tag: String) -> BlockBuilder {
+impl<'token> BlockBuilder<'token> {
+    pub fn new(tag: String) -> Self {
         BlockBuilder {
             tag,
             attributes: vec![],
             children: vec![],
+            directives: vec![],
         }
     }
 
@@ -114,11 +120,15 @@ impl BlockBuilder {
         self.attributes.push(attr);
     }
 
-    pub fn add_child(&mut self, child: BlockBuilder) {
+    pub fn add_child(&mut self, child: BlockBuilder<'token>) {
         self.children.push(child);
     }
 
-    pub fn build(&mut self) -> Block {
+    pub fn add_directive(&mut self, directive: &'token DirectiveEnum<'token>) {
+        self.directives.push(directive);
+    }
+
+    pub fn build(&mut self) -> Block<'token> {
         let mut content: Vec<Block> = vec![];
 
         for child in &mut self.children {
@@ -129,8 +139,12 @@ impl BlockBuilder {
             tag: std::mem::take(&mut self.tag),
             attributes: std::mem::take(&mut self.attributes),
             children: content,
-            directives: vec![],
+            directives: std::mem::take(&mut self.directives),
         }
+    }
+
+    pub fn build2(&mut self) -> &str {
+        "HELLO"
     }
 }
 
@@ -141,13 +155,13 @@ pub struct Attr {
 }
 
 #[derive(Debug)]
-pub struct AttrBuilder<'a> {
+pub struct AttrBuilder<'token> {
     handle: String,
-    pub(super) expr_processor: PostfixProcessor<'a>,
+    pub(super) expr_processor: PostfixProcessor<'token>,
 }
 
-impl<'a> AttrBuilder<'a> {
-    pub fn new(handle: String) -> AttrBuilder<'a> {
+impl<'token> AttrBuilder<'token> {
+    pub fn new(handle: String) -> AttrBuilder<'token> {
         AttrBuilder {
             handle,
             expr_processor: PostfixProcessor::new(),
