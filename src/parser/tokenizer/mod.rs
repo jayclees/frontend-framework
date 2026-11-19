@@ -192,14 +192,15 @@ impl<'token> Tokenizer<'token> {
                 State::ExprParsingString => self.pipeline(vec![Pipe::ParseString]),
                 State::ExprParsedString => self.pipeline(vec![
                     Pipe::ExpectCommentStart,
+                    Pipe::ExpectConcatenationOperator,
                     Pipe::ExpectPropAccessor,
                     Pipe::ExpectParenthesisClose,
                     Pipe::ExpectAttrSeparator,
                     Pipe::ExpectBlockClose,
                     Pipe::ExpectDirectiveClose,
                 ]),
-                State::ExprParsingVar => self.pipeline(vec![
-                    Pipe::ParseVar,
+                State::ExprParsingVarOrKeyword => self.pipeline(vec![
+                    Pipe::ParseVarOrKeyword,
                     Pipe::ExpectSlash,
                     Pipe::ExpectPropAccessor,
                     Pipe::ExpectBracketOpen,
@@ -208,7 +209,7 @@ impl<'token> Tokenizer<'token> {
                     Pipe::ExpectBlockClose,
                     Pipe::ExpectDirectiveClose,
                 ]),
-                State::ExprParsedVar => self.pipeline(vec![
+                State::ExprParsedVarOrKeyword => self.pipeline(vec![
                     Pipe::ExpectSlash,
                     Pipe::ExpectPropAccessor,
                     Pipe::ExpectBracketOpen,
@@ -305,7 +306,7 @@ impl<'token> Tokenizer<'token> {
                 Pipe::ExpectParenthesisOpen => self.expect_parenthesis_open(),
                 Pipe::ParseString => self.parse_string(),
                 Pipe::ParseNumber => self.parse_number(),
-                Pipe::ParseVar => self.parse_var(),
+                Pipe::ParseVarOrKeyword => self.parse_var_or_keyword(),
                 Pipe::ParseOperator => self.parse_operator(),
                 Pipe::ExpectPropAccessor => self.expect_prop_accessor(),
                 Pipe::ExpectBracketAccessorOpen => self.expect_bracket_accessor_open(),
@@ -320,6 +321,7 @@ impl<'token> Tokenizer<'token> {
                 Pipe::ResolveSlash => self.resolve_slash(),
                 Pipe::ExpectFractionalNumberStart => self.expect_fractional_number_start(),
                 Pipe::ParseFractionalNumber => self.parse_fractional_number(),
+                Pipe::ExpectConcatenationOperator => self.expect_concatenation_operator(),
             };
 
             match result {
@@ -670,8 +672,8 @@ impl<'token> Tokenizer<'token> {
             } else if self.state() == &State::ExprParsedString {
                 self.pop_state_type(State::ExprParsedString);
                 self.pop_state_type(State::ParsedAttrColon);
-            } else if self.state() == &State::ExprParsedVar {
-                self.pop_state_type(State::ExprParsedVar);
+            } else if self.state() == &State::ExprParsedVarOrKeyword {
+                self.pop_state_type(State::ExprParsedVarOrKeyword);
                 self.pop_state_type(State::ParsedAttrColon);
             }
 
@@ -788,7 +790,7 @@ impl<'token> Tokenizer<'token> {
                             self.state(),
                             State::ExprParsedNumber
                                 | State::ExprParsedString
-                                | State::ExprParsedVar
+                                | State::ExprParsedVarOrKeyword
                                 | State::ExprParsedParenthesisClose
                         ) {
                             self.pop_state();
@@ -1015,7 +1017,7 @@ impl<'token> Tokenizer<'token> {
                 self.pop_state_type(State::ExprParsedOperator);
             }
             self.reset_buffer();
-            self.push_state(State::ExprParsingVar, Some(char));
+            self.push_state(State::ExprParsingVarOrKeyword, Some(char));
             return PipelineResult::Handled;
         } else if char == '"' {
             self.reset_buffer();
@@ -1116,7 +1118,7 @@ impl<'token> Tokenizer<'token> {
         PipelineResult::Continue
     }
 
-    fn parse_var(&mut self) -> PipelineResult {
+    fn parse_var_or_keyword(&mut self) -> PipelineResult {
         let char = self.char;
 
         if char.is_ascii_alphanumeric() {
@@ -1124,16 +1126,31 @@ impl<'token> Tokenizer<'token> {
             return PipelineResult::Handled;
         }
 
-        self.push_token(TokenType::ExprToken(
-            match self.tokens.last().unwrap().r#type() {
-                TokenType::ExprToken(ExprToken::PropAccessorDot) => {
-                    ExprToken::PropAccessorVar(self.buf.clone())
-                }
-                _ => ExprToken::Var(self.buf.clone()),
+        match self.buf.to_lowercase().as_str() {
+            "true" => {
+                self.push_token(TokenType::ExprToken(ExprToken::True))
             }
-        ));
-        self.pop_state_type(State::ExprParsingVar);
-        self.push_state(State::ExprParsedVar, None);
+            "false" => {
+                self.push_token(TokenType::ExprToken(ExprToken::False))
+            }
+            "null" => {
+                self.push_token(TokenType::ExprToken(ExprToken::Null))
+            }
+            "nan" => unimplemented!(),
+            _ => {
+                self.push_token(TokenType::ExprToken(
+                    match self.tokens.last().unwrap().r#type() {
+                        TokenType::ExprToken(ExprToken::PropAccessorDot) => {
+                            ExprToken::PropAccessorVar(self.buf.clone())
+                        }
+                        _ => ExprToken::Var(self.buf.clone()),
+                    }
+                ));
+            }
+        }
+
+        self.pop_state_type(State::ExprParsingVarOrKeyword);
+        self.push_state(State::ExprParsedVarOrKeyword, None);
 
         PipelineResult::Continue
     }
@@ -1335,7 +1352,7 @@ impl<'token> Tokenizer<'token> {
             self.reset_buffer();
             self.push_token(TokenType::ExprToken(ExprToken::PropAccessorDot));
             self.pop_state_type(State::ExprResolvingDot);
-            self.push_state(State::ExprParsingVar, Some(char))
+            self.push_state(State::ExprParsingVarOrKeyword, Some(char))
         }
 
         PipelineResult::Continue
@@ -1375,6 +1392,20 @@ impl<'token> Tokenizer<'token> {
                 TokenType::ExprToken(ExprToken::Number(format!("{}{}", num, self.buf))),
             ));
             self.pop_state_type(State::ExprParsingFractionalNumber);
+        }
+
+        PipelineResult::Continue
+    }
+
+    fn expect_concatenation_operator(&mut self) -> PipelineResult {
+        let char = self.char;
+
+        if char == '+' {
+            self.reset_buffer();
+            self.push_token(TokenType::ExprToken(ExprToken::Operator(Operator::Plus)));
+            self.pop_state_type(State::ExprParsedString);
+            self.push_state(State::ExprParsedOperator, None);
+            return PipelineResult::Handled;
         }
 
         PipelineResult::Continue
@@ -1432,7 +1463,7 @@ pub enum Pipe {
     ExpectStringStart,
     ParseString,
     ParseNumber,
-    ParseVar,
+    ParseVarOrKeyword,
     ParseOperator,
     ExpectPropAccessor,
     ExpectBracketAccessorOpen,
@@ -1449,4 +1480,5 @@ pub enum Pipe {
     ResolveSlash,
     ExpectFractionalNumberStart,
     ParseFractionalNumber,
+    ExpectConcatenationOperator,
 }

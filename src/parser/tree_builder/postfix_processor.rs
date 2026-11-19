@@ -5,24 +5,26 @@ use crate::parser::tree_builder::block::BlockContent;
 /// - https://runestone.academy/ns/books/published/pythonds/BasicDS/InfixPrefixandPostfixExpressions.html
 /// - https://www.geeksforgeeks.org/dsa/convert-infix-expression-to-postfix-expression/
 #[derive(Debug)]
-pub struct PostfixProcessor<'a> {
-    op_stack: Vec<&'a ExprToken>,
-    output: Vec<Part<'a>>,
+pub struct PostfixProcessor<'token> {
+    op_stack: Vec<&'token ExprToken>,
+    postfix_expr: Vec<Part<'token>>,
     step: usize,
+    part_builders: Vec<Part<'token>>
 }
 
-impl<'a> PostfixProcessor<'a> {
-    pub fn new() -> PostfixProcessor<'a> {
+impl<'token> PostfixProcessor<'token> {
+    pub fn new() -> PostfixProcessor<'token> {
         PostfixProcessor {
             op_stack: vec![],
-            output: vec![],
+            postfix_expr: vec![],
             step: 0,
+            part_builders: vec![],
         }
     }
 
-    pub fn process(&mut self, token: &'a ExprToken) {
+    pub fn process(&mut self, token: &'token ExprToken) {
         match token {
-            ExprToken::Number(_) => self.output.push(Part::Operand(token)),
+            ExprToken::Number(_) => self.postfix_expr.push(Part::Operand(token)),
             ExprToken::Operator(op) => match op {
                 Operator::Plus
                 | Operator::Minus
@@ -37,7 +39,7 @@ impl<'a> PostfixProcessor<'a> {
                             && to_pop_op.precedence() >= op.precedence()
                         {
                             let popped = self.op_stack.remove(i);
-                            self.output.push(Part::Operator(popped));
+                            self.postfix_expr.push(Part::Operator(popped));
                         }
                     }
                     self.op_stack.push(token);
@@ -54,7 +56,7 @@ impl<'a> PostfixProcessor<'a> {
                             break;
                         } else {
                             let to_add_op = self.op_stack.remove(i);
-                            self.output.push(Part::Operator(to_add_op))
+                            self.postfix_expr.push(Part::Operator(to_add_op))
                         }
                     }
                 }
@@ -77,7 +79,7 @@ impl<'a> PostfixProcessor<'a> {
                 | Operator::Not => unimplemented!("Operator not implemented."),
             },
             ExprToken::String(_) => {
-                self.output.push(Part::Operand(token));
+                self.postfix_expr.push(Part::Operand(token));
             }
             ExprToken::Var(_) => unimplemented!(),
             ExprToken::PropAccessorVar(_) => unimplemented!(),
@@ -89,6 +91,9 @@ impl<'a> PostfixProcessor<'a> {
             ExprToken::FunctionArgsClose => unimplemented!(),
             ExprToken::ArrayOpen => unimplemented!(),
             ExprToken::ArrayClose => unimplemented!(),
+            ExprToken::True => unimplemented!(),
+            ExprToken::False => unimplemented!(),
+            ExprToken::Null => unimplemented!(),
         }
         self.step += 1;
     }
@@ -96,12 +101,12 @@ impl<'a> PostfixProcessor<'a> {
     pub fn resolve(&mut self) -> BlockContent {
         // Add remaining operators to list
         for operator in self.op_stack.iter().rev() {
-            self.output.push(Part::Operator(operator));
+            self.postfix_expr.push(Part::Operator(operator));
         }
 
         // dbg!(&self.output);
 
-        let mut output: Vec<Part> = std::mem::take(&mut self.output);
+        let mut output: Vec<Part> = std::mem::take(&mut self.postfix_expr);
         let mut buf: Vec<ExprToken> = vec![];
 
         while !output.is_empty() {
@@ -115,7 +120,15 @@ impl<'a> PostfixProcessor<'a> {
 
                     if let ExprToken::Operator(operator) = operator {
                         match operator {
-                            Operator::Plus => buf.push(ExprToken::Number(left.add(right))),
+                            Operator::Plus => {
+                                // todo should we separate Operator::Plus into Operator::Concat?
+                                // todo potentially to have different operator precedence levels.
+                                if matches!(left, ExprToken::String(_)) || matches!(right, ExprToken::String(_)) {
+                                    buf.push(ExprToken::Number(left.concat(right)))
+                                } else {
+                                    buf.push(ExprToken::Number(left.add(right)))
+                                }
+                            },
                             Operator::Minus => buf.push(ExprToken::Number(left.subtract(right))),
                             Operator::Multiply => buf.push(ExprToken::Number(left.multiply(right))),
                             Operator::Divide => buf.push(ExprToken::Number(left.divide(right))),
@@ -157,21 +170,24 @@ impl<'a> PostfixProcessor<'a> {
 
         self.reset();
 
+        // dbg!(buf.first());
         if let Some(ExprToken::Number(num)) = buf.first() {
             BlockContent::Text(num.to_owned())
         } else if let Some(ExprToken::String(str)) = buf.first() {
-            BlockContent::Text(str.to_owned())
+            let chars = str.chars();
+            let string = chars.skip(1).take(str.len() - 2).collect::<String>();
+            BlockContent::Text(string)
         } else {
             panic!("Buf should not be empty.");
         }
     }
 
     pub fn is_empty(&self) -> bool {
-        self.output.is_empty()
+        self.postfix_expr.is_empty()
     }
 
     pub fn reset(&mut self) {
-        self.output = vec![];
+        self.postfix_expr = vec![];
         self.op_stack = vec![];
     }
 }
@@ -181,16 +197,23 @@ enum Part<'a> {
     Operand(&'a ExprToken),
     Operator(&'a ExprToken),
 }
+// enum Part<'token> {
+//     Number(&'token ExprToken),
+//     String(&'token ExprToken),
+//     Var(&'token ExprToken),
+//     FnCall(&'token ExprToken),
+//     Operator(&'token ExprToken),
+// }
 
-impl<'a> Part<'a> {
-    fn get_operand(&self) -> &'a ExprToken {
+impl<'token> Part<'token> {
+    fn get_operand(&self) -> &'token ExprToken {
         match self {
             Part::Operand(token) => token,
             Part::Operator(token) => panic!(r#""{token}" is not an operand."#),
         }
     }
 
-    fn get_operator(&self) -> &'a ExprToken {
+    fn get_operator(&self) -> &'token ExprToken {
         match self {
             Part::Operator(token) => token,
             Part::Operand(token) => panic!(r#""{token}" is not an operator."#),

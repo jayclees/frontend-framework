@@ -1,4 +1,5 @@
 use std::panic::RefUnwindSafe;
+use serde_json::Value;
 use crate::parser::tokenizer::directive::{Directive, DirectiveEnum};
 use crate::parser::tree_builder::postfix_processor::PostfixProcessor;
 
@@ -24,7 +25,21 @@ impl<'token> Block<'token> {
         &self.directives
     }
 
-    pub fn to_html(&self) -> String {
+    pub fn if_true(&self, state: &Value) -> bool {
+        for directive in &self.directives {
+            if let DirectiveEnum::If(dir) = directive {
+                return dir.is_true();
+            }
+        }
+
+        true
+    }
+
+    pub fn to_html(&self, state: &Value) -> String {
+        if !self.if_true(state) {
+            return "".to_owned();
+        }
+
         let mut html = String::new();
         let is_self_closing = matches!(
             self.tag.to_lowercase().as_ref(),
@@ -51,9 +66,7 @@ impl<'token> Block<'token> {
 
         // Append attributes to string
         for attr in &self.attributes {
-            let chars = attr.value.chars();
-            let string = chars.skip(1).take(attr.value.len() - 2).collect::<String>();
-
+            let string = attr.value.to_owned();
             match attr.handle.to_lowercase().as_ref() {
                 "text" => content.push(html_escape::encode_double_quoted_attribute(&string).to_string()),
                 "html" => content.push(string),
@@ -77,7 +90,7 @@ impl<'token> Block<'token> {
         }
 
         for child in &self.children {
-            html.push_str(child.to_html().as_str());
+            html.push_str(child.to_html(&state).as_str());
         }
 
         // todo:

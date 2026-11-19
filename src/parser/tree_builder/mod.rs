@@ -42,10 +42,8 @@ impl<'token> TreeBuilder<'token> {
 
                     match self.block_builders.last_mut() {
                         None => self.blocks.push(block_builder.build()),
-                        Some(parent) => {
-                            parent.add_child(block_builder);
-                        }
-                    }
+                        Some(parent) => parent.add_child(block_builder),
+                    };
                 }
                 TokenType::AttrIdentifier(id) => {
                     if self.attr_builder.is_some() {

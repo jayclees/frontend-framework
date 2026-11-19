@@ -21,11 +21,31 @@ html {
             div {
                 class: "h-100 d-flex justify-content-center align-items-center",
                 div {
-                    h1 [if: true] {
+                    h1 [if: myVar] {
                         text: "Hello world!",
                     }
                     p [else] {
                         text: "This is the first page!",
+                    }
+                }
+                div {
+                    class: "posts",
+                    div [for: post in posts] {
+                        id: "post_" + post.id,
+                        h1 {
+                            text: post.title,
+                        }
+                        p {
+                            text: "Written by " + post.author + " on " + post.date,
+                        }
+                        span [if: post.featured] {
+                            class: "featured",
+                            text: "Featured article"
+                        }
+                        span [else] {
+                            class: "guest",
+                            text: "Guest article"
+                        }
                     }
                 }
             }
