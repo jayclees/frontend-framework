@@ -155,10 +155,6 @@ impl<'token> BlockBuilder<'token> {
             directives: std::mem::take(&mut self.directives),
         }
     }
-
-    pub fn build2(&mut self) -> &str {
-        "HELLO"
-    }
 }
 
 #[derive(Debug, PartialEq, Clone)]

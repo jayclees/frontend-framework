@@ -1,5 +1,6 @@
 use crate::parser::tokenizer::token::{ExprToken, Operator};
 use crate::parser::tree_builder::block::BlockContent;
+use serde_json::{Number, Value};
 
 /// Read:
 /// - https://runestone.academy/ns/books/published/pythonds/BasicDS/InfixPrefixandPostfixExpressions.html
@@ -9,7 +10,7 @@ pub struct PostfixProcessor<'token> {
     op_stack: Vec<&'token ExprToken>,
     postfix_expr: Vec<Part<'token>>,
     step: usize,
-    part_builders: Vec<Part<'token>>
+    part_builders: Vec<Part<'token>>,
 }
 
 impl<'token> PostfixProcessor<'token> {
@@ -24,145 +25,126 @@ impl<'token> PostfixProcessor<'token> {
 
     pub fn process(&mut self, token: &'token ExprToken) {
         match token {
-            ExprToken::Number(_) => self.postfix_expr.push(Part::Operand(token)),
-            ExprToken::Operator(op) => match op {
-                Operator::Plus
-                | Operator::Minus
-                | Operator::Multiply
-                | Operator::Divide
-                | Operator::Power => {
-                    // Pop each operator on the stack that has higher
-                    // or equal precedence and append to output.
-                    for i in (0..self.op_stack.len()).rev() {
-                        let to_pop_token = self.op_stack.get(i);
-                        if let Some(ExprToken::Operator(to_pop_op)) = to_pop_token
-                            && to_pop_op.precedence() >= op.precedence()
-                        {
-                            let popped = self.op_stack.remove(i);
-                            self.postfix_expr.push(Part::Operator(popped));
-                        }
-                    }
-                    self.op_stack.push(token);
-                }
-                Operator::ParenthesesOpen => {
-                    self.op_stack.push(token);
-                }
-                Operator::ParenthesesClose => {
-                    // Pop all operators and append to output until a left parenthesis is found.
-                    for i in (0..self.op_stack.len()).rev() {
-                        let to_pop_token = self.op_stack.get(i);
-                        if let Some(ExprToken::Operator(Operator::ParenthesesOpen)) = to_pop_token {
-                            self.op_stack.remove(i);
-                            break;
-                        } else {
-                            let to_add_op = self.op_stack.remove(i);
-                            self.postfix_expr.push(Part::Operator(to_add_op))
-                        }
-                    }
-                }
-                Operator::Modulus
-                | Operator::Assign
-                | Operator::Increment
-                | Operator::Decrement
-                | Operator::IncrementBy
-                | Operator::DecrementBy
-                | Operator::MultiplyBy
-                | Operator::DivideBy
-                | Operator::EqualTo
-                | Operator::NotEqualTo
-                | Operator::GreaterThan
-                | Operator::GreaterThanOrEqualTo
-                | Operator::LessThan
-                | Operator::LessThanOrEqualTo
-                | Operator::And
-                | Operator::Or
-                | Operator::Not => unimplemented!("Operator not implemented."),
-            },
-            ExprToken::String(_) => {
-                self.postfix_expr.push(Part::Operand(token));
+            ExprToken::Number(_) | ExprToken::String(_) => {
+                self.postfix_expr.push(Part::Operand(token))
             }
-            ExprToken::Var(_) => unimplemented!(),
-            ExprToken::PropAccessorVar(_) => unimplemented!(),
-            ExprToken::PropAccessorDot => unimplemented!(),
-            ExprToken::UnresolvedDot => unimplemented!(),
-            ExprToken::BracketAccessorOpen => unimplemented!(),
-            ExprToken::BracketAccessorClose => unimplemented!(),
-            ExprToken::FunctionArgsOpen => unimplemented!(),
-            ExprToken::FunctionArgsClose => unimplemented!(),
-            ExprToken::ArrayOpen => unimplemented!(),
-            ExprToken::ArrayClose => unimplemented!(),
-            ExprToken::True => unimplemented!(),
-            ExprToken::False => unimplemented!(),
-            ExprToken::Null => unimplemented!(),
+            ExprToken::Operator(op) => {
+                match op {
+                    Operator::Plus
+                    | Operator::Minus
+                    | Operator::Multiply
+                    | Operator::Divide
+                    | Operator::Power => {
+                        // Pop each operator on the stack that has higher
+                        // or equal precedence and append to output.
+                        for i in (0..self.op_stack.len()).rev() {
+                            let to_pop_token = self.op_stack.get(i);
+                            if let Some(ExprToken::Operator(to_pop_op)) = to_pop_token
+                                && to_pop_op.precedence() >= op.precedence()
+                            {
+                                let popped = self.op_stack.remove(i);
+                                self.postfix_expr.push(Part::Operator(popped));
+                            }
+                        }
+                        self.op_stack.push(token);
+                    }
+                    Operator::ParenthesesOpen => self.op_stack.push(token),
+                    Operator::ParenthesesClose => {
+                        // Pop all operators and append to output until a left parenthesis is found.
+                        for i in (0..self.op_stack.len()).rev() {
+                            let to_pop_token = self.op_stack.get(i);
+                            if let Some(ExprToken::Operator(Operator::ParenthesesOpen)) =
+                                to_pop_token
+                            {
+                                self.op_stack.remove(i);
+                                break;
+                            } else {
+                                let to_add_op = self.op_stack.remove(i);
+                                self.postfix_expr.push(Part::Operator(to_add_op))
+                            }
+                        }
+                    }
+                    op => unimplemented!("Operator {op} not implemented."),
+                }
+            }
+            tok => unimplemented!("Token {tok} not implemented."),
         }
         self.step += 1;
     }
 
-    pub fn resolve(&mut self) -> BlockContent {
-        // Add remaining operators to list
+    pub fn resolve(&mut self) -> BlockContent<'token> {
+        // Append remaining operators to postfix output
         for operator in self.op_stack.iter().rev() {
             self.postfix_expr.push(Part::Operator(operator));
         }
 
-        // dbg!(&self.output);
+        println!("Infix:   1 + 2 - 3 * (4 + 1) + 1");
+        print!("PostFix: ");
+        for part in &self.postfix_expr {
+            match part {
+                Part::Operand(tok) => print!("{} ", tok.symbol()),
+                Part::Operator(tok) => print!("{} ", tok.symbol()),
+            }
+        }
+        println!();
 
         let mut output: Vec<Part> = std::mem::take(&mut self.postfix_expr);
-        let mut buf: Vec<ExprToken> = vec![];
+        let mut operation_stack: Vec<Value> = vec![];
 
         while !output.is_empty() {
             match output.remove(0) {
-                Part::Operand(operand) => {
-                    buf.push(operand.clone());
+                Part::Operand(ExprToken::String(str)) => {
+                    // Push operand onto operation stack
+                    let mut str = str.clone();
+                    str.remove(0);
+                    str.pop();
+                    operation_stack.push(Value::String(str));
                 }
-                Part::Operator(operator) => {
-                    let right = buf.pop().expect("Operand buffer is empty.");
-                    let left = buf.pop().expect("Only one operand left in buffer.");
-
-                    if let ExprToken::Operator(operator) = operator {
-                        match operator {
-                            Operator::Plus => {
-                                // todo should we separate Operator::Plus into Operator::Concat?
-                                // todo potentially to have different operator precedence levels.
-                                if matches!(left, ExprToken::String(_)) || matches!(right, ExprToken::String(_)) {
-                                    buf.push(ExprToken::Number(left.concat(right)))
-                                } else {
-                                    buf.push(ExprToken::Number(left.add(right)))
-                                }
-                            },
-                            Operator::Minus => buf.push(ExprToken::Number(left.subtract(right))),
-                            Operator::Multiply => buf.push(ExprToken::Number(left.multiply(right))),
-                            Operator::Divide => buf.push(ExprToken::Number(left.divide(right))),
-                            Operator::Power => buf.push(ExprToken::Number(left.power(right))),
-                            Operator::Modulus => buf.push(ExprToken::Number(left.modulus(right))),
-                            // todo move this into Operator::Plus match arm and conditionally handle
-                            // todo based on operand types
-                            // Operator::Concatenation => {
-                            //     buf.push(ExprToken::String(format!("{left}{right}")))
-                            // }
-                            Operator::Assign => {}
-                            Operator::Increment => {}
-                            Operator::Decrement => {}
-                            Operator::IncrementBy => {}
-                            Operator::DecrementBy => {}
-                            Operator::MultiplyBy => {}
-                            Operator::DivideBy => {}
-                            Operator::EqualTo => {}
-                            Operator::NotEqualTo => {}
-                            Operator::GreaterThan => {}
-                            Operator::GreaterThanOrEqualTo => {}
-                            Operator::LessThan => {}
-                            Operator::LessThanOrEqualTo => {}
-                            Operator::ParenthesesOpen => {}
-                            Operator::ParenthesesClose => {}
-                            Operator::And => {}
-                            Operator::Or => {}
-                            Operator::Not => {}
-                        }
+                Part::Operand(ExprToken::Number(num_str)) => {
+                    // Push operand onto operation stack
+                    let num = if num_str.contains('.') {
+                        Number::from_f64(num_str.parse().unwrap()).unwrap()
                     } else {
-                        // todo Should this be checked earlier by different enum strategy?
-                        panic!("Non operator found in Part::Operator.")
+                        Number::from_i128(num_str.parse().unwrap()).unwrap()
+                    };
+                    operation_stack.push(Value::Number(num));
+                }
+                Part::Operator(ExprToken::Operator(operator)) => {
+                    // Pop last 2 operands from operation_stack and perform operation on them.
+                    let right = operation_stack.pop().expect("Operand buffer is empty.");
+                    let left = operation_stack
+                        .pop()
+                        .expect("Only one operand left in buffer.");
+
+                    match operator {
+                        Operator::Plus => {
+                            // todo should we separate Operator::Plus into Operator::Concat?
+                            // todo potentially to have different operator precedence levels.
+                            let is_concat = matches!(left, Value::String(_))
+                                || matches!(right, Value::String(_));
+                            if is_concat {
+                                let left = match left {
+                                    Value::String(s) => s,
+                                    Value::Number(n) => n.to_string(),
+                                    Value::Null => "null".to_string(),
+                                    Value::Bool(bool) => bool.to_string(),
+                                    Value::Array(_) => unimplemented!(),
+                                    Value::Object(_) => unimplemented!(),
+                                };
+                                operation_stack.push(Value::String(format!("{left}{right}")));
+                            } else {
+                                operation_stack.push(add(left, right))
+                            }
+                        }
+                        Operator::Minus => operation_stack.push(subtract(left, right)),
+                        Operator::Multiply => operation_stack.push(multiply(left, right)),
+                        Operator::Divide => operation_stack.push(divide(left, right)),
+                        Operator::Power => operation_stack.push(power(left, right)),
+                        Operator::Modulus => operation_stack.push(modulus(left, right)),
+                        _ => unimplemented!(),
                     }
                 }
+                _ => panic!("Non operator found in Part::Operator."),
             }
         }
 
@@ -170,13 +152,17 @@ impl<'token> PostfixProcessor<'token> {
 
         self.reset();
 
-        // dbg!(buf.first());
-        if let Some(ExprToken::Number(num)) = buf.first() {
-            BlockContent::Text(num.to_owned())
-        } else if let Some(ExprToken::String(str)) = buf.first() {
-            let chars = str.chars();
-            let string = chars.skip(1).take(str.len() - 2).collect::<String>();
-            BlockContent::Text(string)
+        if operation_stack.len() > 1 {
+            dbg!(operation_stack);
+            panic!("Buf should have length of one at this point.")
+        }
+
+        if let Some(Value::Number(num)) = operation_stack.first() {
+            BlockContent::Text(num.to_string())
+        } else if let Some(Value::String(str)) = operation_stack.first() {
+            // let chars = str.chars();
+            // let string = chars.skip(1).take(str.len() - 2).collect::<String>();
+            BlockContent::Text(str.to_owned())
         } else {
             panic!("Buf should not be empty.");
         }
@@ -219,4 +205,101 @@ impl<'token> Part<'token> {
             Part::Operand(token) => panic!(r#""{token}" is not an operator."#),
         }
     }
+}
+
+fn add(left: Value, right: Value) -> Value {
+    if left.is_f64() || right.is_f64() {
+        return Value::Number(
+            Number::from_f64(left.as_f64().unwrap() + right.as_f64().unwrap()).unwrap(),
+        );
+    }
+
+    Value::Number(
+        Number::from_i128(
+            left.as_number().unwrap().as_i128().unwrap()
+                + right.as_number().unwrap().as_i128().unwrap(),
+        )
+        .unwrap(),
+    )
+}
+
+fn subtract(left: Value, right: Value) -> Value {
+    if left.is_f64() || right.is_f64() {
+        return Value::Number(
+            Number::from_f64(left.as_f64().unwrap() - right.as_f64().unwrap()).unwrap(),
+        );
+    }
+
+    Value::Number(
+        Number::from_i128(
+            left.as_number().unwrap().as_i128().unwrap()
+                - right.as_number().unwrap().as_i128().unwrap(),
+        )
+        .unwrap(),
+    )
+}
+
+fn multiply(left: Value, right: Value) -> Value {
+    if left.is_f64() || right.is_f64() {
+        return Value::Number(
+            Number::from_f64(left.as_f64().unwrap() * right.as_f64().unwrap()).unwrap(),
+        );
+    }
+
+    Value::Number(
+        Number::from_i128(
+            left.as_number().unwrap().as_i128().unwrap()
+                * right.as_number().unwrap().as_i128().unwrap(),
+        )
+        .unwrap(),
+    )
+}
+
+fn divide(left: Value, right: Value) -> Value {
+    if left.is_f64() || right.is_f64() {
+        return Value::Number(
+            Number::from_f64(left.as_f64().unwrap() / right.as_f64().unwrap()).unwrap(),
+        );
+    }
+
+    Value::Number(
+        Number::from_i128(
+            left.as_number().unwrap().as_i128().unwrap()
+                / right.as_number().unwrap().as_i128().unwrap(),
+        )
+        .unwrap(),
+    )
+}
+
+fn power(left: Value, right: Value) -> Value {
+    if left.is_f64() || right.is_f64() {
+        let left = left.as_f64().unwrap();
+        let right = right.as_f64().unwrap();
+        return Value::Number(Number::from_f64(left.powf(right)).unwrap());
+    }
+
+    let left = left.as_number().unwrap().as_i128().unwrap();
+    let right = right.as_number().unwrap().as_i128().unwrap();
+
+    if right > u32::MAX as i128 {
+        panic!("Exponent too high.")
+    }
+
+    Value::Number(Number::from_i128(left.pow(right as u32)).unwrap())
+}
+
+fn modulus(left: Value, right: Value) -> Value {
+    if left.is_f64() || right.is_f64() {
+        return Value::Number(
+            Number::from_f64(left.as_f64().unwrap() % right.as_f64().unwrap()).unwrap(),
+        );
+    }
+
+    Value::Number(
+        Number::from_i128(
+            left.as_number().unwrap().as_i128().unwrap()
+                % right.as_number().unwrap().as_i128().unwrap(),
+        )
+        .unwrap(),
+    )
 }

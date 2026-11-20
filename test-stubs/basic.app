@@ -1,3 +1,3 @@
 p {
-    text: "number is " + 1
+    text: 1 + 2 - 3 * (4 + 1) + 1
 }

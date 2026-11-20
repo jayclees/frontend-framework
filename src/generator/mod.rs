@@ -38,6 +38,7 @@ impl<'token> Generator<'token> {
 
         match file.write(html.as_bytes()) {
             Ok(written) => {
+                println!("{html}");
                 println!(
                     "{written} bytes written to {}",
                     self.target_dir.to_str().unwrap()

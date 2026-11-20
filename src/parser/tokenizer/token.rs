@@ -150,7 +150,7 @@ pub enum ExprToken {
 
 impl ExprToken {
     // todo use these in tests to match tokens
-    fn symbol(&self) -> &str {
+    pub(crate) fn symbol(&self) -> &str {
         match self {
             ExprToken::String(str)
             | ExprToken::Number(str)
@@ -175,142 +175,13 @@ impl ExprToken {
         self.symbol().len()
     }
 
-    pub(crate) fn concat(&self, right: ExprToken) -> String {
-        assert!(
-            matches!(self, ExprToken::String(_)) || matches!(right, ExprToken::String(_)),
-            "Neither side operand is a string"
-        );
-
-        fn trim_quote_ends(str: &String) -> String {
-            let mut str = str.clone();
-            str.pop();
-            str.remove(0);
-            str
-        }
-
-        let left = match self {
-            ExprToken::String(s) => trim_quote_ends(s),
-            ExprToken::Number(n) => n.to_owned(),
-            token => panic!(r#"Left operand "{token}" is not a string."#),
-        };
-        let right = match right {
-            ExprToken::String(s) => trim_quote_ends(&s),
-            ExprToken::Number(n) => n,
-            token => panic!(r#"Right operand "{token}" is not a string."#),
-        };
-
-        format!("{}{}", left, right)
-    }
-
-    pub(crate) fn add(&self, right: ExprToken) -> String {
-        // if either side is a string, and the other a number, this is a concatenation operator
-        let left = match self {
-            ExprToken::Number(n) => n,
-            token => panic!(r#"Left operand "{token}" is not a number."#),
-        };
-        let right = match right {
-            ExprToken::Number(n) => n,
-            token => panic!(r#"Right operand "{token}" is not a number."#),
-        };
-
-        if left.contains(".") || right.contains(".") {
-            (left.parse::<f64>().unwrap() + right.parse::<f64>().unwrap()).to_string()
-        } else {
-            (left.parse::<usize>().unwrap() + right.parse::<usize>().unwrap()).to_string()
-        }
-    }
-
-    pub(crate) fn subtract(&self, right: ExprToken) -> String {
-        let left = match self {
-            ExprToken::Number(n) => n,
-            token => panic!(r#"Left operand "{token}" is not a number."#),
-        };
-        let right = match right {
-            ExprToken::Number(n) => n,
-            token => panic!(r#"Right operand "{token}" is not a number."#),
-        };
-
-        if left.contains(".") || right.contains(".") {
-            (left.parse::<f64>().unwrap() - right.parse::<f64>().unwrap()).to_string()
-        } else {
-            (left.parse::<usize>().unwrap() - right.parse::<usize>().unwrap()).to_string()
-        }
-    }
-
-    pub(crate) fn multiply(&self, right: ExprToken) -> String {
-        let left = match self {
-            ExprToken::Number(n) => n,
-            token => panic!(r#"Left operand "{token}" is not a number."#),
-        };
-        let right = match right {
-            ExprToken::Number(n) => n,
-            token => panic!(r#"Right operand "{token}" is not a number."#),
-        };
-
-        if left.contains(".") || right.contains(".") {
-            (left.parse::<f64>().unwrap() * right.parse::<f64>().unwrap()).to_string()
-        } else {
-            (left.parse::<usize>().unwrap() * right.parse::<usize>().unwrap()).to_string()
-        }
-    }
-
-    pub(crate) fn divide(&self, right: ExprToken) -> String {
-        let left = match self {
-            ExprToken::Number(n) => n,
-            token => panic!(r#"Left operand "{token}" is not a number."#),
-        };
-        let right = match right {
-            ExprToken::Number(n) => n,
-            token => panic!(r#"Right operand "{token}" is not a number."#),
-        };
-
-        (left.parse::<f64>().unwrap() / right.parse::<f64>().unwrap()).to_string()
-    }
-
-    pub(crate) fn power(&self, right: ExprToken) -> String {
-        let left = match self {
-            ExprToken::Number(n) => n,
-            token => panic!(r#"Left operand "{token}" is not a number."#),
-        };
-        let right = match right {
-            ExprToken::Number(n) => n,
-            token => panic!(r#"Right operand "{token}" is not a number."#),
-        };
-
-        if left.contains(".") || right.contains(".") {
-            left.parse::<f64>()
-                .unwrap()
-                .powf(right.parse::<f64>().unwrap())
-                .to_string()
-        } else {
-            match left
-                .parse::<usize>()
-                .unwrap()
-                .checked_pow(right.parse::<u32>().unwrap())
-            {
-                Some(result) => result.to_string(),
-                None => panic!("Failed raising {left} to the power of {right}."),
+    pub(crate) fn trim_quotes(&mut self) {
+        match self {
+            ExprToken::String(str) => {
+                str.remove(0);
+                str.pop();
             }
-        }
-    }
-
-    pub(crate) fn modulus(&self, right: ExprToken) -> String {
-        if let ExprToken::Number(right) = right {
-            match self {
-                ExprToken::Number(left) => {
-                    if left.contains(".") || right.contains(".") {
-                        (left.parse::<f64>().unwrap() % right.parse::<f64>().unwrap()).to_string()
-                    } else {
-                        (left.parse::<usize>().unwrap() % right.parse::<usize>().unwrap())
-                            .to_string()
-                    }
-                }
-                token => {
-                    panic!(r#""{token}" is not a number."#)
-                }
-            }
-        } else {
-            panic!("Right hand operand is not a number.")
+            _ => panic!("Should only call on string")
         }
     }
 }

@@ -23,7 +23,7 @@ impl<'token> TreeBuilder<'token> {
         }
     }
 
-    pub fn build(&mut self, tokens: &'token Vec<Token>) -> Vec<Block> {
+    pub fn build(&mut self, tokens: &'token Vec<Token>) -> Vec<Block<'token>> {
         for token in tokens {
             match token.r#type() {
                 TokenType::BlockIdentifier(id) => {

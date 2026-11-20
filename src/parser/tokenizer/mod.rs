@@ -224,7 +224,11 @@ impl<'token> Tokenizer<'token> {
                     Pipe::ExpectOperandStart,
                 ]),
                 State::ExprParsedOperator => {
-                    self.pipeline(vec![Pipe::ExpectCommentStart, Pipe::ExpectOperandStart])
+                    self.pipeline(vec![
+                        Pipe::ExpectCommentStart,
+                        Pipe::ExpectOperandStart,
+                        Pipe::ExpectParenthesisOpen,
+                    ])
                 }
                 State::ExprParsedBracketOpen => self.pipeline(vec![
                     Pipe::UNIMPLEMENTED,
@@ -253,6 +257,11 @@ impl<'token> Tokenizer<'token> {
                 ]),
                 State::ExprParsedNegativeOperator => self.pipeline(vec![Pipe::ExpectNumberStart]),
             }
+        }
+
+        if self.state_history.len() == 2 && self.state() == &State::ParsingLineComment {
+            self.push_token(TokenType::LineComment(self.buf.clone()));
+            self.pop_state_type(State::ParsingLineComment);
         }
 
         // All states should have been popped, and we should be back to start
