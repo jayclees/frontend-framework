@@ -1,3 +1,5 @@
 p {
-    text: "Evaluated to: " + 2 * 3 + "!"
+    span [if: false] {
+        text: "Hello world!"
+    }
 }

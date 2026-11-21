@@ -6,27 +6,19 @@ use serde_json::Value;
 use crate::parser::tokenizer::directive::DirectiveEnum;
 
 pub struct Generator<'token> {
-    blocks: &'token Vec<Block<'token>>,
+    blocks: &'token mut Vec<Block<'token>>,
     target_dir: PathBuf,
 }
 
 impl<'token> Generator<'token> {
-    pub fn new(blocks: &'token Vec<Block>, target_dir: PathBuf) -> Self {
+    pub fn new(blocks: &'token mut Vec<Block<'token>>, target_dir: PathBuf) -> Self {
         Generator { blocks, target_dir }
     }
 
     pub fn generate(&mut self, state: Value) {
         let mut html = String::from("<!doctype html>");
-        for block in self.blocks {
-            // if block has `if` directive, check that expression
-            // resolves to true if not, skip rendering block.
-            for directive in block.directives() {
-                if let DirectiveEnum::If(inner) = directive {
-                    let is_true = inner.is_true();
-                };
-            }
-
-            html.push_str(block.to_html(&state).as_str());
+        for block in self.blocks.iter_mut() {
+            html.push_str(block.render_html(&state).as_str());
         }
         // todo use rayon for certain tasks?
         let mut file = OpenOptions::new()

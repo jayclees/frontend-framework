@@ -1,5 +1,4 @@
 use crate::parser::tokenizer::token::{ExprToken, Operator};
-use crate::parser::tree_builder::block::BlockContent;
 use serde_json::{Number, Value};
 
 /// Read:
@@ -38,6 +37,7 @@ impl<'token> PostfixProcessor<'token> {
                 ExprToken::Number(_) | ExprToken::String(_) => {
                     self.postfix.push(Part::Operand(token))
                 }
+                ExprToken::True | ExprToken::False => self.postfix.push(Part::Operand(token)),
                 ExprToken::Operator(op) => match op {
                     // If the token is a left parenthesis, push it on the opstack.
                     Operator::ParenthesesOpen => self.op_stack.push(token),
@@ -103,7 +103,7 @@ impl<'token> PostfixProcessor<'token> {
         self
     }
 
-    pub fn resolve(&mut self) -> BlockContent<'token> {
+    pub fn evaluate(&self) -> Value {
         assert!(self.converted, "Infix not converted.");
 
         // Save for debugging
@@ -115,11 +115,10 @@ impl<'token> PostfixProcessor<'token> {
         // }
         // println!();
 
-        let mut output: Vec<Part> = std::mem::take(&mut self.postfix);
         let mut buffer: Vec<Value> = vec![];
 
-        while !output.is_empty() {
-            match output.remove(0) {
+        for part in &self.postfix {
+            match part {
                 Part::Operand(ExprToken::String(str)) => {
                     // Push operand onto operation stack
                     let mut str = str.clone();
@@ -135,6 +134,8 @@ impl<'token> PostfixProcessor<'token> {
                         Number::from_i128(num_str.parse().unwrap()).unwrap()
                     }));
                 }
+                Part::Operand(ExprToken::True) => buffer.push(Value::Bool(true)),
+                Part::Operand(ExprToken::False) => buffer.push(Value::Bool(false)),
                 Part::Operator(ExprToken::Operator(operator)) => {
                     // Pop last 2 operands from operation_stack and perform operation on them.
                     let right = buffer.pop().expect("Operand buffer is empty.");
@@ -161,33 +162,19 @@ impl<'token> PostfixProcessor<'token> {
                         Operator::Divide => buffer.push(divide(left, right)),
                         Operator::Power => buffer.push(power(left, right)),
                         Operator::Modulus => buffer.push(modulus(left, right)),
-                        op => unimplemented!("Operator ({op}) not implemented."),
+                        operator => unimplemented!("Operator ({operator}) not implemented."),
                     }
                 }
-                _ => panic!("Non operator found in Part::Operator."),
+                operand => panic!("Operand ({}) not implemented.", operand.get_operand()),
             }
         }
-
-        self.reset();
 
         if buffer.len() > 1 {
             dbg!(buffer);
             panic!("Buf should have length of one at this point.")
         }
 
-        if let Some(Value::Number(num)) = buffer.first() {
-            BlockContent::Text(num.to_string())
-        } else if let Some(Value::String(str)) = buffer.first() {
-            BlockContent::Text(str.to_owned())
-        } else {
-            panic!("Buf should not be empty.");
-        }
-    }
-
-    pub fn reset(&mut self) {
-        self.infix = vec![];
-        self.postfix = vec![];
-        self.op_stack = vec![];
+        buffer.remove(0)
     }
 }
 

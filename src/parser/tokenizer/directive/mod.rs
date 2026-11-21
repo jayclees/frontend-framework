@@ -1,6 +1,7 @@
 use crate::parser::tokenizer::token::ExprToken;
-use std::fmt::Debug;
 use crate::parser::tree_builder::postfix_processor::PostfixProcessor;
+use serde_json::{Number, Value};
+use std::fmt::Debug;
 
 #[derive(Debug)]
 pub(crate) enum DirectiveEnum<'token> {
@@ -23,7 +24,7 @@ impl<'token> DirectiveEnum<'token> {
             "extends" => Self::Extends(ExtendsDirective::new()),
             "dummymarker" => Self::DummyMarker(DummyMarkerDirective::new()),
             "dummystring" => Self::DummyString(DummyStringDirective::new()),
-            _ => todo!("Allow custom directives?")
+            _ => todo!("Allow custom directives?"),
         }
     }
 
@@ -40,38 +41,80 @@ impl<'token> DirectiveEnum<'token> {
     }
 }
 
-pub trait Directive: Debug {
+pub trait Directive<'token>: Debug {
     fn value_type(&self) -> DirectiveValueType;
+    fn add_expr_token(&mut self, token: &'token ExprToken);
 }
 
 #[derive(Debug)]
 pub struct IfDirective<'token> {
-    tokens: Vec<&'token ExprToken>,
+    postfix_processor: PostfixProcessor<'token>,
 }
 
 impl<'token> IfDirective<'token> {
     pub fn new() -> Self {
-        Self { tokens: vec![] }
+        Self {
+            postfix_processor: PostfixProcessor::new(),
+        }
     }
 
-    pub fn is_true(&self) -> bool {
-        let mut expr = PostfixProcessor::new();
-        for token in &self.tokens {
-            expr.add(token);
+    fn add_expr_token(&mut self, token: &'token ExprToken) {
+        add_expr_token(&mut self.postfix_processor, token)
+    }
+
+    pub fn evaluate_is_true(&mut self, state: &Value) -> bool {
+        // todo extract into is_truthy helper function?
+        match self.postfix_processor.convert().evaluate() {
+            Value::Null => false,
+            Value::Bool(bool) => bool,
+            Value::Number(n) => !n.eq(&Number::from_u128(0).unwrap()),
+            Value::String(_) => panic!("String evaluation as boolean not supported."),
+            Value::Array(_) => panic!("Array evaluation as boolean not supported."),
+            Value::Object(_) => panic!("Object evaluation as boolean not supported."),
         }
-        true
     }
 }
 
-impl<'token> Directive for IfDirective<'token> {
+impl<'token> Directive<'token> for IfDirective<'token> {
     fn value_type(&self) -> DirectiveValueType {
         DirectiveValueType::Expression
+    }
+
+    fn add_expr_token(&mut self, token: &'token ExprToken) {
+        add_expr_token(&mut self.postfix_processor, token)
     }
 }
 
 impl<'token> PartialEq for IfDirective<'token> {
     fn eq(&self, other: &Self) -> bool {
         todo!()
+    }
+}
+
+#[derive(Debug)]
+pub struct ElseIfDirective<'token> {
+    postfix_processor: PostfixProcessor<'token>,
+}
+
+impl<'token> ElseIfDirective<'token> {
+    pub fn new() -> Self {
+        Self {
+            postfix_processor: PostfixProcessor::new(),
+        }
+    }
+
+    fn postfix_processor_mut(&mut self) -> &mut PostfixProcessor<'token> {
+        &mut self.postfix_processor
+    }
+}
+
+impl<'token> Directive<'token> for ElseIfDirective<'token> {
+    fn value_type(&self) -> DirectiveValueType {
+        DirectiveValueType::Expression
+    }
+
+    fn add_expr_token(&mut self, token: &'token ExprToken) {
+        add_expr_token(&mut self.postfix_processor, token)
     }
 }
 
@@ -84,26 +127,13 @@ impl ElseDirective {
     }
 }
 
-impl Directive for ElseDirective {
+impl<'token> Directive<'token> for ElseDirective {
     fn value_type(&self) -> DirectiveValueType {
         DirectiveValueType::None
     }
-}
 
-#[derive(Debug)]
-pub struct ElseIfDirective<'token> {
-    tokens: Vec<&'token ExprToken>,
-}
-
-impl<'token> ElseIfDirective<'token> {
-    pub fn new() -> Self {
-        Self { tokens: vec![] }
-    }
-}
-
-impl<'token> Directive for ElseIfDirective<'token> {
-    fn value_type(&self) -> DirectiveValueType {
-        DirectiveValueType::Expression
+    fn add_expr_token(&mut self, token: &'token ExprToken) {
+        panic!("Cannot add token to `else` directive since it takes no value.")
     }
 }
 
@@ -116,9 +146,14 @@ impl ForDirective {
     }
 }
 
-impl Directive for ForDirective {
+impl<'token> Directive<'token> for ForDirective {
     fn value_type(&self) -> DirectiveValueType {
         DirectiveValueType::Custom
+    }
+
+    fn add_expr_token(&mut self, token: &'token ExprToken) {
+        todo!()
+        // Handle token differently since it will be for the `iterable` section
     }
 }
 
@@ -133,9 +168,13 @@ impl<'token> ExtendsDirective<'token> {
     }
 }
 
-impl<'token> Directive for ExtendsDirective<'token> {
+impl<'token> Directive<'token> for ExtendsDirective<'token> {
     fn value_type(&self) -> DirectiveValueType {
         DirectiveValueType::String
+    }
+
+    fn add_expr_token(&mut self, token: &'token ExprToken) {
+        set_string(&mut self.layout, token)
     }
 }
 
@@ -149,9 +188,13 @@ impl<'token> DummyMarkerDirective {
     }
 }
 
-impl Directive for DummyMarkerDirective {
+impl<'token> Directive<'token> for DummyMarkerDirective {
     fn value_type(&self) -> DirectiveValueType {
         DirectiveValueType::None
+    }
+
+    fn add_expr_token(&mut self, _: &'token ExprToken) {
+        panic!("Cannot add token to marker directive.")
     }
 }
 
@@ -167,9 +210,13 @@ impl<'token> DummyStringDirective<'token> {
     }
 }
 
-impl<'token> Directive for DummyStringDirective<'token> {
+impl<'token> Directive<'token> for DummyStringDirective<'token> {
     fn value_type(&self) -> DirectiveValueType {
         DirectiveValueType::None
+    }
+
+    fn add_expr_token(&mut self, token: &'token ExprToken) {
+        todo!()
     }
 }
 
@@ -186,4 +233,23 @@ pub(crate) enum DirectiveValueType {
     ForStatement,
     Custom,
     None,
+}
+
+fn add_expr_token<'token>(
+    postfix_processor: &mut PostfixProcessor<'token>,
+    token: &'token ExprToken,
+) {
+    postfix_processor.add(token);
+}
+
+fn set_string<'token>(string: &mut Option<&'token String>, token: &'token ExprToken) {
+    match token {
+        ExprToken::String(str) => {
+            if string.is_some() {
+                panic!("Layout already set for `extends` directive.")
+            }
+            string.replace(str);
+        },
+        _ => panic!()
+    }
 }

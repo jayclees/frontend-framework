@@ -3,14 +3,14 @@ pub(crate) mod postfix_processor;
 
 use super::tokenizer::token::{Token, TokenType};
 use super::tree_builder::block::AttrBuilder;
-use crate::parser::tokenizer::directive::DirectiveEnum;
+use crate::parser::tokenizer::directive::{Directive, DirectiveEnum};
 use block::{Block, BlockBuilder};
 
 pub struct TreeBuilder<'token> {
     blocks: Vec<Block<'token>>,
     block_builders: Vec<BlockBuilder<'token>>,
     attr_builder: Option<AttrBuilder<'token>>,
-    active_directive: Option<&'token DirectiveEnum<'token>>,
+    active_directive: Option<DirectiveEnum<'token>>,
 }
 
 impl<'token> TreeBuilder<'token> {
@@ -60,7 +60,17 @@ impl<'token> TreeBuilder<'token> {
                     self.block_builders.push(block_builder);
                 }
                 TokenType::ExprToken(expr_tok) => {
-                    if self.active_directive.is_none() {
+                    if let Some(directive) = self.active_directive.as_mut() {
+                        match directive {
+                            DirectiveEnum::If(dir) => dir.add_expr_token(expr_tok),
+                            DirectiveEnum::ElseIf(dir) => dir.add_expr_token(expr_tok),
+                            DirectiveEnum::Else(dir) => dir.add_expr_token(expr_tok),
+                            DirectiveEnum::For(dir) => dir.add_expr_token(expr_tok),
+                            DirectiveEnum::Extends(dir) => dir.add_expr_token(expr_tok),
+                            DirectiveEnum::DummyMarker(dir) => dir.add_expr_token(expr_tok),
+                            DirectiveEnum::DummyString(dir) => dir.add_expr_token(expr_tok),
+                        }
+                    } else {
                         self.attr_builder
                             .as_mut()
                             .expect("Should be set.")
@@ -74,8 +84,8 @@ impl<'token> TreeBuilder<'token> {
                     .last_mut()
                     .unwrap()
                     .add_directive(self.active_directive.take().unwrap()),
-                TokenType::DirectiveIdentifier(id, directive) => {
-                    self.active_directive = Some(directive)
+                TokenType::DirectiveIdentifier(id) => {
+                    self.active_directive = Some(DirectiveEnum::from(id));
                 }
                 TokenType::DirectiveColon => {}
                 TokenType::DirectiveValue(str) => {

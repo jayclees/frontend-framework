@@ -1,14 +1,13 @@
-use std::panic::RefUnwindSafe;
-use serde_json::Value;
-use crate::parser::tokenizer::directive::{Directive, DirectiveEnum};
+use crate::parser::tokenizer::directive::DirectiveEnum;
 use crate::parser::tree_builder::postfix_processor::PostfixProcessor;
+use serde_json::Value;
 
 #[derive(Debug)]
 pub struct Block<'token> {
     tag: String,
     attributes: Vec<Attr>,
     children: Vec<Block<'token>>,
-    directives: Vec<&'token DirectiveEnum<'token>>
+    directives: Vec<DirectiveEnum<'token>>,
 }
 
 impl<'token> Block<'token> {
@@ -21,22 +20,28 @@ impl<'token> Block<'token> {
         }
     }
 
-    pub fn directives(&self) -> &Vec<&'token DirectiveEnum<'token>> {
+    pub fn directives(&self) -> &Vec<DirectiveEnum<'token>> {
         &self.directives
     }
 
-    pub fn if_true(&self, state: &Value) -> bool {
-        for directive in &self.directives {
-            if let DirectiveEnum::If(dir) = directive {
-                return dir.is_true();
+    pub fn evaluate_is_true(&mut self, state: &Value) -> bool {
+        for directive in &mut self.directives {
+            if let DirectiveEnum::If(directive) = directive {
+                return directive.evaluate_is_true(state);
             }
         }
 
         true
     }
 
-    pub fn to_html(&self, state: &Value) -> String {
-        if !self.if_true(state) {
+    pub fn if_dir_for(&self, state: &Value) {
+        for directive in &self.directives {
+            if let DirectiveEnum::For(for_directive) = directive {}
+        }
+    }
+
+    pub fn render_html(&mut self, state: &Value) -> String {
+        if !self.evaluate_is_true(state) {
             return "".to_owned();
         }
 
@@ -68,7 +73,9 @@ impl<'token> Block<'token> {
         for attr in &self.attributes {
             let string = attr.value.to_owned();
             match attr.handle.to_lowercase().as_ref() {
-                "text" => content.push(html_escape::encode_double_quoted_attribute(&string).to_string()),
+                "text" => {
+                    content.push(html_escape::encode_double_quoted_attribute(&string).to_string())
+                }
                 "html" => content.push(string),
                 handle => {
                     html.push_str(
@@ -89,8 +96,8 @@ impl<'token> Block<'token> {
             html.push_str(item.as_ref());
         }
 
-        for child in &self.children {
-            html.push_str(child.to_html(&state).as_str());
+        for child in &mut self.children {
+            html.push_str(child.render_html(&state).as_str());
         }
 
         // todo:
@@ -116,7 +123,7 @@ pub struct BlockBuilder<'token> {
     tag: String,
     attributes: Vec<Attr>,
     children: Vec<BlockBuilder<'token>>,
-    directives: Vec<&'token DirectiveEnum<'token>>
+    directives: Vec<DirectiveEnum<'token>>,
 }
 
 impl<'token> BlockBuilder<'token> {
@@ -137,7 +144,7 @@ impl<'token> BlockBuilder<'token> {
         self.children.push(child);
     }
 
-    pub fn add_directive(&mut self, directive: &'token DirectiveEnum<'token>) {
+    pub fn add_directive(&mut self, directive: DirectiveEnum<'token>) {
         self.directives.push(directive);
     }
 
@@ -181,10 +188,19 @@ impl<'token> AttrBuilder<'token> {
         Attr {
             handle: std::mem::take(&mut self.handle),
             // value: self.expr_parser.build_tree().resolve(),
-            value: match self.expr_processor.convert().resolve() {
-                BlockContent::Html(str) => str,
-                BlockContent::Text(str) => str,
-                BlockContent::Block(_) => unimplemented!("this shouldn't be called?"),
+            value: match self.expr_processor.convert().evaluate() {
+                Value::Null => "null".to_owned(),
+                Value::Bool(bool) => {
+                    if bool {
+                        "true".to_owned()
+                    } else {
+                        "false".to_owned()
+                    }
+                }
+                Value::Number(n) => n.to_string(),
+                Value::String(s) => s,
+                Value::Array(a) => unimplemented!(),
+                Value::Object(o) => unimplemented!(),
             },
         }
     }

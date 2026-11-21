@@ -22,6 +22,8 @@ pub enum State {
     ParsingDirectiveValue,
     DirectiveExprStart,
     ExpectDirectiveClose,
+    
+    ParsingForDirectiveValue,
 
     ParsingEventListenerOpen,
     ParsedEventListenerOpen,
@@ -73,6 +75,7 @@ impl Display for State {
                 ParsingDirectiveValue => "ParsingDirectiveValue",
                 DirectiveExprStart => "DirectiveExprStart",
                 ExpectDirectiveClose => "ExpectDirectiveClose",
+                ParsingForDirectiveValue => "ParsingForDirectiveValue",
                 ParsingEventListenerOpen => "ParsingEventListenerOpen",
                 ParsedEventListenerOpen => "ParsedEventListenerOpen",
                 ParsingEventListenerIdentifier => "ParsingEventListenerIdentifier",

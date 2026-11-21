@@ -13,8 +13,8 @@ fn main() {
     let mut tokenizer = Tokenizer::new();
     let tokens = tokenizer.tokenize(read_to_string("test-stubs/basic.app").unwrap());
     let mut builder = TreeBuilder::new();
-    let tree = builder.build(tokens);
-    let mut generator = Generator::new(&tree, PathBuf::from("dist/target.html"));
+    let mut tree = builder.build(tokens);
+    let mut generator = Generator::new(&mut tree, PathBuf::from("dist/target.html"));
     generator.generate(json!({
         "posts": [
             {

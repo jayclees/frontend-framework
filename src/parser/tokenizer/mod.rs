@@ -21,7 +21,8 @@ pub struct Tokenizer<'token> {
     column: usize,
     buf: String,
     buf_start: Option<usize>,
-    tokens: Vec<Token<'token>>,
+    tokens: Vec<Token>,
+    active_directive: Option<DirectiveEnum<'token>>,
 }
 
 impl<'token> Tokenizer<'token> {
@@ -35,6 +36,7 @@ impl<'token> Tokenizer<'token> {
             buf: String::new(),
             buf_start: None,
             tokens: vec![],
+            active_directive: None,
         }
     }
 
@@ -131,6 +133,9 @@ impl<'token> Tokenizer<'token> {
                     Pipe::ExpectDirectiveClose,
                 ]),
                 State::ExpectDirectiveClose => self.pipeline(vec![Pipe::ExpectDirectiveClose]),
+                State::ParsingForDirectiveValue => {
+                    self.pipeline(vec![Pipe::ParseForDirectiveValue])
+                }
                 State::ParsingEventListenerOpen => {
                     self.pipeline(vec![Pipe::ParseEventListenerOpen])
                 }
@@ -306,6 +311,9 @@ impl<'token> Tokenizer<'token> {
                 Pipe::ExpectAttrColon => self.expect_attr_colon(),
                 Pipe::ExpectAttrSeparator => self.expect_attr_separator(),
 
+                // Directive values
+                Pipe::ParseForDirectiveValue => self.parse_for_directive_value(),
+
                 // Expressions
                 Pipe::ExpectOperandStart => self.expect_operand_start(),
                 Pipe::ExpectStringStart => self.expect_string_start(),
@@ -390,20 +398,25 @@ impl<'token> Tokenizer<'token> {
             panic!(
                 r#"Expected to pop "{}", found "{}" instead.
 Current State: "{}", Line: {}, Column: {}, Char: "{}""#,
-                state, last, self.state(), self.line, self.column, self.char
+                state,
+                last,
+                self.state(),
+                self.line,
+                self.column,
+                self.char
             );
         }
         self.state_history.pop();
     }
 
-    fn push_token(&mut self, r#type: TokenType<'token>) {
+    fn push_token(&mut self, r#type: TokenType) {
         self.tokens
             .push(Token::new(self.buf_start.expect("Should be set."), r#type));
 
         self.reset_buffer();
     }
 
-    fn push_token_pop_state(&mut self, r#type: TokenType<'token>) {
+    fn push_token_pop_state(&mut self, r#type: TokenType) {
         self.push_token(r#type);
         self.pop_state();
     }
@@ -529,22 +542,6 @@ Current State: "{}", Line: {}, Column: {}, Char: "{}""#,
         } else {
             dbg!("Failed to write to generated/generated.html");
         }
-    }
-
-    fn active_directive(&'token self) -> Option<&'token DirectiveEnum<'token>> {
-        let mut directive_is_closed = false;
-        for token in self.tokens.iter().rev() {
-            if let TokenType::DirectiveClose = token.r#type() {
-                directive_is_closed = true;
-            } else if let TokenType::DirectiveIdentifier(_, directive) = token.r#type() {
-                if directive_is_closed {
-                    directive_is_closed = false;
-                } else {
-                    return Some(directive);
-                }
-            }
-        }
-        None
     }
 
     fn expect_identifier_start(&mut self) -> PipelineResult {
@@ -688,13 +685,6 @@ Current State: "{}", Line: {}, Column: {}, Char: "{}""#,
                 self.pop_state_type(State::ParsedAttrColon);
             }
 
-            // if any of these states are the previous ones, the tokenizer is in an invalid state
-            // ExprParsedOperator
-            // ExprParsedBracketOpen
-            // ExprParsedFuncParenthesisOpen
-            // ExprParsedFuncOperand
-            // ExprParsedParenthesisClose
-
             self.pop_state_type(State::ParsingBlock);
             return PipelineResult::Handled;
         }
@@ -735,10 +725,8 @@ Current State: "{}", Line: {}, Column: {}, Char: "{}""#,
             return PipelineResult::Handled;
         }
 
-        self.push_token(TokenType::DirectiveIdentifier(
-            self.buf.clone(),
-            DirectiveEnum::from(self.buf.as_str()),
-        ));
+        self.active_directive = Some(DirectiveEnum::from(self.buf.as_ref()));
+        self.push_token(TokenType::DirectiveIdentifier(self.buf.clone()));
         self.pop_state_type(State::ParsingDirectiveIdentifier);
         self.push_state(State::ParsedDirectiveIdentifier, None);
 
@@ -751,9 +739,7 @@ Current State: "{}", Line: {}, Column: {}, Char: "{}""#,
         if char == ':' {
             self.reset_buffer();
             self.push_token(TokenType::DirectiveColon);
-            let mut active_directive = self.active_directive();
-            let directive = active_directive.as_mut().expect("Should be set.");
-            match directive.value_type() {
+            match self.active_directive.as_ref().unwrap().value_type() {
                 DirectiveValueType::Expression => self.push_state(State::DirectiveExprStart, None),
                 DirectiveValueType::Custom => self.push_state(State::ParsingDirectiveValue, None),
                 DirectiveValueType::None => self.push_state(State::ExpectDirectiveClose, None),
@@ -767,7 +753,7 @@ Current State: "{}", Line: {}, Column: {}, Char: "{}""#,
     }
 
     fn set_state_for_directive_value(&mut self) -> PipelineResult {
-        match self.active_directive().as_ref().unwrap().value_type() {
+        match self.active_directive.as_ref().unwrap().value_type() {
             DirectiveValueType::Expression => {
                 self.push_state(State::DirectiveExprStart, None);
                 PipelineResult::Continue
@@ -788,11 +774,11 @@ Current State: "{}", Line: {}, Column: {}, Char: "{}""#,
         if char == ']' {
             // We must first ensure that if the directive is being
             // closed, that it is being closed in a valid state.
-            let active_directive = self.active_directive();
-            match active_directive
-                .expect("No active directive found.")
-                .value_type()
-            {
+            let active_directive = self
+                .active_directive
+                .as_ref()
+                .expect("No active directive found.");
+            match active_directive.value_type() {
                 DirectiveValueType::Expression => match self.tokens.last().unwrap().r#type() {
                     TokenType::ExprToken(_) => {
                         self.reset_buffer();
@@ -813,10 +799,13 @@ Current State: "{}", Line: {}, Column: {}, Char: "{}""#,
                             "Expected directive expression before close.".to_lowercase(),
                         );
                     }
-                    TokenType::DirectiveIdentifier(_, directive) => {
-                        if let DirectiveValueType::None = directive.value_type() {
+                    TokenType::DirectiveIdentifier(_) => {
+                        if let DirectiveValueType::None = active_directive.value_type() {
                             self.reset_buffer();
                             self.push_token(TokenType::DirectiveClose);
+                            // todo instead of dropping active_directive and recreating it later
+                            // todo during token building, attach it to DirectiveIdentifier enum?
+                            self.active_directive = None;
                         } else {
                             return PipelineResult::Err(
                                 "Expected directive expression before close.".to_lowercase(),
@@ -1009,6 +998,13 @@ Current State: "{}", Line: {}, Column: {}, Char: "{}""#,
         }
 
         PipelineResult::Continue
+    }
+
+    fn parse_for_directive_value(&mut self) -> PipelineResult {
+        let char = self.char;
+        let prev = self.tokens.last();
+
+        todo!()
     }
 
     // Expressions
@@ -1454,6 +1450,8 @@ pub enum Pipe {
     ExpectDirectiveColon,
     SetStateForDirectiveValue,
     ExpectDirectiveClose,
+
+    ParseForDirectiveValue,
 
     ExpectEventListenerOpenStart,
     ParseEventListenerOpen,

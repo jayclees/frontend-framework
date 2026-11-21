@@ -2,13 +2,13 @@ use crate::parser::tokenizer::directive::DirectiveEnum;
 use std::fmt::{Display, Formatter};
 
 #[derive(Debug)]
-pub struct Token<'token> {
+pub struct Token {
     start: usize,
     end: usize,
-    r#type: TokenType<'token>,
+    r#type: TokenType,
 }
 
-impl<'token> Token<'token> {
+impl Token {
     pub fn new(start: usize, r#type: TokenType) -> Token {
         // match and validate start/end with token len
 
@@ -46,7 +46,7 @@ impl<'token> Token<'token> {
 }
 
 #[derive(Debug)]
-pub enum TokenType<'token> {
+pub enum TokenType {
     // Keyword(KeywordEnum),
     BlockIdentifier(String),
     LineComment(String),
@@ -59,7 +59,7 @@ pub enum TokenType<'token> {
     ExprToken(ExprToken),
     DirectiveOpen,
     DirectiveClose,
-    DirectiveIdentifier(String, DirectiveEnum<'token>),
+    DirectiveIdentifier(String),
     DirectiveColon,
     DirectiveValue(String),
     EventListenerOpen,
@@ -67,16 +67,23 @@ pub enum TokenType<'token> {
     EventListenerIdentifier(String),
     EventListenerColon,
     EventListenerHandler(String),
+
+    // For directive tokens
+    // ForDirectiveParenthesesOpen,
+    // ForDirectiveItemVar,
+    // ForDirectiveParenthesesClose,
+    // ForDirectiveInKeyword,
+    // ForDirectiveIterVar(Vec<ExprToken>),
 }
 
-impl<'token> TokenType<'token> {
+impl TokenType {
     pub fn symbol(&self) -> &str {
         match self {
             TokenType::BlockIdentifier(str)
             | TokenType::LineComment(str)
             | TokenType::BlockComment(str)
             | TokenType::AttrIdentifier(str)
-            | TokenType::DirectiveIdentifier(str, _)
+            | TokenType::DirectiveIdentifier(str)
             | TokenType::DirectiveValue(str)
             | TokenType::EventListenerHandler(str)
             | TokenType::EventListenerIdentifier(str) => str,
@@ -101,7 +108,7 @@ impl<'token> TokenType<'token> {
     }
 }
 
-impl<'token> Display for TokenType<'token> {
+impl Display for TokenType {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match &self {
             TokenType::BlockIdentifier(str) => write!(f, "BlockIdentifier({str})"),
@@ -115,7 +122,7 @@ impl<'token> Display for TokenType<'token> {
             TokenType::ExprToken(expr) => write!(f, "ExpressionToken({expr})"),
             TokenType::DirectiveOpen => write!(f, "DirectiveOpen"),
             TokenType::DirectiveClose => write!(f, "DirectiveClose"),
-            TokenType::DirectiveIdentifier(str, _) => write!(f, "DirectiveIdentifier({str})"),
+            TokenType::DirectiveIdentifier(str) => write!(f, "DirectiveIdentifier({str})"),
             TokenType::DirectiveColon => write!(f, "DirectiveColon"),
             TokenType::DirectiveValue(str) => write!(f, "DirectiveValue({}, {})", "directive", str),
             TokenType::EventListenerOpen => write!(f, "EventListenerOpen"),
