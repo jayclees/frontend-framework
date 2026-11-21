@@ -116,7 +116,7 @@ impl<'token> PostfixProcessor<'token> {
         // println!();
 
         let mut output: Vec<Part> = std::mem::take(&mut self.postfix);
-        let mut operation_stack: Vec<Value> = vec![];
+        let mut buffer: Vec<Value> = vec![];
 
         while !output.is_empty() {
             match output.remove(0) {
@@ -125,11 +125,11 @@ impl<'token> PostfixProcessor<'token> {
                     let mut str = str.clone();
                     str.remove(0);
                     str.pop();
-                    operation_stack.push(Value::String(str));
+                    buffer.push(Value::String(str));
                 }
                 Part::Operand(ExprToken::Number(num_str)) => {
                     // Push operand onto operation stack
-                    operation_stack.push(Value::Number(if num_str.contains('.') {
+                    buffer.push(Value::Number(if num_str.contains('.') {
                         Number::from_f64(num_str.parse().unwrap()).unwrap()
                     } else {
                         Number::from_i128(num_str.parse().unwrap()).unwrap()
@@ -137,10 +137,8 @@ impl<'token> PostfixProcessor<'token> {
                 }
                 Part::Operator(ExprToken::Operator(operator)) => {
                     // Pop last 2 operands from operation_stack and perform operation on them.
-                    let right = operation_stack.pop().expect("Operand buffer is empty.");
-                    let left = operation_stack
-                        .pop()
-                        .expect("Only one operand left in buffer.");
+                    let right = buffer.pop().expect("Operand buffer is empty.");
+                    let left = buffer.pop().expect("Only one operand left in buffer.");
 
                     match operator {
                         Operator::Plus => {
@@ -149,24 +147,20 @@ impl<'token> PostfixProcessor<'token> {
                             let is_concat = matches!(left, Value::String(_))
                                 || matches!(right, Value::String(_));
                             if is_concat {
-                                let left = match left {
-                                    Value::String(s) => s,
-                                    Value::Number(n) => n.to_string(),
-                                    Value::Null => "null".to_string(),
-                                    Value::Bool(bool) => bool.to_string(),
-                                    Value::Array(_) => unimplemented!(),
-                                    Value::Object(_) => unimplemented!(),
-                                };
-                                operation_stack.push(Value::String(format!("{left}{right}")));
+                                buffer.push(Value::String(format!(
+                                    "{}{}",
+                                    value_as_string(left),
+                                    value_as_string(right)
+                                )));
                             } else {
-                                operation_stack.push(add(left, right))
+                                buffer.push(add(left, right))
                             }
                         }
-                        Operator::Minus => operation_stack.push(subtract(left, right)),
-                        Operator::Multiply => operation_stack.push(multiply(left, right)),
-                        Operator::Divide => operation_stack.push(divide(left, right)),
-                        Operator::Power => operation_stack.push(power(left, right)),
-                        Operator::Modulus => operation_stack.push(modulus(left, right)),
+                        Operator::Minus => buffer.push(subtract(left, right)),
+                        Operator::Multiply => buffer.push(multiply(left, right)),
+                        Operator::Divide => buffer.push(divide(left, right)),
+                        Operator::Power => buffer.push(power(left, right)),
+                        Operator::Modulus => buffer.push(modulus(left, right)),
                         op => unimplemented!("Operator ({op}) not implemented."),
                     }
                 }
@@ -176,14 +170,14 @@ impl<'token> PostfixProcessor<'token> {
 
         self.reset();
 
-        if operation_stack.len() > 1 {
-            dbg!(operation_stack);
+        if buffer.len() > 1 {
+            dbg!(buffer);
             panic!("Buf should have length of one at this point.")
         }
 
-        if let Some(Value::Number(num)) = operation_stack.first() {
+        if let Some(Value::Number(num)) = buffer.first() {
             BlockContent::Text(num.to_string())
-        } else if let Some(Value::String(str)) = operation_stack.first() {
+        } else if let Some(Value::String(str)) = buffer.first() {
             BlockContent::Text(str.to_owned())
         } else {
             panic!("Buf should not be empty.");
@@ -321,4 +315,15 @@ fn modulus(left: Value, right: Value) -> Value {
         )
         .unwrap(),
     )
+}
+
+fn value_as_string(value: Value) -> String {
+    match value {
+        Value::String(s) => s,
+        Value::Number(n) => n.to_string(),
+        Value::Null => "null".to_string(),
+        Value::Bool(bool) => bool.to_string(),
+        Value::Array(_) => unimplemented!(),
+        Value::Object(_) => unimplemented!(),
+    }
 }

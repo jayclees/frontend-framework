@@ -223,13 +223,11 @@ impl<'token> Tokenizer<'token> {
                     Pipe::ExpectSlash,
                     Pipe::ExpectOperandStart,
                 ]),
-                State::ExprParsedOperator => {
-                    self.pipeline(vec![
-                        Pipe::ExpectCommentStart,
-                        Pipe::ExpectOperandStart,
-                        Pipe::ExpectParenthesisOpen,
-                    ])
-                }
+                State::ExprParsedOperator => self.pipeline(vec![
+                    Pipe::ExpectCommentStart,
+                    Pipe::ExpectOperandStart,
+                    Pipe::ExpectParenthesisOpen,
+                ]),
                 State::ExprParsedBracketOpen => self.pipeline(vec![
                     Pipe::UNIMPLEMENTED,
                     Pipe::ExpectCommentStart,
@@ -389,7 +387,11 @@ impl<'token> Tokenizer<'token> {
         if last != &state {
             dbg!(&self.tokens);
             dbg!(&self.state_history);
-            panic!(r#"Expected to pop "{state}", found "{last}" instead."#);
+            panic!(
+                r#"Expected to pop "{}", found "{}" instead.
+Current State: "{}", Line: {}, Column: {}, Char: "{}""#,
+                state, last, self.state(), self.line, self.column, self.char
+            );
         }
         self.state_history.pop();
     }
@@ -1029,6 +1031,9 @@ impl<'token> Tokenizer<'token> {
             self.push_state(State::ExprParsingVarOrKeyword, Some(char));
             return PipelineResult::Handled;
         } else if char == '"' {
+            if self.state() == &State::ExprParsedOperator {
+                self.pop_state_type(State::ExprParsedOperator);
+            }
             self.reset_buffer();
             self.push_state(State::ExprParsingString, Some(char));
             return PipelineResult::Handled;
@@ -1043,6 +1048,9 @@ impl<'token> Tokenizer<'token> {
         // todo support single quote
         if char == '"' {
             self.pop_state_type(State::ExprExpectStringStart);
+            if self.state() == &State::ExprParsedOperator {
+                self.pop_state_type(State::ExprParsedOperator);
+            }
             self.reset_buffer();
             self.push_state(State::ExprParsingString, Some(char));
             return PipelineResult::Handled;
@@ -1136,15 +1144,9 @@ impl<'token> Tokenizer<'token> {
         }
 
         match self.buf.to_lowercase().as_str() {
-            "true" => {
-                self.push_token(TokenType::ExprToken(ExprToken::True))
-            }
-            "false" => {
-                self.push_token(TokenType::ExprToken(ExprToken::False))
-            }
-            "null" => {
-                self.push_token(TokenType::ExprToken(ExprToken::Null))
-            }
+            "true" => self.push_token(TokenType::ExprToken(ExprToken::True)),
+            "false" => self.push_token(TokenType::ExprToken(ExprToken::False)),
+            "null" => self.push_token(TokenType::ExprToken(ExprToken::Null)),
             "nan" => unimplemented!(),
             _ => {
                 self.push_token(TokenType::ExprToken(
@@ -1153,7 +1155,7 @@ impl<'token> Tokenizer<'token> {
                             ExprToken::PropAccessorVar(self.buf.clone())
                         }
                         _ => ExprToken::Var(self.buf.clone()),
-                    }
+                    },
                 ));
             }
         }
