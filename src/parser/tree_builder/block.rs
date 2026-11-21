@@ -181,7 +181,7 @@ impl<'token> AttrBuilder<'token> {
         Attr {
             handle: std::mem::take(&mut self.handle),
             // value: self.expr_parser.build_tree().resolve(),
-            value: match self.expr_processor.resolve() {
+            value: match self.expr_processor.convert().resolve() {
                 BlockContent::Html(str) => str,
                 BlockContent::Text(str) => str,
                 BlockContent::Block(_) => unimplemented!("this shouldn't be called?"),

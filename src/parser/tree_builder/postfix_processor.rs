@@ -7,88 +7,115 @@ use serde_json::{Number, Value};
 /// - https://www.geeksforgeeks.org/dsa/convert-infix-expression-to-postfix-expression/
 #[derive(Debug)]
 pub struct PostfixProcessor<'token> {
+    infix: Vec<&'token ExprToken>,
+    postfix: Vec<Part<'token>>,
     op_stack: Vec<&'token ExprToken>,
-    postfix_expr: Vec<Part<'token>>,
-    step: usize,
     part_builders: Vec<Part<'token>>,
+    converted: bool,
 }
 
 impl<'token> PostfixProcessor<'token> {
     pub fn new() -> PostfixProcessor<'token> {
         PostfixProcessor {
+            infix: vec![],
+            postfix: vec![],
             op_stack: vec![],
-            postfix_expr: vec![],
-            step: 0,
             part_builders: vec![],
+            converted: false,
         }
     }
 
-    pub fn process(&mut self, token: &'token ExprToken) {
-        match token {
-            ExprToken::Number(_) | ExprToken::String(_) => {
-                self.postfix_expr.push(Part::Operand(token))
-            }
-            ExprToken::Operator(op) => {
-                match op {
+    pub fn add(&mut self, token: &'token ExprToken) {
+        self.infix.push(token);
+    }
+
+    pub fn convert(&mut self) -> &mut PostfixProcessor<'token> {
+        assert!(!self.infix.is_empty(), "Infix list is empty.");
+
+        for (i, token) in self.infix.iter().enumerate() {
+            match token {
+                // If the token is an operand, append it to the end of the output list.
+                ExprToken::Number(_) | ExprToken::String(_) => {
+                    self.postfix.push(Part::Operand(token))
+                }
+                ExprToken::Operator(op) => match op {
+                    // If the token is a left parenthesis, push it on the opstack.
+                    Operator::ParenthesesOpen => self.op_stack.push(token),
+                    // If the token is a right parenthesis, pop the opstack until
+                    // the corresponding left parenthesis is removed. Append
+                    // each operator to the end of the output list.
+                    Operator::ParenthesesClose => {
+                        let mut top_token = self.op_stack.pop().unwrap();
+                        while !matches!(top_token, ExprToken::Operator(Operator::ParenthesesOpen))
+                            && !self.op_stack.is_empty()
+                        {
+                            self.postfix.push(Part::Operator(top_token));
+                            top_token = self.op_stack.pop().unwrap();
+                        }
+                    }
+                    // If the token is an operator, *, /, +, or -, push it on the opstack. However,
+                    // first remove any operators already on the opstack that have higher or
+                    // equal precedence and append them to the output list.
                     Operator::Plus
                     | Operator::Minus
                     | Operator::Multiply
                     | Operator::Divide
                     | Operator::Power => {
-                        // Pop each operator on the stack that has higher
-                        // or equal precedence and append to output.
-                        for i in (0..self.op_stack.len()).rev() {
-                            let to_pop_token = self.op_stack.get(i);
-                            if let Some(ExprToken::Operator(to_pop_op)) = to_pop_token
-                                && to_pop_op.precedence() >= op.precedence()
-                            {
-                                let popped = self.op_stack.remove(i);
-                                self.postfix_expr.push(Part::Operator(popped));
-                            }
+                        while !self.op_stack.is_empty()
+                            && let Some(ExprToken::Operator(next)) = self.op_stack.last()
+                            && next.precedence() >= op.precedence()
+                        {
+                            let popped = self.op_stack.pop().unwrap();
+                            self.postfix.push(Part::Operator(popped));
                         }
                         self.op_stack.push(token);
                     }
-                    Operator::ParenthesesOpen => self.op_stack.push(token),
-                    Operator::ParenthesesClose => {
-                        // Pop all operators and append to output until a left parenthesis is found.
-                        for i in (0..self.op_stack.len()).rev() {
-                            let to_pop_token = self.op_stack.get(i);
-                            if let Some(ExprToken::Operator(Operator::ParenthesesOpen)) =
-                                to_pop_token
-                            {
-                                self.op_stack.remove(i);
-                                break;
-                            } else {
-                                let to_add_op = self.op_stack.remove(i);
-                                self.postfix_expr.push(Part::Operator(to_add_op))
-                            }
-                        }
-                    }
                     op => unimplemented!("Operator {op} not implemented."),
-                }
+                },
+                tok => unimplemented!("Token {tok} not implemented."),
             }
-            tok => unimplemented!("Token {tok} not implemented."),
+
+            // Save for debugging
+            // if i == 10 {
+            //     println!("Current token: {token}");
+            //     for item in &self.postfix {
+            //         let symbol = match item {
+            //             Part::Operand(item) => item.symbol(),
+            //             Part::Operator(item) => item.symbol(),
+            //         };
+            //         print!("{} ", symbol);
+            //     }
+            //     println!();
+            //     for item in &self.op_stack {
+            //         print!("{} ", item.symbol());
+            //     }
+            //     std::process::exit(1);
+            // }
         }
-        self.step += 1;
+
+        // Append remaining operators to postfix output
+        for operator in self.op_stack.iter().rev() {
+            self.postfix.push(Part::Operator(operator));
+        }
+
+        self.converted = true;
+
+        self
     }
 
     pub fn resolve(&mut self) -> BlockContent<'token> {
-        // Append remaining operators to postfix output
-        for operator in self.op_stack.iter().rev() {
-            self.postfix_expr.push(Part::Operator(operator));
-        }
+        assert!(self.converted, "Infix not converted.");
 
-        println!("Infix:   1 + 2 - 3 * (4 + 1) + 1");
-        print!("PostFix: ");
-        for part in &self.postfix_expr {
-            match part {
-                Part::Operand(tok) => print!("{} ", tok.symbol()),
-                Part::Operator(tok) => print!("{} ", tok.symbol()),
-            }
-        }
-        println!();
+        // Save for debugging
+        // for part in &self.postfix {
+        //     match part {
+        //         Part::Operand(tok) => print!("{} ", tok.symbol()),
+        //         Part::Operator(tok) => print!("{} ", tok.symbol()),
+        //     }
+        // }
+        // println!();
 
-        let mut output: Vec<Part> = std::mem::take(&mut self.postfix_expr);
+        let mut output: Vec<Part> = std::mem::take(&mut self.postfix);
         let mut operation_stack: Vec<Value> = vec![];
 
         while !output.is_empty() {
@@ -102,12 +129,11 @@ impl<'token> PostfixProcessor<'token> {
                 }
                 Part::Operand(ExprToken::Number(num_str)) => {
                     // Push operand onto operation stack
-                    let num = if num_str.contains('.') {
+                    operation_stack.push(Value::Number(if num_str.contains('.') {
                         Number::from_f64(num_str.parse().unwrap()).unwrap()
                     } else {
                         Number::from_i128(num_str.parse().unwrap()).unwrap()
-                    };
-                    operation_stack.push(Value::Number(num));
+                    }));
                 }
                 Part::Operator(ExprToken::Operator(operator)) => {
                     // Pop last 2 operands from operation_stack and perform operation on them.
@@ -141,14 +167,12 @@ impl<'token> PostfixProcessor<'token> {
                         Operator::Divide => operation_stack.push(divide(left, right)),
                         Operator::Power => operation_stack.push(power(left, right)),
                         Operator::Modulus => operation_stack.push(modulus(left, right)),
-                        _ => unimplemented!(),
+                        op => unimplemented!("Operator ({op}) not implemented."),
                     }
                 }
                 _ => panic!("Non operator found in Part::Operator."),
             }
         }
-
-        // dbg!(&buf);
 
         self.reset();
 
@@ -160,20 +184,15 @@ impl<'token> PostfixProcessor<'token> {
         if let Some(Value::Number(num)) = operation_stack.first() {
             BlockContent::Text(num.to_string())
         } else if let Some(Value::String(str)) = operation_stack.first() {
-            // let chars = str.chars();
-            // let string = chars.skip(1).take(str.len() - 2).collect::<String>();
             BlockContent::Text(str.to_owned())
         } else {
             panic!("Buf should not be empty.");
         }
     }
 
-    pub fn is_empty(&self) -> bool {
-        self.postfix_expr.is_empty()
-    }
-
     pub fn reset(&mut self) {
-        self.postfix_expr = vec![];
+        self.infix = vec![];
+        self.postfix = vec![];
         self.op_stack = vec![];
     }
 }

@@ -1,3 +1,3 @@
 p {
-    text: 1 + 2 - 3 * (4 + 1) + 1
+    text: "Evaluated to: " + 2 * 3
 }

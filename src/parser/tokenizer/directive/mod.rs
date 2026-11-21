@@ -57,7 +57,7 @@ impl<'token> IfDirective<'token> {
     pub fn is_true(&self) -> bool {
         let mut expr = PostfixProcessor::new();
         for token in &self.tokens {
-            expr.process(token);
+            expr.add(token);
         }
         true
     }

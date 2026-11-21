@@ -65,7 +65,7 @@ impl<'token> TreeBuilder<'token> {
                             .as_mut()
                             .expect("Should be set.")
                             .expr_processor
-                            .process(expr_tok);
+                            .add(expr_tok);
                     }
                 }
                 TokenType::DirectiveOpen => {}
