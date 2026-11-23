@@ -18,6 +18,7 @@ impl<'token> Generator<'token> {
     pub fn generate(&mut self, state: Value) {
         let mut html = String::from("<!doctype html>");
         for block in self.blocks.iter_mut() {
+            
             html.push_str(block.render_html(&state).as_str());
         }
         // todo use rayon for certain tasks?

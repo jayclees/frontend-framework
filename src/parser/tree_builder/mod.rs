@@ -1,33 +1,52 @@
 pub mod block;
+pub mod component;
 pub(crate) mod postfix_processor;
 
 use super::tokenizer::token::{Token, TokenType};
 use super::tree_builder::block::AttrBuilder;
 use crate::parser::tokenizer::directive::{Directive, DirectiveEnum};
+use crate::parser::tree_builder::component::ComponentInterface;
 use block::{Block, BlockBuilder};
+use std::collections::HashMap;
 
-pub struct TreeBuilder<'token> {
+pub struct TreeBuilder<'token, C: ComponentInterface> {
     blocks: Vec<Block<'token>>,
-    block_builders: Vec<BlockBuilder<'token>>,
+    block_builders: Vec<BlockBuilder<'token, C>>,
     attr_builder: Option<AttrBuilder<'token>>,
     active_directive: Option<DirectiveEnum<'token>>,
+    component_factories: HashMap<&'static str, fn() -> C>,
 }
 
-impl<'token> TreeBuilder<'token> {
-    pub fn new() -> TreeBuilder<'token> {
+impl<'token, C: ComponentInterface> TreeBuilder<'token, C> {
+    pub fn new() -> TreeBuilder<'token, C> {
         TreeBuilder {
             blocks: vec![],
             block_builders: vec![],
             attr_builder: None,
             active_directive: None,
+            component_factories: HashMap::new(),
         }
+    }
+
+    pub fn component(&mut self, str: &'static str, factory: fn() -> C) {
+        self.component_factories.insert(str, factory);
     }
 
     pub fn build(&mut self, tokens: &'token Vec<Token>) -> Vec<Block<'token>> {
         for token in tokens {
             match token.r#type() {
                 TokenType::BlockIdentifier(id) => {
-                    self.block_builders.push(BlockBuilder::new(id.to_owned()));
+                    let component_factory = self.component_factories.get(id.as_str());
+                    match component_factory {
+                        Some(factory) => {
+                            self
+                                .block_builders
+                                .push(BlockBuilder::new(id.to_owned(), Some(factory())))
+                        }
+                        None => self
+                            .block_builders
+                            .push(BlockBuilder::new(id.to_owned(), None)),
+                    }
                 }
                 TokenType::LineComment(_) => {}
                 TokenType::BlockComment(_) => {}
