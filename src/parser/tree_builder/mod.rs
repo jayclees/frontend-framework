@@ -8,6 +8,7 @@ use crate::parser::tokenizer::directive::{Directive, DirectiveEnum};
 use crate::parser::tree_builder::component::ComponentInterface;
 use block::{Block, BlockBuilder};
 use std::collections::HashMap;
+use serde_json::Value;
 
 pub struct TreeBuilder<'token, C: ComponentInterface> {
     blocks: Vec<Block<'token>>,
@@ -32,7 +33,7 @@ impl<'token, C: ComponentInterface> TreeBuilder<'token, C> {
         self.component_factories.insert(str, factory);
     }
 
-    pub fn build(&mut self, tokens: &'token Vec<Token>) -> Vec<Block<'token>> {
+    pub fn build(&mut self, tokens: &'token Vec<Token>, state: &Value) -> Vec<Block<'token>> {
         for token in tokens {
             match token.r#type() {
                 TokenType::BlockIdentifier(id) => {
@@ -56,7 +57,7 @@ impl<'token, C: ComponentInterface> TreeBuilder<'token, C> {
 
                     if self.attr_builder.is_some() {
                         let mut builder = self.attr_builder.take().expect("Should be set.");
-                        block_builder.add_attr(builder.build());
+                        block_builder.add_attr(builder.build(state));
                     }
 
                     match self.block_builders.last_mut() {
@@ -75,7 +76,7 @@ impl<'token, C: ComponentInterface> TreeBuilder<'token, C> {
                 TokenType::AttrSeparator => {
                     let mut block_builder = self.block_builders.pop().expect("Should be set.");
                     let mut builder = self.attr_builder.take().expect("Should be set.");
-                    block_builder.add_attr(builder.build());
+                    block_builder.add_attr(builder.build(state));
                     self.block_builders.push(block_builder);
                 }
                 TokenType::ExprToken(expr_tok) => {

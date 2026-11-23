@@ -1,5 +1,5 @@
 p {
-    span [if: false] {
+    span [if: my_obj.prop] {
         text: "Hello world!"
     }
 }

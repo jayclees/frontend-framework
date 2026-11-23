@@ -187,11 +187,11 @@ impl<'token> AttrBuilder<'token> {
         }
     }
 
-    pub fn build(&mut self) -> Attr {
+    pub fn build(&mut self, state: &Value) -> Attr {
         Attr {
             handle: std::mem::take(&mut self.handle),
             // value: self.expr_parser.build_tree().resolve(),
-            value: match self.expr_processor.convert().evaluate() {
+            value: match self.expr_processor.convert().evaluate(state) {
                 Value::Null => "null".to_owned(),
                 Value::Bool(bool) => {
                     if bool {

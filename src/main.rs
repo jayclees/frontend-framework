@@ -14,12 +14,11 @@ fn main() {
     let mut tokenizer = Tokenizer::new();
     let tokens = tokenizer.tokenize(read_to_string("test-stubs/basic.app").unwrap());
     let mut builder = TreeBuilder::new();
-
     builder.component("App", || AppComponent {});
-
-    let mut tree = builder.build(tokens);
-    let mut generator = Generator::new(&mut tree, PathBuf::from("dist/target.html"));
-    generator.generate(json!({
+    let state = json!({
+        "my_obj": {
+            "prop": false
+        },
         "posts": [
             {
                 "id": 1,
@@ -36,5 +35,8 @@ fn main() {
                 "public": false,
             },
         ]
-    }));
+    });
+    let mut tree = builder.build(tokens, &state);
+    let mut generator = Generator::new(&mut tree, PathBuf::from("dist/target.html"));
+    generator.generate(&state);
 }

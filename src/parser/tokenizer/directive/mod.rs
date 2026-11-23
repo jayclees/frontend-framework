@@ -64,7 +64,7 @@ impl<'token> IfDirective<'token> {
 
     pub fn evaluate_is_true(&mut self, state: &Value) -> bool {
         // todo extract into is_truthy helper function?
-        match self.postfix_processor.convert().evaluate() {
+        match self.postfix_processor.convert().evaluate(state) {
             Value::Null => false,
             Value::Bool(bool) => bool,
             Value::Number(n) => !n.eq(&Number::from_u128(0).unwrap()),

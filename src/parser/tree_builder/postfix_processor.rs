@@ -37,6 +37,23 @@ impl<'token> PostfixProcessor<'token> {
                 ExprToken::Number(_) | ExprToken::String(_) => {
                     self.postfix.push(Part::Operand(token))
                 }
+                ExprToken::Var(_) | ExprToken::PropAccessorVar(_) => {
+                    let last = self.postfix.last_mut();
+                    if let Some(Part::VarOperand(_)) = last {
+                        last.unwrap().append_var_part(token);
+                    } else {
+                        self.postfix.push(Part::VarOperand(vec![token]))
+                    }
+                }
+                ExprToken::PropAccessorDot => {
+                    let last = self.postfix.last_mut();
+                    if let Some(Part::VarOperand(var)) = last {
+                        last.unwrap().append_var_part(token);
+                    } else {
+                        dbg!(&self.postfix);
+                        panic!("Prop accessor dot has no left hand var.")
+                    }
+                }
                 ExprToken::True | ExprToken::False => self.postfix.push(Part::Operand(token)),
                 ExprToken::Operator(op) => match op {
                     // If the token is a left parenthesis, push it on the opstack.
@@ -103,7 +120,7 @@ impl<'token> PostfixProcessor<'token> {
         self
     }
 
-    pub fn evaluate(&self) -> Value {
+    pub fn evaluate(&self, state: &Value) -> Value {
         assert!(self.converted, "Infix not converted.");
 
         // Save for debugging
@@ -165,7 +182,29 @@ impl<'token> PostfixProcessor<'token> {
                         operator => unimplemented!("Operator ({operator}) not implemented."),
                     }
                 }
-                operand => panic!("Operand ({}) not implemented.", operand.get_operand()),
+                Part::VarOperand(vec) => {
+                    let mut x = state;;
+                    for part in vec {
+                        dbg!(part);
+                        dbg!(x);
+                        match part {
+                            ExprToken::Var(str) => x = x.get(str).unwrap(),
+                            ExprToken::PropAccessorVar(str) => x = x.get(str).unwrap(),
+                            ExprToken::PropAccessorDot => {
+                                // do nothing
+                            }
+                            t => {
+                                dbg!(t);
+                                unimplemented!()
+                            }
+                        }
+                    }
+                    buffer.push(x.to_owned());
+                }
+                operand => {
+                    dbg!(&operand);
+                    panic!("Operand not implemented.")
+                },
             }
         }
 
@@ -179,9 +218,49 @@ impl<'token> PostfixProcessor<'token> {
 }
 
 #[derive(Debug, Clone)]
-enum Part<'a> {
-    Operand(&'a ExprToken),
-    Operator(&'a ExprToken),
+enum Part<'token> {
+    Operand(&'token ExprToken),
+    VarOperand(Vec<&'token ExprToken>),
+    Operator(&'token ExprToken),
+}
+
+impl<'token> Part<'token> {
+    pub(crate) fn append_var_part(&mut self, token: &'token ExprToken) {
+        match self {
+            Part::VarOperand(vec) => match token {
+                ExprToken::Var(_) => {
+                    if vec.is_empty() {
+                        vec.push(token);
+                    } else {
+                        panic!("Cannot add ExprToken::Var to non empty vec here.")
+                    }
+                }
+                ExprToken::PropAccessorDot => match vec.last() {
+                    Some(ExprToken::Var(_) | ExprToken::PropAccessorVar(_)) => {
+                        vec.push(token);
+                    }
+                    _ => {
+                        dbg!(&vec);
+                        panic!("Cannot push {token} to vec.")
+                    }
+                },
+                ExprToken::PropAccessorVar(_) => {
+                    if let Some(ExprToken::PropAccessorDot) = vec.last() {
+                        vec.push(token);
+                    } else {
+                        dbg!(&vec);
+                        panic!("Cannot push {token} to vec.")
+                    }
+                }
+                _ => {
+                    dbg!(&vec, token);
+                    panic!("Invalid state.")
+                }
+            },
+            Part::Operand(_) => {}
+            Part::Operator(_) => {}
+        }
+    }
 }
 // enum Part<'token> {
 //     Number(&'token ExprToken),
@@ -192,19 +271,19 @@ enum Part<'a> {
 // }
 
 impl<'token> Part<'token> {
-    fn get_operand(&self) -> &'token ExprToken {
-        match self {
-            Part::Operand(token) => token,
-            Part::Operator(token) => panic!(r#""{token}" is not an operand."#),
-        }
-    }
-
-    fn get_operator(&self) -> &'token ExprToken {
-        match self {
-            Part::Operator(token) => token,
-            Part::Operand(token) => panic!(r#""{token}" is not an operator."#),
-        }
-    }
+    // fn get_operand(&self) -> &'token ExprToken {
+    //     match self {
+    //         Part::Operand(token) => token,
+    //         Part::Operator(token) => panic!(r#""{token}" is not an operand."#),
+    //     }
+    // }
+    //
+    // fn get_operator(&self) -> &'token ExprToken {
+    //     match self {
+    //         Part::Operator(token) => token,
+    //         Part::Operand(token) => panic!(r#""{token}" is not an operator."#),
+    //     }
+    // }
 }
 
 fn add(left: Value, right: Value) -> Value {

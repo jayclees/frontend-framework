@@ -1019,7 +1019,7 @@ Current State: "{}", Line: {}, Column: {}, Char: "{}""#,
             self.reset_buffer();
             self.push_state(State::ExprParsingNumber, Some(char));
             return PipelineResult::Handled;
-        } else if char.is_ascii_alphabetic() {
+        } else if char.is_ascii_alphabetic() || char == '_' {
             if self.state() == &State::ExprParsedOperator {
                 self.pop_state_type(State::ExprParsedOperator);
             }
@@ -1134,7 +1134,7 @@ Current State: "{}", Line: {}, Column: {}, Char: "{}""#,
     fn parse_var_or_keyword(&mut self) -> PipelineResult {
         let char = self.char;
 
-        if char.is_ascii_alphanumeric() {
+        if char.is_ascii_alphanumeric() || char == '_' {
             self.buf.push(char);
             return PipelineResult::Handled;
         }
@@ -1281,6 +1281,8 @@ Current State: "{}", Line: {}, Column: {}, Char: "{}""#,
         if char == '.' {
             self.reset_buffer();
             self.push_token(TokenType::ExprToken(ExprToken::PropAccessorDot));
+            self.pop_state_type(State::ExprParsedVarOrKeyword);
+            self.push_state(State::ExprParsingVarOrKeyword, None);
             return PipelineResult::Handled;
         }
 
