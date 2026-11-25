@@ -751,6 +751,8 @@ Current State: "{}", Line: {}, Column: {}, Char: "{}""#,
         PipelineResult::Continue
     }
 
+    // Directives
+
     fn expect_directive_open(&mut self) -> PipelineResult {
         let char = self.char;
 
@@ -937,6 +939,138 @@ Current State: "{}", Line: {}, Column: {}, Char: "{}""#,
         PipelineResult::Continue
     }
 
+    // For directive...
+
+    fn expect_for_item_var_start(&mut self) -> PipelineResult {
+        let char = self.char;
+
+        if is_valid_var_start(char) {
+            self.reset_buffer();
+            if self.state() == &State::ExpectForItemVarParenthesisOpenOrVarStart {
+                self.pop_state_type(State::ExpectForItemVarParenthesisOpenOrVarStart);
+            }
+            self.push_state(State::ParsingForItemVar, Some(char));
+            return PipelineResult::Handled;
+        }
+
+        PipelineResult::Continue
+    }
+
+    fn expect_for_item_parenthesis_open(&mut self) -> PipelineResult {
+        let char = self.char;
+
+        if char == '(' {
+            self.reset_buffer();
+            self.push_token(TokenType::ForDirectiveParenthesesOpen);
+            self.pop_state_type(State::ExpectForItemVarParenthesisOpenOrVarStart);
+            self.push_state(State::ParsedForParenthesisOpen, None);
+            self.push_state(State::ExpectForItemIndexVarStart, None);
+            return PipelineResult::Handled;
+        }
+
+        PipelineResult::Continue
+    }
+
+    fn expect_for_item_parenthesis_close(&mut self) -> PipelineResult {
+        let char = self.char;
+
+        if char == ')' {
+            self.reset_buffer();
+            self.push_token(TokenType::ForDirectiveParenthesesClose);
+            crate::dd!(&self.state_history);
+            self.push_state(State::ParsingForInKeyword, None);
+            return PipelineResult::Handled;
+        }
+
+        PipelineResult::Continue
+    }
+
+    fn expect_for_index_item_var_start(&mut self) -> PipelineResult {
+        let char = self.char;
+
+        if is_valid_var_start(char) {
+            self.reset_buffer();
+            self.pop_state_type(State::ExpectForItemIndexVarStart);
+            self.push_state(State::ParsingForItemIndexVar, Some(char));
+            return PipelineResult::Handled;
+        }
+
+        PipelineResult::Continue
+    }
+
+    fn parse_for_item_index_var(&mut self) -> PipelineResult {
+        let char = self.char;
+
+        if is_valid_var_char(char) {
+            self.buf.push(char);
+            return PipelineResult::Handled;
+        }
+
+        self.push_token(TokenType::ExprToken(ExprToken::Var(self.buf.clone())));
+        self.pop_state_type(State::ParsingForItemIndexVar);
+        self.push_state(State::ExpectForItemIndexComma, None);
+
+        PipelineResult::Continue
+    }
+
+    fn expect_for_item_index_comma(&mut self) -> PipelineResult {
+        let char = self.char;
+
+        if char == ',' {
+            self.reset_buffer();
+            self.push_token(TokenType::ForDirectiveIndexComma);
+            self.pop_state_type(State::ExpectForItemIndexComma);
+            self.push_state(State::ForIterExprStart, None);
+            return PipelineResult::Handled;
+        }
+
+        PipelineResult::Continue
+    }
+
+    fn parse_for_item_var(&mut self) -> PipelineResult {
+        let char = self.char;
+
+        if is_valid_var_char(char) {
+            self.buf.push(char);
+            return PipelineResult::Handled;
+        }
+
+        self.push_token(TokenType::ExprToken(ExprToken::Var(self.buf.clone())));
+        self.pop_state_type(State::ParsingForItemVar);
+
+        if self.state() == &State::ParsedForParenthesisOpen {
+            self.pop_state_type(State::ParsedForParenthesisOpen);
+            self.push_state(State::ExpectForItemVarParenthesisClose, None);
+        } else {
+            self.push_state(State::ParsingForInKeyword, None);
+        }
+
+        PipelineResult::Continue
+    }
+
+    fn parse_for_in_keyword(&mut self) -> PipelineResult {
+        let char = self.char;
+
+        if self.buf.is_empty() {
+            if char == 'i' || char == 'I' {
+                self.reset_buffer();
+                self.buf.push(char);
+                PipelineResult::Handled
+            } else {
+                PipelineResult::Continue
+            }
+        } else if self.buf.as_str() == "i" && (char == 'n' || char == 'N') {
+            self.push_token(TokenType::ForDirectiveInKeyword);
+            self.pop_state_type(State::ParsingForInKeyword);
+            self.push_state(State::ForIterExprStart, None);
+            PipelineResult::Handled
+        } else {
+            PipelineResult::ErrUnexpected
+        }
+    }
+
+    // End for directive...
+
     fn parse_event_listener_open(&mut self) -> PipelineResult {
         let char = self.char;
 
@@ -1069,136 +1203,6 @@ Current State: "{}", Line: {}, Column: {}, Char: "{}""#,
 
         PipelineResult::Continue
     }
-
-    fn expect_for_item_var_start(&mut self) -> PipelineResult {
-        let char = self.char;
-
-        if is_valid_var_start(char) {
-            self.reset_buffer();
-            if self.state() == &State::ExpectForItemVarParenthesisOpenOrVarStart {
-                self.pop_state_type(State::ExpectForItemVarParenthesisOpenOrVarStart);
-            }
-            self.push_state(State::ParsingForItemVar, Some(char));
-            return PipelineResult::Handled;
-        }
-
-        PipelineResult::Continue
-    }
-
-    fn expect_for_item_parenthesis_open(&mut self) -> PipelineResult {
-        let char = self.char;
-
-        if char == '(' {
-            self.reset_buffer();
-            self.push_token(TokenType::ForDirectiveParenthesesOpen);
-            self.pop_state_type(State::ExpectForItemVarParenthesisOpenOrVarStart);
-            self.push_state(State::ParsedForParenthesisOpen, None);
-            self.push_state(State::ExpectForItemIndexVarStart, None);
-            return PipelineResult::Handled;
-        }
-
-        PipelineResult::Continue
-    }
-
-    fn expect_for_item_parenthesis_close(&mut self) -> PipelineResult {
-        let char = self.char;
-
-        if char == ')' {
-            self.reset_buffer();
-            self.push_token(TokenType::ForDirectiveParenthesesClose);
-            crate::dd!(&self.state_history);
-            self.push_state(State::ParsingForInKeyword, None);
-            return PipelineResult::Handled;
-        }
-
-        PipelineResult::Continue
-    }
-
-    fn expect_for_index_item_var_start(&mut self) -> PipelineResult {
-        let char = self.char;
-
-        if is_valid_var_start(char) {
-            self.reset_buffer();
-            self.pop_state_type(State::ExpectForItemIndexVarStart);
-            self.push_state(State::ParsingForItemIndexVar, Some(char));
-            return PipelineResult::Handled;
-        }
-
-        PipelineResult::Continue
-    }
-
-    fn parse_for_item_index_var(&mut self) -> PipelineResult {
-        let char = self.char;
-
-        if is_valid_var_char(char) {
-            self.buf.push(char);
-            return PipelineResult::Handled;
-        }
-
-        self.push_token(TokenType::ExprToken(ExprToken::Var(self.buf.clone())));
-        self.pop_state_type(State::ParsingForItemIndexVar);
-        self.push_state(State::ExpectForItemIndexComma, None);
-
-        PipelineResult::Continue
-    }
-
-    fn expect_for_item_index_comma(&mut self) -> PipelineResult {
-        let char = self.char;
-
-        if char == ',' {
-            self.reset_buffer();
-            self.push_token(TokenType::ForDirectiveIndexComma);
-            self.pop_state_type(State::ExpectForItemIndexComma);
-            self.push_state(State::ForIterExprStart, None);
-            return PipelineResult::Handled;
-        }
-
-        PipelineResult::Continue
-    }
-
-    fn parse_for_item_var(&mut self) -> PipelineResult {
-        let char = self.char;
-
-        if is_valid_var_char(char) {
-            self.buf.push(char);
-            return PipelineResult::Handled;
-        }
-
-        self.push_token(TokenType::ExprToken(ExprToken::Var(self.buf.clone())));
-        self.pop_state_type(State::ParsingForItemVar);
-
-        if self.state() == &State::ParsedForParenthesisOpen {
-            self.pop_state_type(State::ParsedForParenthesisOpen);
-            self.push_state(State::ExpectForItemVarParenthesisClose, None);
-        } else {
-            self.push_state(State::ParsingForInKeyword, None);
-        }
-
-        PipelineResult::Continue
-    }
-
-    fn parse_for_in_keyword(&mut self) -> PipelineResult {
-        let char = self.char;
-
-        if self.buf.is_empty() {
-            if char == 'i' || char == 'I' {
-                self.reset_buffer();
-                self.buf.push(char);
-                PipelineResult::Handled
-            } else {
-                PipelineResult::Continue
-            }
-        } else if self.buf.as_str() == "i" && (char == 'n' || char == 'N') {
-            self.push_token(TokenType::ForDirectiveInKeyword);
-            self.pop_state_type(State::ParsingForInKeyword);
-            self.push_state(State::ForIterExprStart, None);
-            PipelineResult::Handled
-        } else {
-            PipelineResult::ErrUnexpected
-        }
-    }
-
-    // End for directive...
 
     // Expressions
 
