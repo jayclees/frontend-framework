@@ -185,8 +185,6 @@ impl<'token> PostfixProcessor<'token> {
                 Part::VarOperand(vec) => {
                     let mut x = state;;
                     for part in vec {
-                        dbg!(part);
-                        dbg!(x);
                         match part {
                             ExprToken::Var(str) => x = x.get(str).unwrap(),
                             ExprToken::PropAccessorVar(str) => x = x.get(str).unwrap(),

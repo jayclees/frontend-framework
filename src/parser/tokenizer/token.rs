@@ -69,11 +69,10 @@ pub enum TokenType {
     EventListenerHandler(String),
 
     // For directive tokens
-    // ForDirectiveParenthesesOpen,
-    // ForDirectiveItemVar,
-    // ForDirectiveParenthesesClose,
-    // ForDirectiveInKeyword,
-    // ForDirectiveIterVar(Vec<ExprToken>),
+    ForDirectiveParenthesesOpen,
+    ForDirectiveParenthesesClose,
+    ForDirectiveInKeyword,
+    ForDirectiveIndexComma,
 }
 
 impl TokenType {
@@ -98,6 +97,10 @@ impl TokenType {
             TokenType::EventListenerClose => "]",
             TokenType::EventListenerColon => ":",
             TokenType::DirectiveColon => ":",
+            TokenType::ForDirectiveParenthesesOpen => "(",
+            TokenType::ForDirectiveParenthesesClose => ")",
+            TokenType::ForDirectiveInKeyword => "in",
+            TokenType::ForDirectiveIndexComma => ",",
 
             TokenType::ExprToken(expr) => expr.symbol(),
         }
@@ -105,6 +108,16 @@ impl TokenType {
 
     pub fn len(&self) -> usize {
         self.symbol().len()
+    }
+    
+    pub fn is_keyword(str: &str) -> KeywordResult {
+        match str {
+            "true" => KeywordResult::Expr(ExprToken::True),
+            "false" => KeywordResult::Expr(ExprToken::False),
+            "null" => KeywordResult::Expr(ExprToken::Null),
+            "in" => KeywordResult::Expr(ExprToken::Null),
+            _ => KeywordResult::None,
+        }
     }
 }
 
@@ -130,7 +143,10 @@ impl Display for TokenType {
             TokenType::EventListenerIdentifier(str) => write!(f, "EventListenerIdentifier({str})"),
             TokenType::EventListenerColon => write!(f, "EventListenerColon"),
             TokenType::EventListenerHandler(str) => write!(f, "EventListenerHandler({str})"),
-            // Expression token
+            TokenType::ForDirectiveParenthesesOpen => write!(f, "ForDirectiveParenthesesOpen"),
+            TokenType::ForDirectiveParenthesesClose => write!(f, "ForDirectiveParenthesesClose"),
+            TokenType::ForDirectiveInKeyword => write!(f, "ForDirectiveInKeyword"),
+            TokenType::ForDirectiveIndexComma => write!(f, "ForDirectiveIndexComma"),
         }
     }
 }
@@ -377,5 +393,11 @@ impl Display for Operator {
 pub(super) enum OperatorMatchResult {
     Matched(Operator),
     Matches(Vec<Operator>),
+    None,
+}
+
+pub(super) enum KeywordResult {
+    Regular(TokenType),
+    Expr(ExprToken),
     None,
 }

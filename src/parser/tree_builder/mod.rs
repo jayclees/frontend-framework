@@ -116,6 +116,12 @@ impl<'token, C: ComponentInterface> TreeBuilder<'token, C> {
                 TokenType::EventListenerIdentifier(id) => {}
                 TokenType::EventListenerColon => {}
                 TokenType::EventListenerHandler(str) => {}
+                
+                // For directive...
+                TokenType::ForDirectiveParenthesesOpen => {}
+                TokenType::ForDirectiveParenthesesClose => {}
+                TokenType::ForDirectiveInKeyword => {}
+                TokenType::ForDirectiveIndexComma => {}
             }
         }
 

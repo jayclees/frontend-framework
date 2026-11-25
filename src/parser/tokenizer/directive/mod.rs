@@ -182,7 +182,7 @@ impl<'token> Directive<'token> for ExtendsDirective<'token> {
 #[derive(Debug)]
 pub struct DummyMarkerDirective {}
 
-impl<'token> DummyMarkerDirective {
+impl DummyMarkerDirective {
     pub fn new() -> Self {
         Self {}
     }
