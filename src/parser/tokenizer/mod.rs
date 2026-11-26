@@ -891,6 +891,8 @@ Current State: "{}", Line: {}, Column: {}, Char: "{}""#,
                     self.pop_state_type(State::ExprParsedString);
                 }
                 DirectiveValueType::ForStatement => {
+                    self.reset_buffer();
+                    self.push_token(TokenType::DirectiveClose);
                     if self.state() == &State::ExprParsedOperator {
                         self.pop_state_type(State::ExprParsedOperator)
                     } else if self.state() == &State::ExprParsedVarOrKeyword {

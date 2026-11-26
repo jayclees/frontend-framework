@@ -1,6 +1,7 @@
 use crate::parser::tokenizer::token::ExprToken;
 use crate::parser::tree_builder::postfix_processor::PostfixProcessor;
 use serde_json::{Number, Value};
+use std::assert_matches;
 use std::fmt::Debug;
 
 #[derive(Debug)]
@@ -8,7 +9,7 @@ pub(crate) enum DirectiveEnum<'token> {
     If(IfDirective<'token>),
     ElseIf(ElseIfDirective<'token>),
     Else(ElseDirective),
-    For(ForDirective),
+    For(ForDirective<'token>),
     Extends(ExtendsDirective<'token>),
     DummyMarker(DummyMarkerDirective),
     DummyString(DummyStringDirective<'token>),
@@ -138,23 +139,53 @@ impl<'token> Directive<'token> for ElseDirective {
 }
 
 #[derive(Debug)]
-pub struct ForDirective {}
+pub struct ForDirective<'token> {
+    state: ForDirectiveBuildState,
+    item_var: Option<&'token ExprToken>,
+    index_var: Option<&'token ExprToken>,
+    iter_expr: Vec<&'token ExprToken>,
+}
 
-impl ForDirective {
+impl<'token> ForDirective<'token> {
     pub fn new() -> Self {
-        Self {}
+        Self {
+            state: ForDirectiveBuildState::ReceiveItemVar,
+            item_var: None,
+            index_var: None,
+            iter_expr: vec![],
+        }
+    }
+
+    pub fn set_state(&mut self, state: ForDirectiveBuildState) {
+        self.state = state;
     }
 }
 
-impl<'token> Directive<'token> for ForDirective {
+impl<'token> Directive<'token> for ForDirective<'token> {
     fn value_type(&self) -> DirectiveValueType {
-        DirectiveValueType::Custom
+        DirectiveValueType::ForStatement
     }
 
     fn add_expr_token(&mut self, token: &'token ExprToken) {
-        todo!()
-        // Handle token differently since it will be for the `iterable` section
+        match self.state {
+            ForDirectiveBuildState::ReceiveIndexVar => {
+                assert_matches!(token, ExprToken::Var(_));
+                self.index_var = Some(token);
+            }
+            ForDirectiveBuildState::ReceiveItemVar => {
+                assert_matches!(token, ExprToken::Var(_));
+                self.item_var = Some(token);
+            }
+            ForDirectiveBuildState::ReceiveIterExpr => self.iter_expr.push(token),
+        }
     }
+}
+
+#[derive(Debug)]
+pub enum ForDirectiveBuildState {
+    ReceiveIndexVar,
+    ReceiveItemVar,
+    ReceiveIterExpr,
 }
 
 #[derive(Debug)]
@@ -249,7 +280,7 @@ fn set_string<'token>(string: &mut Option<&'token String>, token: &'token ExprTo
                 panic!("Layout already set for `extends` directive.")
             }
             string.replace(str);
-        },
-        _ => panic!()
+        }
+        _ => panic!(),
     }
 }
