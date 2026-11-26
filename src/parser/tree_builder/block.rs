@@ -1,7 +1,6 @@
 use crate::parser::tokenizer::directive::DirectiveEnum;
 use crate::parser::tree_builder::postfix_processor::PostfixProcessor;
 use serde_json::Value;
-use crate::parser::tree_builder::component::ComponentInterface;
 
 #[derive(Debug)]
 pub struct Block<'token> {
@@ -120,19 +119,17 @@ pub enum BlockContent<'token> {
 }
 
 #[derive(Debug)]
-pub struct BlockBuilder<'token, T: ComponentInterface> {
+pub struct BlockBuilder<'token> {
     tag: String,
-    component: Option<T>,
     attributes: Vec<Attr>,
-    children: Vec<BlockBuilder<'token, T>>,
+    children: Vec<BlockBuilder<'token>>,
     directives: Vec<DirectiveEnum<'token>>,
 }
 
-impl<'token, T: ComponentInterface> BlockBuilder<'token, T> {
-    pub fn new(tag: String, component: Option<T>) -> Self {
+impl<'token> BlockBuilder<'token> {
+    pub fn new(tag: String) -> Self {
         BlockBuilder {
             tag,
-            component,
             attributes: vec![],
             children: vec![],
             directives: vec![],
@@ -143,7 +140,7 @@ impl<'token, T: ComponentInterface> BlockBuilder<'token, T> {
         self.attributes.push(attr);
     }
 
-    pub fn add_child(&mut self, child: BlockBuilder<'token, T>) {
+    pub fn add_child(&mut self, child: BlockBuilder<'token>) {
         self.children.push(child);
     }
 

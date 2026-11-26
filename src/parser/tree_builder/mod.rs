@@ -1,53 +1,36 @@
 pub mod block;
-pub mod component;
 pub(crate) mod postfix_processor;
 
 use super::tokenizer::token::{Token, TokenType};
 use super::tree_builder::block::AttrBuilder;
-use crate::parser::tokenizer::directive::{Directive, DirectiveEnum};
-use crate::parser::tree_builder::component::ComponentInterface;
+use crate::parser::tokenizer::directive::{Directive, DirectiveEnum, ForDirectiveBuildState};
 use block::{Block, BlockBuilder};
-use std::collections::HashMap;
 use serde_json::Value;
 
-pub struct TreeBuilder<'token, C: ComponentInterface> {
+pub struct TreeBuilder<'token> {
     blocks: Vec<Block<'token>>,
-    block_builders: Vec<BlockBuilder<'token, C>>,
+    block_builders: Vec<BlockBuilder<'token>>,
     attr_builder: Option<AttrBuilder<'token>>,
     active_directive: Option<DirectiveEnum<'token>>,
-    component_factories: HashMap<&'static str, fn() -> C>,
 }
 
-impl<'token, C: ComponentInterface> TreeBuilder<'token, C> {
-    pub fn new() -> TreeBuilder<'token, C> {
+impl<'token> TreeBuilder<'token> {
+    pub fn new() -> TreeBuilder<'token> {
         TreeBuilder {
             blocks: vec![],
             block_builders: vec![],
             attr_builder: None,
             active_directive: None,
-            component_factories: HashMap::new(),
         }
-    }
-
-    pub fn component(&mut self, str: &'static str, factory: fn() -> C) {
-        self.component_factories.insert(str, factory);
     }
 
     pub fn build(&mut self, tokens: &'token Vec<Token>, state: &Value) -> Vec<Block<'token>> {
         for token in tokens {
             match token.r#type() {
                 TokenType::BlockIdentifier(id) => {
-                    let component_factory = self.component_factories.get(id.as_str());
-                    match component_factory {
-                        Some(factory) => {
-                            self
-                                .block_builders
-                                .push(BlockBuilder::new(id.to_owned(), Some(factory())))
-                        }
-                        None => self
-                            .block_builders
-                            .push(BlockBuilder::new(id.to_owned(), None)),
-                    }
+                    self
+                        .block_builders
+                        .push(BlockBuilder::new(id.to_owned()))
                 }
                 TokenType::LineComment(_) => {}
                 TokenType::BlockComment(_) => {}
@@ -98,6 +81,8 @@ impl<'token, C: ComponentInterface> TreeBuilder<'token, C> {
                             .add(expr_tok);
                     }
                 }
+
+                // Directives...
                 TokenType::DirectiveOpen => {}
                 TokenType::DirectiveClose => self
                     .block_builders
@@ -111,17 +96,37 @@ impl<'token, C: ComponentInterface> TreeBuilder<'token, C> {
                 TokenType::DirectiveValue(str) => {
                     // active_directive = Some(directive);
                 }
+
+                // For directive...
+                TokenType::ForDirectiveParenthesesOpen => {
+                    if let Some(DirectiveEnum::For(directive)) = self.active_directive.as_mut() {
+                        directive.set_state(ForDirectiveBuildState::ReceiveIndexVar);
+                    } else {
+                        panic!("Active directive should be set.")
+                    }
+                }
+                TokenType::ForDirectiveParenthesesClose => {}
+                TokenType::ForDirectiveInKeyword => {
+                    if let Some(DirectiveEnum::For(directive)) = self.active_directive.as_mut() {
+                        directive.set_state(ForDirectiveBuildState::ReceiveIterExpr);
+                    } else {
+                        panic!("Active directive should be set.")
+                    }
+                }
+                TokenType::ForDirectiveIndexComma => {
+                    if let Some(DirectiveEnum::For(directive)) = self.active_directive.as_mut() {
+                        directive.set_state(ForDirectiveBuildState::ReceiveItemVar);
+                    } else {
+                        panic!("Active directive should be set.")
+                    }
+                }
+
+                // Event listeners...
                 TokenType::EventListenerOpen => {}
                 TokenType::EventListenerClose => {}
                 TokenType::EventListenerIdentifier(id) => {}
                 TokenType::EventListenerColon => {}
                 TokenType::EventListenerHandler(str) => {}
-                
-                // For directive...
-                TokenType::ForDirectiveParenthesesOpen => {}
-                TokenType::ForDirectiveParenthesesClose => {}
-                TokenType::ForDirectiveInKeyword => {}
-                TokenType::ForDirectiveIndexComma => {}
             }
         }
 
