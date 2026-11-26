@@ -203,7 +203,7 @@ fn decimal_0010_fail() {
         let string = file("expression/decimal_0010_fail").unwrap();
         let mut tokenizer = Tokenizer::new();
         tokenizer.tokenize(string.clone());
-    }, r#"Unexpected token "." at line: 2, column: 14. State: "ExprParsedNumber"."#);
+    }, r#"Pipeline finished unhandled. Unexpected token "." at line: 2, column: 14. State: "ExprParsedNumber"."#);
 }
 
 #[test]
@@ -275,5 +275,5 @@ fn neg_decimal_0010_fail() {
         let string = file("expression/neg_decimal_0010_fail").unwrap();
         let mut tokenizer = Tokenizer::new();
         tokenizer.tokenize(string.clone());
-    }, r#"Unexpected token "." at line: 2, column: 15. State: "ExprParsedNumber"."#);
+    }, r#"Pipeline finished unhandled. Unexpected token "." at line: 2, column: 15. State: "ExprParsedNumber"."#);
 }

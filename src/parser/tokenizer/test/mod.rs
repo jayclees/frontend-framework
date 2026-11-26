@@ -6,7 +6,6 @@ mod expression;
 mod token;
 
 use super::Tokenizer;
-use crate::parser::tokenizer::directive::{DirectiveEnum, DummyStringDirective};
 use crate::parser::tokenizer::token::{Token, TokenType};
 use std::fs::read_to_string;
 use std::io;
@@ -259,7 +258,7 @@ fn test_assert_fn_passes_when_panic_occurs() {
             let mut tokenizer = Tokenizer::new();
             tokenizer.tokenize(string);
         },
-        r#"Unexpected token "{" at line: 1, column: 6. State: "ParsingDirective"."#,
+        r#"Pipeline finished unhandled. Unexpected token "{" at line: 1, column: 6. State: "ParsingDirective"."#,
     );
 }
 
