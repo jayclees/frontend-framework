@@ -562,7 +562,7 @@ Current State: "{}", Line: {}, Column: {}, Char: "{}""#,
                     display,
                     html_escape::encode_text(&token_string).as_ref()
                 )
-                .as_str(),
+                    .as_str(),
             );
             prev = Some(token);
         }
@@ -573,7 +573,7 @@ Current State: "{}", Line: {}, Column: {}, Char: "{}""#,
                 r#"<span class="Untokenized">{}</span>"#,
                 html_escape::encode_text(source.get_mut().as_str())
             )
-            .as_str(),
+                .as_str(),
         );
 
         let layout = read_to_string("generated/layout.html")

@@ -3,10 +3,10 @@ pub(crate) mod postfix_processor;
 
 use super::tokenizer::token::{Token, TokenType};
 use super::tree_builder::block::AttrBuilder;
+use crate::parser::tokenizer::directive::for_directive::ForDirectiveBuildState;
 use crate::parser::tokenizer::directive::{Directive, DirectiveEnum};
 use block::{Block, BlockBuilder};
 use serde_json::{Number, Value};
-use crate::parser::tokenizer::directive::for_directive::ForDirectiveBuildState;
 
 pub struct TreeBuilder<'token> {
     blocks: Vec<Block<'token>>,

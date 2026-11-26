@@ -311,7 +311,7 @@ fn add(left: Value, right: Value) -> Value {
             left.as_number().unwrap().as_i128().unwrap()
                 + right.as_number().unwrap().as_i128().unwrap(),
         )
-        .unwrap(),
+            .unwrap(),
     )
 }
 
@@ -330,7 +330,7 @@ fn subtract(left: Value, right: Value) -> Value {
             left.as_number().unwrap().as_i128().unwrap()
                 - right.as_number().unwrap().as_i128().unwrap(),
         )
-        .unwrap(),
+            .unwrap(),
     )
 }
 
@@ -349,7 +349,7 @@ fn multiply(left: Value, right: Value) -> Value {
             left.as_number().unwrap().as_i128().unwrap()
                 * right.as_number().unwrap().as_i128().unwrap(),
         )
-        .unwrap(),
+            .unwrap(),
     )
 }
 
@@ -368,7 +368,7 @@ fn divide(left: Value, right: Value) -> Value {
             left.as_number().unwrap().as_i128().unwrap()
                 / right.as_number().unwrap().as_i128().unwrap(),
         )
-        .unwrap(),
+            .unwrap(),
     )
 }
 
@@ -407,7 +407,7 @@ fn modulus(left: Value, right: Value) -> Value {
             left.as_number().unwrap().as_i128().unwrap()
                 % right.as_number().unwrap().as_i128().unwrap(),
         )
-        .unwrap(),
+            .unwrap(),
     )
 }
 

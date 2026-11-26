@@ -1,9 +1,8 @@
 use crate::parser::tree_builder::block::Block;
+use serde_json::Value;
 use std::fs::OpenOptions;
 use std::io::Write;
 use std::path::PathBuf;
-use serde_json::Value;
-use crate::parser::tokenizer::directive::DirectiveEnum;
 
 pub struct Generator<'token> {
     blocks: &'token mut Vec<Block<'token>>,

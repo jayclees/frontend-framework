@@ -1,4 +1,3 @@
-use crate::parser::tokenizer::directive::DirectiveEnum;
 use std::fmt::{Display, Formatter};
 
 #[derive(Debug)]
@@ -109,7 +108,7 @@ impl TokenType {
     pub fn len(&self) -> usize {
         self.symbol().len()
     }
-    
+
     pub fn is_keyword(str: &str) -> KeywordResult {
         match str {
             "true" => KeywordResult::Expr(ExprToken::True),

@@ -1,5 +1,5 @@
-use crate::parser::tokenizer::test::{assert_fails, file, match_tokens_to_source};
 use crate::parser::tokenizer::Tokenizer;
+use crate::parser::tokenizer::test::{assert_fails, file, match_tokens_to_source};
 
 #[test]
 fn string_0001() {

@@ -167,7 +167,7 @@ impl<'token> Block<'token> {
                             handle,
                             html_escape::encode_double_quoted_attribute(&string)
                         )
-                        .as_ref(),
+                            .as_ref(),
                     );
                 }
             }
