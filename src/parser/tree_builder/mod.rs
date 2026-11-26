@@ -3,7 +3,7 @@ pub(crate) mod postfix_processor;
 
 use super::tokenizer::token::{Token, TokenType};
 use super::tree_builder::block::AttrBuilder;
-use crate::parser::tokenizer::directive::for_directive::ForDirectiveBuildState;
+use crate::parser::tokenizer::directive::for_directive::ForDirectiveReceiving;
 use crate::parser::tokenizer::directive::{Directive, DirectiveEnum};
 use block::{Block, BlockBuilder};
 use serde_json::{Number, Value};
@@ -101,7 +101,7 @@ impl<'token> TreeBuilder<'token> {
                 // For directive...
                 TokenType::ForDirectiveParenthesesOpen => {
                     if let Some(DirectiveEnum::For(directive)) = self.active_directive.as_mut() {
-                        directive.set_state(ForDirectiveBuildState::ReceiveIndexVar);
+                        directive.set_state(ForDirectiveReceiving::IndexVar);
                     } else {
                         panic!("Active directive should be set.")
                     }
@@ -109,14 +109,14 @@ impl<'token> TreeBuilder<'token> {
                 TokenType::ForDirectiveParenthesesClose => {}
                 TokenType::ForDirectiveInKeyword => {
                     if let Some(DirectiveEnum::For(directive)) = self.active_directive.as_mut() {
-                        directive.set_state(ForDirectiveBuildState::ReceiveIterExpr);
+                        directive.set_state(ForDirectiveReceiving::IterExpr);
                     } else {
                         panic!("Active directive should be set.")
                     }
                 }
                 TokenType::ForDirectiveIndexComma => {
                     if let Some(DirectiveEnum::For(directive)) = self.active_directive.as_mut() {
-                        directive.set_state(ForDirectiveBuildState::ReceiveItemVar);
+                        directive.set_state(ForDirectiveReceiving::ItemVar);
                     } else {
                         panic!("Active directive should be set.")
                     }

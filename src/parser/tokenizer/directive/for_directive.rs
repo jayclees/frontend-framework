@@ -6,7 +6,7 @@ use std::assert_matches;
 
 #[derive(Debug)]
 pub struct ForDirective<'token> {
-    state: ForDirectiveBuildState,
+    state: ForDirectiveReceiving,
     item_var: Option<&'token ExprToken>,
     index_var: Option<&'token ExprToken>,
     expr_processor: PostfixProcessor<'token>,
@@ -15,14 +15,14 @@ pub struct ForDirective<'token> {
 impl<'token> ForDirective<'token> {
     pub fn new() -> Self {
         Self {
-            state: ForDirectiveBuildState::ReceiveItemVar,
+            state: ForDirectiveReceiving::ItemVar,
             item_var: None,
             index_var: None,
             expr_processor: PostfixProcessor::new(),
         }
     }
 
-    pub fn set_state(&mut self, state: ForDirectiveBuildState) {
+    pub fn set_state(&mut self, state: ForDirectiveReceiving) {
         self.state = state;
     }
 
@@ -56,22 +56,22 @@ impl<'token> Directive<'token> for ForDirective<'token> {
 
     fn add_expr_token(&mut self, token: &'token ExprToken) {
         match self.state {
-            ForDirectiveBuildState::ReceiveIndexVar => {
+            ForDirectiveReceiving::IndexVar => {
                 assert_matches!(token, ExprToken::Var(_));
                 self.index_var = Some(token);
             }
-            ForDirectiveBuildState::ReceiveItemVar => {
+            ForDirectiveReceiving::ItemVar => {
                 assert_matches!(token, ExprToken::Var(_));
                 self.item_var = Some(token);
             }
-            ForDirectiveBuildState::ReceiveIterExpr => self.expr_processor.add(token),
+            ForDirectiveReceiving::IterExpr => self.expr_processor.add(token),
         }
     }
 }
 
 #[derive(Debug)]
-pub enum ForDirectiveBuildState {
-    ReceiveIndexVar,
-    ReceiveItemVar,
-    ReceiveIterExpr,
+pub enum ForDirectiveReceiving {
+    IndexVar,
+    ItemVar,
+    IterExpr,
 }
