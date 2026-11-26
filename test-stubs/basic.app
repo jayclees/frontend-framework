@@ -1,5 +1,5 @@
-p {
-    span [for: post in posts] {
-        text: "Hello world!"
+div {
+    h1 [for: post in posts] {
+        text: post.title
     }
 }

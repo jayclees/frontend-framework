@@ -5,7 +5,7 @@ use super::tokenizer::token::{Token, TokenType};
 use super::tree_builder::block::AttrBuilder;
 use crate::parser::tokenizer::directive::{Directive, DirectiveEnum, ForDirectiveBuildState};
 use block::{Block, BlockBuilder};
-use serde_json::Value;
+use serde_json::{Number, Value};
 
 pub struct TreeBuilder<'token> {
     blocks: Vec<Block<'token>>,
@@ -28,9 +28,7 @@ impl<'token> TreeBuilder<'token> {
         for token in tokens {
             match token.r#type() {
                 TokenType::BlockIdentifier(id) => {
-                    self
-                        .block_builders
-                        .push(BlockBuilder::new(id.to_owned()))
+                    self.block_builders.push(BlockBuilder::new(id.to_owned()))
                 }
                 TokenType::LineComment(_) => {}
                 TokenType::BlockComment(_) => {}
@@ -78,6 +76,8 @@ impl<'token> TreeBuilder<'token> {
                             .as_mut()
                             .expect("Should be set.")
                             .expr_processor
+                            .as_mut()
+                            .unwrap()
                             .add(expr_tok);
                     }
                 }
@@ -131,5 +131,27 @@ impl<'token> TreeBuilder<'token> {
         }
 
         std::mem::take(&mut self.blocks)
+    }
+}
+
+pub(super) fn value_as_string(value: Value) -> String {
+    match value {
+        Value::String(s) => s.to_owned(),
+        Value::Number(n) => n.to_string(),
+        Value::Null => "null".to_string(),
+        Value::Bool(bool) => bool.to_string(),
+        Value::Array(_) => unimplemented!(),
+        Value::Object(_) => unimplemented!(),
+    }
+}
+
+pub(super) fn value_as_bool(value: &Value) -> bool {
+    match value {
+        Value::Null => false,
+        Value::Bool(bool) => *bool,
+        Value::Number(n) => !n.eq(&Number::from_u128(0).unwrap()),
+        Value::String(_) => panic!("String evaluation as boolean not supported."),
+        Value::Array(_) => panic!("Array evaluation as boolean not supported."),
+        Value::Object(_) => panic!("Object evaluation as boolean not supported."),
     }
 }

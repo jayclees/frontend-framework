@@ -1,0 +1,21 @@
+{
+  "my_obj": {
+    "prop": false
+  },
+  "posts": [
+    {
+      "id": 1,
+      "title": "Hello world!",
+      "body": "This is the first post.",
+      "published": "01-01-1970",
+      "public": true
+    },
+    {
+      "id": 1,
+      "title": "Foo bar",
+      "body": "Baz.",
+      "published": "01-02-1970",
+      "public": false
+    }
+  ]
+}

@@ -1,8 +1,9 @@
 use crate::parser::tokenizer::token::ExprToken;
-use crate::parser::tree_builder::postfix_processor::PostfixProcessor;
+use crate::parser::tree_builder::postfix_processor::{PostfixProcessor, ValueType};
 use serde_json::{Number, Value};
 use std::assert_matches;
 use std::fmt::Debug;
+use crate::parser::tree_builder::value_as_bool;
 
 #[derive(Debug)]
 pub(crate) enum DirectiveEnum<'token> {
@@ -65,13 +66,9 @@ impl<'token> IfDirective<'token> {
 
     pub fn evaluate_is_true(&mut self, state: &Value) -> bool {
         // todo extract into is_truthy helper function?
-        match self.postfix_processor.convert().evaluate(state) {
-            Value::Null => false,
-            Value::Bool(bool) => bool,
-            Value::Number(n) => !n.eq(&Number::from_u128(0).unwrap()),
-            Value::String(_) => panic!("String evaluation as boolean not supported."),
-            Value::Array(_) => panic!("Array evaluation as boolean not supported."),
-            Value::Object(_) => panic!("Object evaluation as boolean not supported."),
+        match self.postfix_processor.convert().evaluate(vec![state]) {
+            ValueType::Reference(val) => value_as_bool(val),
+            ValueType::New(val) => value_as_bool(&val),
         }
     }
 }
@@ -143,7 +140,7 @@ pub struct ForDirective<'token> {
     state: ForDirectiveBuildState,
     item_var: Option<&'token ExprToken>,
     index_var: Option<&'token ExprToken>,
-    iter_expr: Vec<&'token ExprToken>,
+    expr_processor: PostfixProcessor<'token>,
 }
 
 impl<'token> ForDirective<'token> {
@@ -152,12 +149,34 @@ impl<'token> ForDirective<'token> {
             state: ForDirectiveBuildState::ReceiveItemVar,
             item_var: None,
             index_var: None,
-            iter_expr: vec![],
+            expr_processor: PostfixProcessor::new(),
         }
     }
 
     pub fn set_state(&mut self, state: ForDirectiveBuildState) {
         self.state = state;
+    }
+
+    pub fn evaluate<'state>(&mut self, state: &'state Value) -> ValueType<'state> {
+        self.expr_processor.convert().evaluate(vec![state])
+    }
+
+    pub fn item_var(&self) -> &'token String {
+        match self.item_var {
+            Some(ExprToken::Var(str)) => str,
+            _ => panic!("Should not be reached.")
+        }
+    }
+
+    pub fn index_var(&self) -> Option<&'token String> {
+        match self.index_var {
+            Some(ExprToken::Var(str)) => Some(str),
+            None => None,
+            token => {
+                dbg!(token);
+                panic!("Should not be reached.")
+            }
+        }
     }
 }
 
@@ -176,7 +195,7 @@ impl<'token> Directive<'token> for ForDirective<'token> {
                 assert_matches!(token, ExprToken::Var(_));
                 self.item_var = Some(token);
             }
-            ForDirectiveBuildState::ReceiveIterExpr => self.iter_expr.push(token),
+            ForDirectiveBuildState::ReceiveIterExpr => self.expr_processor.add(token),
         }
     }
 }
